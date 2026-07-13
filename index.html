@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050214">
+<title>Rift Pirates — Level 1: Rift Approach</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23050214'/%3E%3Crect x='7' y='2' width='2' height='12' fill='%23ff2fd0'/%3E%3Crect x='2' y='7' width='12' height='2' fill='%2322d3ee'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+
+<!-- ======================= HUD ======================= -->
+<div id="hud" class="hidden">
+
+  <!-- top-left: health + level badge + boost -->
+  <div id="playerPanel">
+    <div id="levelRing"><div id="levelBadge">1</div></div>
+    <div id="bars">
+      <div class="barRow">
+        <div class="bar" id="hpBar"><div id="hpFill"></div><span id="hpText">160/160</span></div>
+      </div>
+      <div class="barRow" id="shieldRow">
+        <div class="bar thin" id="shieldBar"><div id="shieldFill"></div></div>
+      </div>
+      <div class="barRow">
+        <div class="bar thin" id="boostBar"><div id="boostFill"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- top-centre: objective -->
+  <div id="objBar" class="hidden">
+    <div id="objHead">
+      <span id="objLabel">OBJECTIVE</span>
+      <span id="objSub"></span>
+    </div>
+    <div id="objTrack"><div id="objFill"></div></div>
+    <div id="objPips"></div>
+    <div id="bossPhase" class="hidden"></div>
+  </div>
+
+  <!-- top-right: score / scrap / pause -->
+  <div id="rightPanel">
+    <div id="scoreBox">
+      <span class="lbl">SCORE</span>
+      <b id="scoreVal">0</b>
+    </div>
+    <div id="scrapBox">
+      <span class="cube"></span>
+      <b id="scrapVal">0</b>
+    </div>
+    <button id="pauseBtn" aria-label="Pause">II</button>
+  </div>
+
+  <!-- bottom-left: rift heat -->
+  <div id="heatPanel">
+    <div id="heatTop">
+      <span id="heatTier">COOL</span>
+      <b id="multVal">x1.0</b>
+    </div>
+    <div class="bar" id="heatBar"><div id="heatFill"></div></div>
+    <div id="comboVal"></div>
+  </div>
+
+  <!-- objective name / next target -->
+  <div id="objectiveName"></div>
+
+  <!-- encounter timer (overload window / core exposed) -->
+  <div id="encTimer" class="hidden">
+    <span id="encTimerLabel">OVERLOAD WINDOW</span>
+    <div class="bar thin"><div id="encTimerFill"></div></div>
+  </div>
+</div>
+
+<!-- ======================= controls ======================= -->
+<div id="stick"><div id="nub"></div></div>
+<div id="boostBtn" class="hidden"><span>&#187;&#187;</span></div>
+
+<!-- ======================= overlays ======================= -->
+<div id="dmgLayer"></div>
+<div id="banner"></div>
+<div id="toasts"></div>
+<div id="vignette"></div>
+<div id="heatGlow"></div>
+<div id="deathFx"></div>
+<div id="nexusFade"></div>
+<div id="skipHint" class="hidden">PRESS SPACE TO SKIP</div>
+
+<div id="titleCard" class="hidden">
+  <span id="tcNum">OBJECTIVE 1</span>
+  <h2 id="tcName">OUTER DEFENSE TOWER</h2>
+  <span id="tcSub">Border Skirmish</span>
+</div>
+
+<!-- ======================= title ======================= -->
+<div id="titleScreen" class="screen">
+  <div class="logoWrap">
+    <div class="eyebrow">LEVEL 1</div>
+    <h1 class="logo"><span class="l1">RIFT</span><span class="l2">PIRATES</span></h1>
+    <div class="tagline">PLUNDER. UPGRADE. BREAK THE NEXUS.</div>
+  </div>
+  <p class="blurb">
+    Sail the fracturing void. Breach the pirate-tech defenses.<br>
+    Disable the Inhibitor. Destroy the Nexus.
+  </p>
+  <div class="chainRow">
+    <span>OUTER TOWER</span><i>&rarr;</i>
+    <span>PRESSURE TOWER</span><i>&rarr;</i>
+    <span>INNER CITADEL</span><i>&rarr;</i>
+    <span>INHIBITOR</span><i>&rarr;</i>
+    <span class="boss">THE RIFT ADMIRAL</span>
+  </div>
+  <div id="titleStats" class="stat"></div>
+  <button class="btnBig" id="launchBtn">LAUNCH RUN</button>
+  <div class="row">
+    <button class="btnGhost on" id="musicTgl">MUSIC: ON</button>
+    <button class="btnGhost on" id="sfxTgl">SFX: ON</button>
+  </div>
+  <div class="controlsHint">
+    DRAG / <b>WASD</b> TO STEER &nbsp;&middot;&nbsp; AUTOFIRE &nbsp;&middot;&nbsp;
+    <b>SHIFT</b> OR <b>&#187;&#187;</b> TO BOOST &nbsp;&middot;&nbsp; <b>P</b> TO PAUSE
+  </div>
+  <div class="foot">A Three.js vertical slice &middot; HUGHESSENTIAL</div>
+</div>
+
+<!-- ======================= pause ======================= -->
+<div id="pauseScreen" class="screen hidden">
+  <div class="eyebrow">HOLDING POSITION</div>
+  <h2 class="pausedTitle">PAUSED</h2>
+  <button class="btnBig" id="resumeBtn">RESUME</button>
+  <div class="row">
+    <button class="btnGhost on" id="musicTgl2">MUSIC: ON</button>
+    <button class="btnGhost on" id="sfxTgl2">SFX: ON</button>
+    <button class="btnGhost danger" id="quitBtn">ABANDON RUN</button>
+  </div>
+</div>
+
+<!-- ======================= upgrade cache ======================= -->
+<div id="upgradeScreen" class="screen hidden">
+  <div class="eyebrow" id="upgradeTitle">UPGRADE CACHE</div>
+  <div class="upSub" id="upgradeSub">CHOOSE ONE</div>
+  <div id="upgradeCards"></div>
+  <div class="upHint">CLICK A CARD &middot; OR PRESS <b>1</b> <b>2</b> <b>3</b></div>
+</div>
+
+<!-- ======================= results ======================= -->
+<div id="resultsScreen" class="screen hidden">
+  <div class="eyebrow" id="resultsEyebrow">RUN TERMINATED</div>
+  <h2 id="resultsTitle">STAR HOPPER DESTROYED</h2>
+  <div id="deathLine" class="hidden"></div>
+
+  <div id="scoreRow">
+    <div id="gradeVal" class="grade gD">D</div>
+    <div id="scoreCol">
+      <b id="scoreBig">0</b>
+      <span>FINAL SCORE</span>
+      <small>BEST <b id="bestScoreVal">0</b></small>
+      <div id="newBest" class="hidden">NEW BEST</div>
+    </div>
+  </div>
+
+  <div id="resultsGrid"></div>
+
+  <div class="buildLbl">RUN BUILD</div>
+  <div id="resultsBuild"></div>
+
+  <div class="row">
+    <button class="btnBig" id="againBtn">RUN AGAIN</button>
+    <button class="btnGhost" id="toTitleBtn">TITLE</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

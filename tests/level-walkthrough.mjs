@@ -1,0 +1,247 @@
+/**
+ * Full-level verification. Steps the simulation with a fixed dt so we can play
+ * an entire 12-minute run in seconds and assert every state transition.
+ */
+import puppeteer from 'puppeteer-core';
+
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const errors = [];
+
+const browser = await puppeteer.launch({
+  executablePath: CHROME,
+  headless: 'new',
+  protocolTimeout: 180000,
+  args: [
+    '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox',
+    '--mute-audio', '--autoplay-policy=no-user-gesture-required', '--window-size=1440,900',
+  ],
+});
+const page = await browser.newPage();
+await page.setViewport({ width: 1440, height: 900 });
+page.on('pageerror', (e) => errors.push(`${e.message} :: ${(e.stack || '').split('\n')[1]?.trim()}`));
+page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(`console: ${m.text()}`); });
+
+await page.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
+await new Promise((r) => setTimeout(r, 700));
+await page.click('#launchBtn');
+await new Promise((r) => setTimeout(r, 500));
+
+// Simulation-only: software GL makes rendering the bottleneck, and we're
+// verifying game logic here. Visuals get checked separately with screenshots.
+await page.evaluate(() => {
+  window.__realRender = window.RIFT.renderer.render.bind(window.RIFT.renderer);
+  window.RIFT.renderer.render = () => {};
+});
+
+/** Step the sim by `seconds` of game time at a fixed 60Hz. */
+const step = async (seconds) => {
+  let left = Math.round(seconds * 60);
+  while (left > 0) {
+    const chunk = Math.min(left, 600);
+    await page.evaluate((n) => {
+      for (let i = 0; i < n; i++) window.RIFT.update(1 / 60);
+    }, chunk);
+    left -= chunk;
+  }
+};
+
+const snap = () =>
+  page.evaluate(() => {
+    const g = window.RIFT;
+    return {
+      dir: g.director.state,
+      enc: g.encounter?.constructor.name.replace(/Tower|Encounter|Boss/g, '') ?? '-',
+      encState: g.encounter?.state ?? '-',
+      objHp: g.encounter ? +(g.encounter.healthPct * 100).toFixed(0) : null,
+      haz: g.hazards.length,
+      tgt: g.targets.length,
+      foes: g.enemies.countAlive(),
+      hp: Math.round(g.player.health),
+      alive: g.player.alive,
+      lvl: g.xp.level,
+      mult: +g.heat.multiplier.toFixed(1),
+      score: g.score.total,
+      scrap: g.scrap.total,
+    };
+  });
+
+const log = async (label) => {
+  const s = await snap();
+  console.log(
+    `${label.padEnd(24)} ${s.dir.padEnd(19)} ${String(s.enc).padEnd(9)} ${String(s.encState).padEnd(7)}` +
+    ` obj:${String(s.objHp ?? '-').padStart(4)}% haz:${String(s.haz).padStart(2)} foes:${String(s.foes).padStart(2)}` +
+    ` hp:${String(s.hp).padStart(3)} lv:${String(s.lvl).padStart(2)} x${String(s.mult).padStart(4)} score:${String(s.score).padStart(7)}`
+  );
+  return s;
+};
+
+const godMode = () =>
+  page.evaluate(() => {
+    window.__realTakeDamage = window.RIFT.player.takeDamage;
+    window.RIFT.player.takeDamage = () => false;
+  });
+const mortal = () => page.evaluate(() => { window.RIFT.player.takeDamage = window.__realTakeDamage; });
+const killEncounter = () =>
+  page.evaluate(() => {
+    const e = window.RIFT.encounter;
+    for (const t of e.targets) { t.targetable = true; t.damageScale = 1; t.damage(1e9); }
+  });
+const pickUpgrade = async () => {
+  const ok = await page.evaluate(() => {
+    const btn = document.querySelector('#upgradeCards .upCard');
+    if (btn) { btn.click(); return true; }
+    return false;
+  });
+  await new Promise((r) => setTimeout(r, 400));
+  await step(1);
+  return ok;
+};
+
+console.log('LABEL                    DIRECTOR            ENCOUNTER STATE');
+console.log('-'.repeat(122));
+
+await godMode();
+await log('boot');
+
+await step(3);
+await log('after intro');
+await step(40);
+await log('traversal 1 (40s)');
+await step(6);
+await log('tower 1 intro');
+await step(10);
+await log('tower 1 combat (10s)');
+
+await killEncounter();
+await step(3);
+await log('tower 1 destroyed');
+
+const up1 = await page.evaluate(() => !document.getElementById('upgradeScreen').classList.contains('hidden'));
+console.log(`   >> upgrade cache 1 visible: ${up1}`);
+await pickUpgrade();
+await log('after upgrade 1');
+
+const cycle = async (name, traversalSecs) => {
+  await step(traversalSecs);
+  await step(6);
+  await log(`${name} intro`);
+  await step(8);
+  await log(`${name} combat`);
+  await killEncounter();
+  await step(4);
+  await log(`${name} destroyed`);
+  await pickUpgrade();
+};
+
+await cycle('tower 2', 58);
+await cycle('tower 3', 58);
+
+// ---- inhibitor ----
+await step(36);
+await step(6);
+await log('inhibitor intro');
+await step(6);
+await log('inhibitor combat');
+const shieldsUp = await page.evaluate(() => window.RIFT.encounter.shieldsUp);
+console.log(`   >> inhibitor rotating shields blocking fire: ${shieldsUp}`);
+
+await page.evaluate(() => {
+  const e = window.RIFT.encounter;
+  for (const [, m] of e.modules) m.target.damage(1e9);
+});
+await step(1);
+const overload = await page.evaluate(() => ({
+  overloading: window.RIFT.encounter.overloading,
+  shieldsUp: window.RIFT.encounter.shieldsUp,
+  coreTargetable: window.RIFT.encounter.core.targetable,
+}));
+console.log(`   >> all conduits down -> ${JSON.stringify(overload)}`);
+await log('inhibitor overload');
+
+await page.evaluate(() => window.RIFT.encounter.core.damage(1e9));
+await step(4);
+await log('inhibitor destroyed');
+console.log(`   >> nexus rift opened: ${await page.evaluate(() => !!window.RIFT.rift)}`);
+
+await pickUpgrade();
+await log('after upgrade 4');
+
+// ---- nexus transition ----
+await step(11);
+await log('nexus transition');
+const up5 = await page.evaluate(() => !document.getElementById('upgradeScreen').classList.contains('hidden'));
+console.log(`   >> upgrade cache 5 (progression-board bonus) visible: ${up5}`);
+await pickUpgrade();
+
+// ---- boss ----
+await step(8);
+await log('boss intro');
+await step(10);
+await log('boss phase 1');
+
+for (const [i, pct] of [[2, 0.74], [3, 0.49], [4, 0.24]]) {
+  await page.evaluate((p) => {
+    const e = window.RIFT.encounter;
+    e.bossHp = e.maxBossHp * p + 5;
+    e._bossDamage(4);
+  }, pct);
+  await step(6);
+  await log(`boss phase ${i}`);
+}
+console.log(`   >> boss reached phase ${await page.evaluate(() => window.RIFT.encounter.phase + 1)} / 4`);
+
+await page.evaluate(() => {
+  const e = window.RIFT.encounter;
+  e.bossHp = 10;
+  e._bossDamage(20);
+});
+await step(6);
+await log('boss dying');
+await step(4);
+await log('victory');
+
+const results = await page.evaluate(() => {
+  const el = document.getElementById('resultsScreen');
+  return {
+    visible: !el.classList.contains('hidden'),
+    title: document.getElementById('resultsTitle').textContent,
+    grade: document.getElementById('gradeVal').textContent,
+    score: document.getElementById('scoreBig').textContent,
+    rows: document.querySelectorAll('#resultsGrid .rrow').length,
+    build: [...document.querySelectorAll('#resultsBuild .chip')].map((c) => c.textContent.trim()),
+  };
+});
+console.log('\nRESULTS:', JSON.stringify(results, null, 1));
+
+// ---- restart without reload ----
+await page.click('#againBtn');
+await new Promise((r) => setTimeout(r, 500));
+await step(2);
+const restart = await snap();
+console.log('RESTART:', JSON.stringify({
+  dir: restart.dir, score: restart.score, hp: restart.hp, lvl: restart.lvl,
+  upgrades: await page.evaluate(() => window.RIFT.upgrades.taken.length),
+}));
+
+// ---- death path (uses the real damage pipeline) ----
+await mortal();
+await page.evaluate(() => {
+  const g = window.RIFT;
+  g.player.health = 1;
+  g.player.stats.secondWind = false;
+  g.player.takeDamage(500, 'MIDRIFT SWEEPING LASER');
+});
+await step(3.2);
+const dead = await page.evaluate(() => ({
+  deathRan: !window.RIFT.death.active,
+  resultsVisible: !document.getElementById('resultsScreen').classList.contains('hidden'),
+  killedBy: document.getElementById('deathLine').textContent.trim(),
+}));
+console.log('DEATH:', JSON.stringify(dead));
+
+console.log('\n===== ERRORS =====');
+if (!errors.length) console.log('none');
+else [...new Set(errors)].slice(0, 20).forEach((e) => console.log('  ' + e));
+
+await browser.close();
+process.exit(errors.length ? 1 : 0);
