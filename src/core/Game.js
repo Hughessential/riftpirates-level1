@@ -319,6 +319,8 @@ export class Game {
 
   update(rawDt) {
     Audio2.update(rawDt);
+    // gamepad is polled every frame — even while paused, so Start can resume
+    Input.pollGamepad();
 
     if (!this.running) {
       // attract mode: the world still drifts behind the menus

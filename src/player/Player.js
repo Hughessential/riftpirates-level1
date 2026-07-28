@@ -4,16 +4,18 @@ import { buildVoxels, glowSprite } from '../render/VoxelBuilder.js';
 import { hopperVoxels } from '../render/Models.js';
 import { Input } from '../core/Input.js';
 import { Audio2 } from '../core/AudioManager.js';
-import { clamp, lerp, rand, damp } from '../core/Utils.js';
+import { clamp, lerp, rand, damp, TAU } from '../core/Utils.js';
 
 /** Base stats. Upgrades mutate a *copy* of this — nothing persists across runs. */
 export const BASE_STATS = () => ({
   maxHealth: 160, // generous by design (Player notes): threat comes from patterns, not fragility
+  healthRegen: 6, // hull points/sec, passive — rewards disengaging after a hit
+  regenDelay: 3.5, // seconds without damage before hull regen begins
   damage: 12,
   fireRate: 4.5,
   projectileSpeed: 95,
-  moveSpeed: 17,
-  boostSpeed: 27,
+  moveSpeed: 19, // snappier baseline (see update(): response is what really sells it)
+  boostSpeed: 31,
   boostCapacity: 100,
   boostDrain: 42,
   boostRegen: 22,
@@ -22,8 +24,9 @@ export const BASE_STATS = () => ({
   damageReduction: 0,
   criticalChance: 0,
   criticalMultiplier: 2.5,
-  shieldMax: 0,
-  shieldRegen: 0,
+  shieldMax: 55, // passive shield — a limited energy bar the hull hides behind
+  shieldRegen: 15, // energy/sec, recharges once you stop taking hits
+  shieldDelay: 2.6, // seconds without damage before the shield rebuilds
   weakPointDamage: 1,
   // boolean upgrade flags
   broadsides: false,
@@ -39,6 +42,12 @@ export const BASE_STATS = () => ({
 export const ARENA = { minX: -22, maxX: 22, minY: -9, maxY: 13 };
 const DODGE_WINDOW = 0.22; // spec §6: 0.15–0.25s
 const IFRAME = 0.8;
+
+// Barrel roll — part of the dodge kit alongside boost/perfect-dodge.
+const ROLL_TIME = 0.42; // spin + i-frame duration
+const ROLL_CD = 0.7; // cooldown between rolls
+const ROLL_COST = 24; // boost energy spent per roll
+const ROLL_DASH = 30; // lateral dash speed at the start of the roll
 
 export class Player {
   constructor(scene, fx) {
@@ -87,13 +96,16 @@ export class Player {
     this.vx = 0;
     this.vy = 0;
     this.health = stats.maxHealth;
-    this.shield = 0;
+    this.shield = stats.shieldMax; // passive shield starts charged
     this.boost = stats.boostCapacity;
     this.boosting = false;
     this.dodgeT = 0; // >0 while inside the perfect-dodge window
     this.dodgeUsed = false; // one dodge award per boost tap
     this.dodgePending = false; // a threat passed us inside the window
     this.dodgeSpoiled = false; // ...but we got hit, so it doesn't count
+    this.rollT = 0; // >0 while a barrel roll is in progress
+    this.rollCd = 0; // roll cooldown remaining
+    this.rollDir = 0; // -1 left, +1 right
     this.invuln = 0;
     this.noDamageT = 0;
     this.buffT = 0; // dodge-drive speed/fire buff
@@ -155,11 +167,39 @@ export class Player {
     }
     if (this.dodgeT > 0) this.dodgeT -= dt;
 
+    // ---- barrel roll ----
+    if (this.rollCd > 0) this.rollCd -= dt;
+    const rollReq = Input.consumeRoll() * (this.frozen ? 0 : 1);
+    if (rollReq && this.rollT <= 0 && this.rollCd <= 0 && this.boost >= ROLL_COST) {
+      this.rollT = ROLL_TIME;
+      this.rollDir = rollReq;
+      this.rollCd = ROLL_CD;
+      this.boost = Math.max(0, this.boost - ROLL_COST);
+      // i-frames for the whole roll, and it opens the dodge window like a boost
+      this.invuln = Math.max(this.invuln, ROLL_TIME);
+      this.dodgeT = Math.max(this.dodgeT, ROLL_TIME);
+      this.dodgeUsed = false;
+      this.dodgePending = false;
+      this.dodgeSpoiled = false;
+      Audio2.play('boost', 0.55, 1.9, 0.05);
+      this.fx.jet(this.x, this.y, 2.5, { x: this.rollDir, y: 0, z: 0 }, 4, [P.cyan, P.white]);
+    }
+    if (this.rollT > 0) this.rollT -= dt;
+
     // ---- motion ----
+    // A high response rate is what makes the Star Hopper feel like a direct
+    // extension of the stick — velocity chases the input almost immediately,
+    // so direction changes read as instant without losing all inertia.
     const speed = this.boosting ? this.stats.boostSpeed : this.moveSpeed;
-    const accel = 90;
-    this.vx = damp(this.vx, inp.x * speed, accel / 14, dt);
-    this.vy = damp(this.vy, inp.y * speed * 0.78, accel / 14, dt);
+    const response = 13;
+    this.vx = damp(this.vx, inp.x * speed, response, dt);
+    this.vy = damp(this.vy, inp.y * speed * 0.9, response, dt);
+
+    // barrel roll adds a decaying lateral dash on top of steering
+    if (this.rollT > 0) {
+      const k = this.rollT / ROLL_TIME; // 1 -> 0 across the roll (ease-out dash)
+      this.x = clamp(this.x + this.rollDir * ROLL_DASH * k * dt, ARENA.minX, ARENA.maxX);
+    }
 
     // gravity wells nudge position directly — they never take away control
     const pull = { x: 0, y: 0 };
@@ -184,7 +224,13 @@ export class Player {
     }
 
     this.group.position.set(this.x, this.y, 0);
-    this.group.rotation.z = lerp(this.group.rotation.z, -this.vx * 0.045, 0.2);
+    if (this.rollT > 0) {
+      // a full 360° roll around the travel axis over the roll's lifetime
+      const k = 1 - this.rollT / ROLL_TIME; // 0 -> 1
+      this.group.rotation.z = -this.rollDir * TAU * k;
+    } else {
+      this.group.rotation.z = lerp(this.group.rotation.z, -this.vx * 0.045, 0.2);
+    }
     this.group.rotation.x = lerp(this.group.rotation.x, this.vy * 0.02, 0.2);
 
     // ---- timers ----
@@ -192,22 +238,30 @@ export class Player {
     this.noDamageT += dt;
     if (this.invuln > 0) {
       this.invuln -= dt;
-      // blink, but never hide the ship completely — you must always see yourself
+      // blink, but never hide the ship completely — you must always see yourself.
+      // During a barrel roll we keep the hull solid so the spin stays readable.
       const blink = Math.floor(ctx.time * 16) % 2 === 0;
-      this.hull.visible = blink;
+      this.hull.visible = this.rollT > 0 || blink;
     } else {
       this.hull.visible = true;
     }
     if (this.buffT > 0) this.buffT -= dt;
     if (this.critBuffT > 0) this.critBuffT -= dt;
 
+    // ---- passive hull regen ----
+    // Disengaging after a hit slowly repairs the Star Hopper. Threat still comes
+    // from patterns (Player notes) — this only rewards buying yourself space.
+    if (this.stats.healthRegen > 0 && this.health < this.stats.maxHealth && this.timeSinceHit > this.stats.regenDelay) {
+      this.health = Math.min(this.stats.maxHealth, this.health + this.stats.healthRegen * dt);
+    }
+
     // ---- shield regen ----
     if (this.stats.shieldMax > 0) {
-      if (this.timeSinceHit > 4) {
+      if (this.timeSinceHit > this.stats.shieldDelay) {
         this.shield = Math.min(this.stats.shieldMax, this.shield + this.stats.shieldRegen * dt);
       }
       const s = this.shield / this.stats.shieldMax;
-      this.shieldMesh.material.opacity = s * 0.35;
+      this.shieldMesh.material.opacity = s * 0.32;
       this.shieldMesh.rotation.y += dt * 0.9;
       this.shieldMesh.rotation.x += dt * 0.4;
     }

@@ -44,10 +44,11 @@ export const UPGRADES = {
   shieldRecharge: {
     name: 'SHIELD RECHARGE',
     icon: '🔷',
-    desc: 'Gain a 45-point shield that rebuilds when you avoid damage.',
+    desc: '+45 shield capacity, and it rebuilds far faster between hits.',
     apply: (s) => {
       s.shieldMax += 45;
-      s.shieldRegen += 11;
+      s.shieldRegen += 12;
+      s.shieldDelay = Math.max(1.4, s.shieldDelay - 1);
     },
     onPick: (p) => {
       p.shield = p.stats.shieldMax;

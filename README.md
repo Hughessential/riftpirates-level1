@@ -25,15 +25,24 @@ an importmap.
 
 ### Controls
 
-| Action | Keyboard | Touch |
-|---|---|---|
-| Steer | `WASD` / arrows | drag anywhere |
-| Boost + Perfect Dodge | `Shift` | the `»` pad, bottom-right |
-| Pause | `P` / `Esc` | pause button |
-| Pick an upgrade | `1` `2` `3` | tap a card |
-| Skip a cutscene | `Space` | tap |
+| Action | Keyboard | Gamepad | Touch |
+|---|---|---|---|
+| Steer | `WASD` / arrows | left stick / d-pad | drag anywhere |
+| Boost + Perfect Dodge | `Shift` | `A` / `RT` / `RB` | the `»` pad, bottom-right |
+| Barrel Roll | `Q` / `E` | `LB` / `X` | — |
+| Pause | `P` / `Esc` | `Start` | pause button |
+| Pick an upgrade | `1` `2` `3` | — | tap a card |
+| Skip a cutscene | `Space` | — | tap |
 
-Weapons autofire — your job is movement, positioning, and dodge timing.
+Weapons autofire — your job is movement, positioning, and dodge timing. Any
+standard-mapped controller is picked up automatically once you nudge a stick or
+press a button.
+
+The Star Hopper repairs its hull slowly a few seconds after taking a hit, and a
+passive shield sits in front of the hull — a limited energy bar that soaks the
+next hits and rebuilds once you stop getting hit. A **barrel roll** is a quick
+i-framed dash on a short cooldown; roll *through* incoming fire and it still
+counts as a Perfect Dodge.
 
 ---
 
