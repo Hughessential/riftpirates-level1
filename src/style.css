@@ -160,9 +160,10 @@ b{font-weight:900}
   transition:opacity .25s, transform .25s}
 #banner.show{opacity:1;transform:translateX(-50%) scale(1)}
 
-/* Below the encounter title card (centred on 38%) so the two never collide. */
+/* Below the encounter title card (centred on 38%) so the two never collide.
+   Above .screen (20) so "controller connected" is visible on the title menu. */
 #toasts{position:fixed;top:47%;left:50%;transform:translateX(-50%);display:flex;
-  flex-direction:column;gap:5px;align-items:center;z-index:14;pointer-events:none}
+  flex-direction:column;gap:5px;align-items:center;z-index:30;pointer-events:none}
 .toast{display:flex;flex-direction:column;align-items:center;line-height:1.15;
   animation:toastUp 1.7s ease forwards}
 .toast b{font-weight:900;letter-spacing:.14em;font-size:16px}

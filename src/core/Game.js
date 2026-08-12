@@ -325,6 +325,20 @@ export class Game {
     // gamepad is polled every frame — even while paused, so Start can resume
     Input.pollGamepad();
 
+    // connect/disconnect notice — #toasts sits outside the HUD, so this is
+    // visible even on the title screen (iOS only reveals a pad after the
+    // first button press, so this doubles as "Safari can see your MCON")
+    const padEv = Input.consumePadEvent();
+    if (padEv) {
+      const name = (padEv.id.split('(')[0].trim() || 'GAMEPAD').toUpperCase().slice(0, 30);
+      this.hud.toast(
+        padEv.connected ? 'CONTROLLER CONNECTED' : 'CONTROLLER DISCONNECTED',
+        padEv.connected ? name : '',
+        padEv.connected ? P.cyan : P.red
+      );
+      if (padEv.connected) Audio2.play('ui_select', 0.5, 1.2);
+    }
+
     if (!this.running) {
       // attract mode: the world still drifts behind the menus
       this.env.update(rawDt * 0.3);

@@ -46,6 +46,10 @@ class InputImpl {
 
     // one-frame d-pad/A edges for menu navigation, overwritten every poll
     this.menuNav = { left: false, right: false, up: false, down: false, confirm: false };
+
+    // gamepad presence — drained by Game for the connect/disconnect toast
+    this._padId = null;
+    this._padEvent = null; // one-shot { connected: boolean, id: string }
   }
 
   init(canvas, { onPause } = {}) {
@@ -217,6 +221,10 @@ class InputImpl {
       }
     }
     if (!pad) {
+      if (this._padId) {
+        this._padEvent = { connected: false, id: this._padId };
+        this._padId = null;
+      }
       this._padX = 0;
       this._padY = 0;
       this._camX = 0;
@@ -228,6 +236,10 @@ class InputImpl {
       const m = this.menuNav;
       m.left = m.right = m.up = m.down = m.confirm = false;
       return;
+    }
+    if (pad.id !== this._padId) {
+      this._padEvent = { connected: true, id: pad.id };
+      this._padId = pad.id;
     }
 
     // deadzone with the remaining range rescaled to 0..1, so motion ramps
@@ -283,6 +295,13 @@ class InputImpl {
     const r = this._rollQueue;
     this._rollQueue = 0;
     return r;
+  }
+
+  /** Drain the one-shot gamepad connect/disconnect notice. */
+  consumePadEvent() {
+    const e = this._padEvent;
+    this._padEvent = null;
+    return e;
   }
 
   key(code) {
