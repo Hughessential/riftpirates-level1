@@ -1,9 +1,11 @@
 import { $ } from '../core/Utils.js';
 import { Audio2 } from '../core/AudioManager.js';
+import { Input } from '../core/Input.js';
 
 /**
  * The three-card upgrade cache (spec §11, §42). Combat is paused underneath.
- * Mouse click, touch, or keys 1/2/3 — the whole choice should take seconds.
+ * Mouse click, touch, keys 1/2/3, or gamepad (d-pad to highlight, A to take) —
+ * the whole choice should take seconds.
  */
 export class UpgradeScreen {
   constructor(game) {
@@ -13,6 +15,7 @@ export class UpgradeScreen {
     this.title = $('upgradeTitle');
     this.sub = $('upgradeSub');
     this.open = false;
+    this.sel = 0; // gamepad-highlighted card
     this._onKey = this._onKey.bind(this);
   }
 
@@ -39,7 +42,12 @@ export class UpgradeScreen {
         <span class="upTake">TAKE</span>
       `;
       card.addEventListener('click', () => this._pick(up.id));
-      card.addEventListener('mouseenter', () => Audio2.play('ui_move', 0.25, 1.1));
+      card.addEventListener('mouseenter', () => {
+        Audio2.play('ui_move', 0.25, 1.1);
+        // keep the pad cursor in sync so a follow-up A press takes this card
+        this.sel = i;
+        this._paintSel();
+      });
       this.cards.appendChild(card);
     });
 
@@ -50,6 +58,27 @@ export class UpgradeScreen {
     Audio2.play('ui_select', 0.5, 0.9);
 
     this._offers = offers;
+    this.sel = 0;
+    this._paintSel();
+  }
+
+  /** Gamepad navigation — called once per frame by Game.update. */
+  update() {
+    if (!this.open || !this._offers?.length) return;
+    const nav = Input.menuNav;
+    const n = this._offers.length;
+
+    const dir = (nav.right || nav.down ? 1 : 0) - (nav.left || nav.up ? 1 : 0);
+    if (dir) {
+      this.sel = (this.sel + dir + n) % n;
+      this._paintSel();
+      Audio2.play('ui_move', 0.3, 1.1);
+    }
+    if (nav.confirm) this._pick(this._offers[this.sel].id);
+  }
+
+  _paintSel() {
+    [...this.cards.children].forEach((c, i) => c.classList.toggle('sel', i === this.sel));
   }
 
   _onKey(e) {

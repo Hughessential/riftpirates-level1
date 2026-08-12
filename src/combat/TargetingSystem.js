@@ -1,13 +1,17 @@
 import { PRIORITY } from './Target.js';
 
 /**
- * Autofire target selection (spec §8). Deliberately simple: no predictive aim
- * for the player. Re-evaluated on a short interval rather than every frame so
- * the turret doesn't jitter between equidistant targets.
+ * Aim-assist target lock (spec §8), consulted only while the player holds the
+ * aim trigger. Locks exclusively inside a narrow cone dead ahead of the ship —
+ * never behind, never off to the side — so shots always go where the reticle
+ * points. Re-evaluated on a short interval rather than every frame so the
+ * lock doesn't jitter between equidistant targets.
  */
 
 const RANGE = 90;
 const THREAT_RANGE = 22; // an enemy this close outranks any structure
+const MIN_AHEAD = 2; // a target must be at least this far in front of the nose
+const CONE_TAN = 0.18; // half-angle ~10°: max lateral offset per unit of depth
 
 export class TargetingSystem {
   constructor() {
@@ -33,9 +37,12 @@ export class TargetingSystem {
       if (!tg.alive || !tg.targetable) continue;
       const dx = tg.pos.x - playerPos.x;
       const dy = tg.pos.y - playerPos.y;
-      const dz = tg.pos.z;
-      const d = Math.hypot(dx, dy, dz);
+      const ahead = -tg.pos.z; // the ship flies down -Z from z=0
+      if (ahead < MIN_AHEAD) continue; // behind or level with the ship
+      const d = Math.hypot(dx, dy, tg.pos.z);
       if (d > RANGE) continue;
+      // outside the aim cone around the ship's nose
+      if (Math.hypot(dx, dy) > ahead * CONE_TAN) continue;
 
       let prio = tg.priority;
       // "Immediate dangerous enemies" beat everything else

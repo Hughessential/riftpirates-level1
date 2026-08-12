@@ -134,6 +134,13 @@ b{font-weight:900}
 #boostBtn span{font-size:26px;font-weight:900;line-height:.8;letter-spacing:-2px;
   text-shadow:0 0 10px var(--cyan)}
 #boostBtn.on{background:rgba(34,211,238,.35);transform:scale(.95)}
+#fireBtn{position:fixed;right:calc(22px + env(safe-area-inset-right));
+  bottom:calc(120px + env(safe-area-inset-bottom));width:78px;height:78px;border-radius:50%;
+  border:3px solid var(--magenta);background:rgba(30,6,26,.6);color:var(--magenta);z-index:12;
+  display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 0 16px rgba(255,46,210,.6), inset 0 0 14px rgba(255,46,210,.25)}
+#fireBtn span{font-size:26px;font-weight:900;line-height:.8;text-shadow:0 0 10px var(--magenta)}
+#fireBtn.on{background:rgba(255,46,210,.35);transform:scale(.95)}
 
 /* ===================== overlays ===================== */
 #dmgLayer{position:fixed;inset:0;z-index:9;pointer-events:none;overflow:hidden}
@@ -260,6 +267,9 @@ b{font-weight:900}
 #upgradeScreen.in .upCard:nth-child(2){transition-delay:.07s}
 #upgradeScreen.in .upCard:nth-child(3){transition-delay:.14s}
 .upCard:hover{transform:translateY(-6px) scale(1.03);
+  box-shadow:0 0 34px color-mix(in srgb,var(--c) 70%,transparent)}
+/* gamepad cursor (d-pad selection) — hover look plus a white ring */
+.upCard.sel{transform:translateY(-6px) scale(1.03);outline:2px solid #fff;outline-offset:3px;
   box-shadow:0 0 34px color-mix(in srgb,var(--c) 70%,transparent)}
 .upKey{position:absolute;top:8px;left:10px;width:20px;height:20px;border-radius:5px;
   display:grid;place-items:center;font-size:11px;font-weight:900;color:#0a0716;

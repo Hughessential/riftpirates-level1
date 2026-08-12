@@ -264,6 +264,7 @@ export class Game {
     this.resultsScreen.hide();
     this.upgradeScreen.hide();
     $('boostBtn').classList.remove('hidden');
+    $('fireBtn').classList.remove('hidden');
     $('nexusFade').style.opacity = '0';
 
     Input.enabled = true;
@@ -288,6 +289,7 @@ export class Game {
     Input.enabled = false;
     this.hud.hide();
     $('boostBtn').classList.add('hidden');
+    $('fireBtn').classList.add('hidden');
     this.resultsScreen.show({ victory, killedBy: this.killedBy });
   }
 
@@ -312,6 +314,7 @@ export class Game {
     Input.enabled = false;
     this.hud.hide();
     $('boostBtn').classList.add('hidden');
+    $('fireBtn').classList.add('hidden');
     this.showResults({ victory: false });
   }
 
@@ -334,6 +337,9 @@ export class Game {
       this.renderer.render(this.scene, this.camera);
       return;
     }
+
+    // d-pad / A card selection while an upgrade cache is open
+    this.upgradeScreen.update();
 
     // --- death sequence owns time while it runs ---
     if (this.death.active) {

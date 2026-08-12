@@ -4,8 +4,8 @@
   "description": "Rift Pirates — Level 1: Rift Approach (Three.js vertical slice)",
   "type": "module",
   "scripts": {
-    "start": "python3 -m http.server 8000",
-    "dev": "python3 -m http.server 8000",
+    "start": "python3 serve.py",
+    "dev": "python3 serve.py",
     "test": "node tests/level-walkthrough.mjs && node tests/combat-integrity.mjs && node tests/perfect-dodge.mjs",
     "test:level": "node tests/level-walkthrough.mjs",
     "test:combat": "node tests/combat-integrity.mjs",

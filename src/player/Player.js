@@ -71,6 +71,45 @@ export class Player {
     this.trail.position.set(0, -0.2, 4.5);
     this.group.add(this.trail);
 
+    // aim reticle — sits on the fire line ahead of the nose while the aim
+    // trigger is held. A bright glowing red ring + crosshair; gold on lock.
+    this.reticle = new THREE.Group();
+    const retMat = (opacity = 1) =>
+      new THREE.MeshBasicMaterial({
+        color: P.red,
+        transparent: true,
+        opacity,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false,
+      });
+    this.reticleRing = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.45, 32), retMat(1));
+    this.reticleRing.renderOrder = 41;
+    // four crosshair ticks reaching in from the ring toward the center
+    this.reticleTicks = [];
+    for (const [rx, ry, w, h] of [
+      [0, 0.85, 0.14, 0.75],
+      [0, -0.85, 0.14, 0.75],
+      [0.85, 0, 0.75, 0.14],
+      [-0.85, 0, 0.75, 0.14],
+    ]) {
+      const tick = new THREE.Mesh(new THREE.PlaneGeometry(w, h), retMat(1));
+      tick.position.set(rx, ry, 0);
+      tick.renderOrder = 41;
+      this.reticleTicks.push(tick);
+      this.reticle.add(tick);
+    }
+    // soft red halo behind the ring + hot center dot, so it reads as glowing
+    this.reticleGlow = glowSprite(P.red, 5.5, 0.55);
+    this.reticleGlow.renderOrder = 39;
+    this.reticleDot = glowSprite(P.red, 1.6, 1);
+    this.reticleDot.renderOrder = 42;
+    this.reticle.add(this.reticleRing, this.reticleGlow, this.reticleDot);
+    this.reticle.position.set(0, 0.05, -26);
+    this.reticle.visible = false;
+    this.group.add(this.reticle);
+    this.reticleLock = false;
+
     // shield bubble (only visible with the Shield Recharge upgrade)
     this.shieldMesh = new THREE.Mesh(
       new THREE.IcosahedronGeometry(2.4, 1),
@@ -120,6 +159,8 @@ export class Player {
     this.group.scale.set(1, 1, 1);
     this.shieldMesh.material.opacity = 0;
     this.frozen = false;
+    this.reticle.visible = false;
+    this.reticleLock = false;
   }
 
   applyStats(stats) {
@@ -190,7 +231,9 @@ export class Player {
     // A high response rate is what makes the Star Hopper feel like a direct
     // extension of the stick — velocity chases the input almost immediately,
     // so direction changes read as instant without losing all inertia.
-    const speed = this.boosting ? this.stats.boostSpeed : this.moveSpeed;
+    // Braking (Y / C) slows the ship for precision flying; boost wins.
+    const braking = !this.frozen && !this.boosting && Input.braking;
+    const speed = (this.boosting ? this.stats.boostSpeed : this.moveSpeed) * (braking ? 0.45 : 1);
     const response = 13;
     this.vx = damp(this.vx, inp.x * speed, response, dt);
     this.vy = damp(this.vy, inp.y * speed * 0.9, response, dt);
@@ -264,6 +307,19 @@ export class Player {
       this.shieldMesh.material.opacity = s * 0.32;
       this.shieldMesh.rotation.y += dt * 0.9;
       this.shieldMesh.rotation.x += dt * 0.4;
+    }
+
+    // ---- aim reticle ----
+    const aiming = !this.frozen && Input.aiming;
+    this.reticle.visible = aiming;
+    if (aiming) {
+      const col = this.reticleLock ? P.gold : P.red;
+      this.reticleRing.material.color.set(col);
+      this.reticleDot.material.color.set(col);
+      this.reticleGlow.material.color.set(col);
+      for (const t of this.reticleTicks) t.material.color.set(col);
+      const pulse = 1 + (this.reticleLock ? 0.12 : 0.05) * Math.sin(ctx.time * (this.reticleLock ? 10 : 6));
+      this.reticle.scale.setScalar(pulse);
     }
 
     // ---- visuals ----

@@ -1,9 +1,13 @@
 import { Audio2 } from '../core/AudioManager.js';
+import { Input } from '../core/Input.js';
 import { chance } from '../core/Utils.js';
 
 /**
- * Autofire (spec §4): the player never presses a fire button. The weapon shoots
- * whatever the targeting system selected, and only when something is in range.
+ * Fully manual fire: hold L2 (gamepad), Space (keyboard) or the fire pad
+ * (touch). Shots always travel where the nose points. Holding aim (R2 / F)
+ * raises the reticle and lets the targeting system lock anything inside the
+ * forward cone; locked shots converge on it. No lock, no redirection — bolts
+ * fly dead ahead, never backwards.
  */
 export class PlayerWeapon {
   constructor(player, projectiles, targeting) {
@@ -21,13 +25,21 @@ export class PlayerWeapon {
 
   update(dt, ctx) {
     const p = this.player;
-    if (!p.alive || p.frozen) return;
+    if (!p.alive || p.frozen) {
+      p.reticleLock = false;
+      return;
+    }
 
-    const target = this.targeting.update(dt, p.pos, ctx.targets);
-    if (!target) return;
+    // a target lock only exists while aiming, and only inside the forward cone
+    const aiming = Input.aiming;
+    const target = aiming ? this.targeting.update(dt, p.pos, ctx.targets) : null;
+    if (!aiming) this.targeting.reset();
+    p.reticleLock = !!target;
 
+    // the cooldown ticks whether or not the trigger is held, so a tap the
+    // moment it elapses always fires instantly
     this.cooldown -= dt;
-    if (this.cooldown > 0) return;
+    if (!Input.firing || this.cooldown > 0) return;
 
     const s = p.stats;
     let rate = p.fireRate;
@@ -40,12 +52,13 @@ export class PlayerWeapon {
     // Overcharge: extra damage once Rift Heat is high (spec §20)
     if (s.overcharge && ctx.heat.multiplier >= 8) dmg *= 1.5;
     // Nexus Breaker: bonus against modules and cores
-    if (target.kind !== 'enemy') dmg *= s.weakPointDamage;
+    if (target && target.kind !== 'enemy') dmg *= s.weakPointDamage;
 
     const crit = chance(s.criticalChance);
     if (crit) dmg *= s.criticalMultiplier;
 
-    const t = target.pos;
+    // locked shots converge on the target; otherwise straight down the nose
+    const t = target ? target.pos : { x: p.x, y: p.y + 0.05, z: -90 };
     this.muzzle *= -1;
 
     this.proj.firePlayer({

@@ -25,18 +25,34 @@ an importmap.
 
 ### Controls
 
+The gamepad layout follows the classic Star Fox-style space-shooter map:
+
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
-| Steer | `WASD` / arrows | left stick / d-pad | drag anywhere |
-| Boost + Perfect Dodge | `Shift` | `A` / `RT` / `RB` | the `»` pad, bottom-right |
-| Barrel Roll | `Q` / `E` | `LB` / `X` | — |
+| Steer | `WASD` / arrows | left stick | drag anywhere |
+| Camera (auto-recenters on release) | — | right stick | — |
+| Fire / primary weapon | `Space` | `A` | the `✦` pad, above boost |
+| Aim / lock-on | `F` | `LT` | hold the fire pad |
+| Boost + Perfect Dodge | `Shift` | `RT` | the `»` pad, bottom-right |
+| Brake / slow down | `C` | `Y` | — |
+| Barrel Roll left / right | `Q` / `E` | `LB` / `RB` | — |
 | Pause | `P` / `Esc` | `Start` | pause button |
-| Pick an upgrade | `1` `2` `3` | — | tap a card |
-| Skip a cutscene | `Space` | — | tap |
+| Pick an upgrade | `1` `2` `3` | d-pad + `A` | tap a card |
+| Skip a cutscene | `Space` / `Enter` | — | tap |
 
-Weapons autofire — your job is movement, positioning, and dodge timing. Any
-standard-mapped controller is picked up automatically once you nudge a stick or
-press a button.
+`B` (bomb / secondary) and `X` (charge shot) are reserved for future
+abilities.
+
+Firing is fully manual and shots only go where you're aimed: bolts fly
+straight down the nose, so you line up shots by flying. Holding **aim**
+raises the red reticle and lets the assist lock anything inside a narrow
+forward cone — locked shots converge on it, and the reticle turns gold.
+Nothing behind or beside you can be locked, so lasers never fire backwards.
+**Brake** drops the ship to ~45% speed for threading gates and steadying your
+aim; boost overrides it. Any standard-mapped controller (Ohsnap MCON, Xbox,
+PlayStation, most Bluetooth pads) is picked up automatically once you nudge a
+stick or press a button; the camera stick free-looks around the Star Hopper
+and always locks back to the front-facing camera the moment you release it.
 
 The Star Hopper repairs its hull slowly a few seconds after taking a hit, and a
 passive shield sits in front of the hull — a limited energy bar that soaks the

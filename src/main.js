@@ -30,13 +30,17 @@ function showTitle() {
   $('pauseScreen').classList.add('hidden');
   game.hud.hide();
   $('boostBtn').classList.add('hidden');
+  $('fireBtn').classList.add('hidden');
   paintTitle();
   Audio2.playMusic('title', 1.5);
 }
 
-async function launch() {
+function launch() {
   $('titleScreen').classList.add('hidden');
-  await Audio2.init();
+  // Audio must never block the run from starting: init() builds the context
+  // and graph synchronously (ready right away) and decodes SFX in the
+  // background — samples simply pop in as they finish loading.
+  Audio2.init();
   Audio2.resume();
   game.startRun();
 }
