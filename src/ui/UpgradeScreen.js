@@ -2,6 +2,7 @@ import { $ } from '../core/Utils.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { augmentDelta } from './AugmentFeedback.js';
 import { Input } from '../core/Input.js';
+import { createHolographicAugmentCard, activateHolographicAugmentCard } from './HolographicAugmentCard.js';
 
 /**
  * The three-card upgrade cache (spec §11, §42). Combat is paused underneath.
@@ -20,6 +21,10 @@ export class UpgradeScreen {
     this.sel = 0; // gamepad-highlighted card
     this._generation = 0;
     this._onKey = this._onKey.bind(this);
+    this.el.dataset.suspended = String(document.hidden);
+    document.addEventListener('visibilitychange', () => {
+      this.el.dataset.suspended = String(document.hidden);
+    });
   }
 
   /** source is a legacy cache number or an approach {sector, checkpoint}. */
@@ -39,20 +44,11 @@ export class UpgradeScreen {
 
     this.cards.innerHTML = '';
     offers.forEach((up, i) => {
-      const card = document.createElement('button');
-      card.className = 'upCard';
-      card.style.setProperty('--c', up.color || color);
-      card.innerHTML = `
-        <span class="upKey">${i + 1}</span>
-        <span class="upIcon">${up.icon}</span>
-        <span class="upCategory">${up.category || 'AUGMENT'} · STACKABLE</span>
-        <h3>${up.name}</h3>
-        <p>${up.desc}</p>
-        <p class="upStackEffect">${up.stack || ''}</p>
-        <p class="upActualDelta">${augmentDelta(up, this.game.upgrades.stats, up.rank)}</p>
-        <span class="upTake">${up.currentRank ? `STACK ${up.currentRank} → ${up.rank}` : 'INSTALL STACK 1'}</span>
-      `;
-      card.addEventListener('click', () => this._pick(up.id));
+      const card = createHolographicAugmentCard(up, {
+        index: i,
+        delta: augmentDelta(up, this.game.upgrades.stats, up.rank),
+        onSelect: () => this._pick(up.id),
+      });
       card.addEventListener('mouseenter', () => {
         Audio2.play('ui_move', 0.25, 1.1);
         // keep the pad cursor in sync so a follow-up A press takes this card
@@ -112,6 +108,9 @@ export class UpgradeScreen {
     if (!this.game.upgrades.pick(id)) return;
     this.open = false;
     this.closing = true;
+    const chosenCard = [...this.cards.children].find(card => card.dataset.augmentId === id);
+    if (chosenCard) activateHolographicAugmentCard(chosenCard);
+    this.el.classList.add('installing');
     removeEventListener('keydown', this._onKey);
 
     Audio2.play('upgrade', 0.9, 1);
@@ -121,7 +120,8 @@ export class UpgradeScreen {
     this.game.fx.explode(p.x, p.y, 0, { count: 22, colors: [selected.color, '#ffffff'],
       power: 9, gravity: 0, arcColor: selected.color, flashScale: .7, flashTime: .18 });
 
-    this.el.classList.remove('in');
+    // Keep the selected artifact visible for the existing scheduler-owned seal
+    // breach. Installation/choice timing and duplicate-pick guards are unchanged.
     const generation = this._generation;
     const done = this.onDone;
     this._dismiss = this.game.scheduler.after(0.26, () => {
@@ -147,6 +147,6 @@ export class UpgradeScreen {
     this.game.upgrades.cancelOffer();
     removeEventListener('keydown', this._onKey);
     this.el.classList.add('hidden');
-    this.el.classList.remove('in');
+    this.el.classList.remove('in', 'installing');
   }
 }

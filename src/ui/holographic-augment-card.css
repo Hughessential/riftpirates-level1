@@ -1,0 +1,68 @@
+/* Three artifacts, bounded decoration, no additional render loops or contexts. */
+#upgradeScreen{background:radial-gradient(ellipse at 50% 10%,#240a3de6,transparent 65%),#020308ed;gap:14px;padding:24px 30px;isolation:isolate}
+#upgradeScreen .eyebrow{color:#54f4de;letter-spacing:.32em;font-size:13px}
+#upgradeScreen .upSub{color:#b9a9d1;line-height:1.7;font-size:10px;letter-spacing:.16em}
+#upgradeCards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;max-width:1120px;width:100%;align-items:stretch;padding:6px}
+.holoCard.upCard{--holo-accent:#34f5d8;--holo-aura:#7d28e9;--holo-line:#216a68;position:relative;isolation:isolate;display:flex;flex-direction:column;width:100%;padding:0;border:1px solid #2b797c;border-radius:2px;text-align:left;color:#c5ff71;background:#030609;box-shadow:0 0 0 3px #04070e,0 0 0 4px #193943,0 10px 35px #000a,0 0 24px #6925bb22;overflow:visible;opacity:1;transform:none;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;min-width:0}
+.holoCard.upCard::before{content:'';position:absolute;inset:-7px;z-index:-1;background:linear-gradient(135deg,#25d8ca20,transparent 25%,transparent 70%,#ad29ff40);clip-path:polygon(0 18px,18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%);pointer-events:none}
+.holoCard .holoFrame{pointer-events:none;position:absolute;inset:4px;z-index:3;border:1px solid #7898ab17;clip-path:polygon(0 0,32% 0,32% 1px,68% 1px,68% 0,100% 0,100% 100%,68% 100%,68% calc(100% - 1px),32% calc(100% - 1px),32% 100%,0 100%)}
+.holoCard.upCard.sel,.holoCard.upCard:hover,.holoCard.upCard:focus-visible{transform:translateY(-5px);border-color:var(--holo-accent);outline:1px solid #a2ffe5;outline-offset:6px;box-shadow:0 0 0 3px #04070e,0 0 0 4px var(--holo-aura),0 15px 40px #000a,0 0 35px #6925bb55}
+#upgradeScreen.in .holoCard.upCard{transform:none;transition-delay:0s}
+#upgradeScreen.in .holoCard.upCard.sel,#upgradeScreen.in .holoCard.upCard:hover{transform:translateY(-5px)}
+.holoTop{display:flex;align-items:center;gap:10px;padding:13px 15px;height:44px;background:linear-gradient(90deg,#061c20,#090715);border-bottom:1px solid #21595b}
+.holoCard .upKey{position:static;flex:none;width:23px;height:19px;background:transparent;color:#d0fff5;border:1px solid #398c86;border-radius:0;font-size:9px;font-weight:400}
+.holoRarity{font-size:10px;letter-spacing:.18em;color:var(--holo-accent)}
+.holoSerial{margin-left:auto;font-size:7px;letter-spacing:.1em;color:#8aa8ad;white-space:nowrap}
+.holoVisual{position:relative;display:block;height:174px;overflow:hidden;background:radial-gradient(ellipse at 50% 60%,#4b1681,#090c18 55%,#000 85%);border-bottom:1px solid #27413c;contain:paint}
+.holoIllustration{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;opacity:.95}
+.holoVisual::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#0002,transparent 35%,#02060822 70%,#030609);pointer-events:none}
+.holoDistortion{position:absolute;inset:-20%;background:radial-gradient(ellipse at 50% 55%,transparent 24%,#1fffe60b 25%,transparent 27%,#8716fb20 44%,transparent 46%);animation:holoPressure 7s ease-in-out infinite;mix-blend-mode:screen}
+.holoPrism{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#30e9cf00 40%,#0ef5dc24 47%,#f051f22b 50%,#ccb0ff20 53%,transparent 60%);background-size:300% 100%;animation:holoRefract 9s ease-in-out infinite;mix-blend-mode:screen}
+.holoHalo{position:absolute;left:21%;top:19%;width:58%;height:60%;border:1px solid #58d5d748;transform:rotate(-15deg);border-radius:50%;box-shadow:0 0 13px #913fff36;animation:holoHalo 9s ease-in-out infinite}
+.holoLightning{--voltage-low:.2;--voltage-high:.44;position:absolute;inset:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 2px #934aff);opacity:.32;animation:holoVoltage 6.2s ease-in-out infinite}
+.holoLightning path{stroke:#10051f;stroke-width:5;stroke-linejoin:bevel}
+.holoLightning path:nth-child(2){stroke-width:7}.holoLightning path:nth-child(3){stroke:#5e279a;stroke-width:1;opacity:.6}
+.holoDust{position:absolute;inset:0}.holoDust i{position:absolute;left:var(--x);top:var(--y);width:var(--size);height:var(--size);background:#77ffe7;box-shadow:0 0 7px #38f4d4;animation:holoFloat 5s ease-in-out infinite;animation-delay:var(--delay);opacity:.65}
+.holoDust i:nth-child(3n){background:#c654ff;box-shadow:0 0 7px #992cf5;transform:rotate(45deg)}
+.holoSigil{position:absolute;top:7px;left:0;right:0;text-align:center;color:#a367e5b3;font-size:16px;letter-spacing:14px;opacity:.2;animation:holoSigil 8s ease-in-out infinite}
+.holoSignal{position:absolute;bottom:9px;left:15px;z-index:2;font-size:7px;letter-spacing:.14em;color:#a0d8ca}
+.holoCrown{display:none;position:absolute;left:27%;top:12%;width:46%;height:37px;border-bottom:1px solid #bf7bff;clip-path:polygon(0 5%,25% 58%,50% 0,75% 58%,100% 5%,86% 100%,14% 100%);background:linear-gradient(0deg,#a043fb99,#5a16b915);filter:drop-shadow(0 0 5px #9b47ff)}
+.holoSeal{position:absolute;inset:0;display:grid;place-items:center;color:#d6ffff;font-size:90px;opacity:0;pointer-events:none}
+.holoBody{display:flex;flex:1;flex-direction:column;padding:16px 18px 15px;position:relative;background:linear-gradient(140deg,#040b0d,#080611 60%,#040407)}
+.holoCard .upCategory{display:block;color:#5aa69a;font-size:8px;letter-spacing:.16em;margin:0 0 9px;line-height:1.5}
+.holoCard.upCard h3{color:#e0fff2;font-size:17px;line-height:1.25;letter-spacing:.035em;font-weight:400;margin:0 0 11px;text-shadow:0 0 10px #2ae6ca24;min-height:43px}
+.holoRule{height:1px;flex:none;width:100%;margin-bottom:12px;background:linear-gradient(90deg,#2adac5,transparent 80%)}
+.holoCard.upCard p{min-height:0;margin:0;line-height:1.65;font-weight:400}
+.holoCard.upCard .holoDescription{color:#abf867;font-size:11px;min-height:54px}
+.holoCard.upCard .upStackEffect{padding:10px 0 12px;color:#d0d5d6;font-size:10px;line-height:1.6;border:0;min-height:76px}
+.holoTelemetry{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #263037;padding-top:10px;margin-top:auto;color:#6a9d96;font-size:7px;letter-spacing:.06em}
+.holoRank{color:#aeffe5;font-weight:400;font-size:9px;white-space:nowrap}
+.holoCard.upCard .upActualDelta{font-size:9px;color:#a3f96a;min-height:40px;margin:8px 0 10px;line-height:1.6}
+.holoCard .upTake{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 10px;margin:0;color:var(--holo-accent);background:linear-gradient(100deg,#103c333d,#0c131d);border:1px solid #2c6059;border-radius:0;font-size:10px;font-weight:400;letter-spacing:.08em}
+.holoCard .upTake b{font-size:17px;font-weight:400;color:#bcffe9}
+.holoCard[data-rarity="ultra-rare"]{--holo-accent:#d291ff;--holo-aura:#9b28f2;--holo-line:#57317e;border-color:#694388;box-shadow:0 0 0 3px #04070e,0 0 0 4px #392449,0 0 0 7px #07050c,0 0 28px #6c13cf36}
+.holoCard[data-rarity="ultra-rare"] .holoTop{background:linear-gradient(90deg,#160b25,#090613);border-color:#653c82}
+.holoCard[data-rarity="ultra-rare"] .holoLightning{--voltage-low:.45;--voltage-high:.8;opacity:.74;filter:drop-shadow(0 0 3px #a04dff)}
+.holoCard[data-rarity="ultra-rare"] .holoPrism{background-size:240% 100%;animation-duration:6.5s}.holoCard[data-rarity="ultra-rare"] .holoSigil{opacity:.7}
+.holoCard[data-rarity="mythic"]{--holo-accent:#ddb5ff;--holo-aura:#ab3fff;border-color:#b26feb;box-shadow:0 0 0 3px #04010a,0 0 0 4px #552a81,0 0 0 7px #08020e,0 0 42px #6710bf55}
+.holoCard[data-rarity="mythic"] .holoTop{background:linear-gradient(90deg,#210b35,#090410);border-color:#a058ce}
+.holoCard[data-rarity="mythic"] .holoRarity::before{content:'◆';color:#c1a66d;font-size:7px;margin-right:7px}
+.holoCard[data-rarity="mythic"] .holoCrown{display:block;animation:holoCrown 5s ease-in-out infinite}
+.holoCard[data-rarity="mythic"] .holoLightning{--voltage-low:.65;--voltage-high:1;opacity:.9;filter:drop-shadow(0 0 4px #a83dff);animation-duration:4.8s}.holoCard[data-rarity="mythic"] .holoLightning path{stroke-width:8}.holoCard[data-rarity="mythic"] .holoLightning path:nth-child(3){stroke-width:2;stroke:#6e28a8}
+.holoCard[data-rarity="mythic"] .holoHalo{left:12%;top:10%;width:76%;height:80%;box-shadow:0 0 0 10px #6600a611,0 0 30px #ad22f644;border-color:#9f55de88}.holoCard[data-rarity="mythic"] .holoSigil{opacity:.8}.holoCard[data-rarity="mythic"] .holoDistortion{animation-duration:5s;background:radial-gradient(ellipse,transparent 23%,#9a2cff33 25%,transparent 29%,#7414df33 44%,transparent 48%)}
+#upgradeScreen.installing .holoCard:not(.installing){opacity:.28;transform:scale(.98);transition:opacity .22s,transform .22s}
+#upgradeScreen.installing .holoCard.installing{outline-color:#d6fff1;border-color:#acffe6;transform:translateY(-5px);box-shadow:0 0 0 4px #051d18,0 0 55px #7633cf80}
+.holoCard.installing .holoSeal{animation:holoBreach .26s ease-out both}.holoCard.installing .holoDust i{animation:holoInstall .26s ease-in both}.holoCard.installing .upTake{color:#d9ffe8;background:#123429}
+#upgradeScreen.hidden .holoCard *,#upgradeScreen[data-suspended="true"] .holoCard *,body:has(#pauseScreen:not(.hidden)) #upgradeScreen .holoCard *{animation-play-state:paused!important}
+@keyframes holoFloat{0%,100%{translate:0 8px;opacity:.25}50%{translate:5px -12px;opacity:.7}}
+@keyframes holoPressure{0%,100%{transform:scale(.96) rotate(-5deg);opacity:.6}50%{transform:scale(1.08) rotate(6deg);opacity:.9}}
+@keyframes holoRefract{0%,100%{background-position:100% 0;opacity:.25}50%{background-position:0 0;opacity:.6}}
+@keyframes holoVoltage{0%,100%{transform:translateX(-2px);opacity:var(--voltage-low)}50%{transform:translateX(2px);opacity:var(--voltage-high)}}
+@keyframes holoHalo{0%,100%{transform:rotate(-15deg) scale(.97)}50%{transform:rotate(15deg) scale(1.03)}}
+@keyframes holoSigil{0%,100%{translate:0 0}50%{translate:0 4px}}
+@keyframes holoCrown{0%,100%{translate:0 0}50%{translate:0 -6px}}
+@keyframes holoBreach{0%{opacity:0;transform:scale(.5) rotate(0)}30%{opacity:.75}100%{opacity:0;transform:scale(1.6) rotate(22deg)}}
+@keyframes holoInstall{to{left:50%;top:45%;opacity:0;transform:scale(.1)}}
+@media(max-height:820px) and (min-width:861px){#upgradeScreen{padding:18px 24px;gap:10px}.holoVisual{height:140px}.holoBody{padding:12px 16px}.holoCard.upCard h3{font-size:15px;min-height:38px;margin-bottom:8px}.holoCard.upCard .holoDescription{font-size:10px;min-height:48px}.holoCard.upCard .upStackEffect{font-size:9px;min-height:66px;padding:8px 0}.holoCard.upCard .upActualDelta{font-size:9px;min-height:38px}.holoCard .upTake{padding:10px;font-size:9px}}
+@media(max-width:860px){#upgradeScreen{justify-content:flex-start;padding:30px 20px;touch-action:pan-y;overscroll-behavior:contain}#upgradeCards{grid-template-columns:1fr;max-width:440px;gap:24px;padding:8px}#upgradeScreen .upSub{max-width:430px;font-size:9px}.holoVisual{height:190px}.holoCard.upCard.sel,#upgradeScreen.in .holoCard.upCard.sel,#upgradeScreen.in .holoCard.upCard:hover{transform:none}.holoCard.upCard h3{min-height:0}.holoCard.upCard .holoDescription,.holoCard.upCard .upStackEffect,.holoCard.upCard .upActualDelta{min-height:0}.holoCard.upCard .holoDescription{margin-bottom:6px}#upgradeScreen .upHint{max-width:400px;line-height:2;letter-spacing:.08em}}
+@media(prefers-reduced-motion:reduce){.holoCard,.holoCard *,.holoCard::before,.holoCard::after{animation:none!important;transition:none!important}.holoCard.upCard.sel,.holoCard.upCard:hover,#upgradeScreen.in .holoCard.upCard.sel,#upgradeScreen.in .holoCard.upCard:hover,#upgradeScreen.installing .holoCard{transform:none}.holoCard .holoPrism{background-position:50% 0;opacity:.25}.holoCard .holoSeal{display:none}}
