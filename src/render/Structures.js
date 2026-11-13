@@ -805,9 +805,10 @@ export function buildRiftAdmiral() {
       if (y === -8 && (x % 2 === 0)) return P.gray; // teeth
       return P.light;
     });
-    // eye sockets — the glowing eyes
+    // The player/cinematic camera approach from +Z, like the gun ports below.
+    // Keep the face on that side so the reveal never presents a blank skull.
     for (const sx of [-3, 3]) {
-      box(v, sx - 1, sx + 1, 0, 2, -8, -6, P.black);
+      box(v, sx - 1, sx + 1, 0, 2, 6, 8, P.black);
     }
     // beard, braided into the hull
     for (let x = -5; x <= 5; x++) {
@@ -827,7 +828,7 @@ export function buildRiftAdmiral() {
     parts.eyes = [];
     for (const sx of [-3, 3]) {
       const e = glowSprite(P.magenta, 3.2, 0.95);
-      e.position.set(sx * S, 17 * S, -8 * S);
+      e.position.set(sx * S, 17 * S, 7 * S);
       group.add(e);
       parts.eyes.push(e);
     }
@@ -853,8 +854,8 @@ export function buildRiftAdmiral() {
     });
     // gold band + skull badge
     box(v, -8, 8, 2, 3, -6, 5, P.gold, (x, y, z) => (Math.abs(z) >= 5 || Math.abs(x) >= 7 ? P.gold : false));
-    sphere(v, 0, 5, -6, 3, P.gold);
-    for (const sx of [-1, 1]) v.push({ x: sx, y: 6, z: -8, c: P.black });
+    sphere(v, 0, 5, 6, 3, P.gold);
+    for (const sx of [-1, 1]) v.push({ x: sx, y: 6, z: 8, c: P.black });
     const g = vx(v, S);
     const grp = new THREE.Group();
     grp.add(g);

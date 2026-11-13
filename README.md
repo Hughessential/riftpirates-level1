@@ -3,8 +3,9 @@
 A complete, playable Three.js vertical slice built from the *Level 1 Progression System* handoff,
 the *Player-System Notes*, and the concept-art board in `riftpirates_content/`.
 
-You fly the **Star Hopper** down a collapsing rift corridor, break five objectives, and take the
-**Rift Admiral** apart at the Nexus. Roughly 10–14 minutes of play per run.
+Choose one of six cosmetic ships and fly down a collapsing rift corridor, break five objectives, and take the
+**Rift Admiral** apart at the Nexus. Each approach grants three augments before
+its objective, letting you build up your ship while you fight forward.
 
 ---
 
@@ -14,14 +15,28 @@ A local web server is **required** — the game uses ES modules and `fetch`-load
 which browsers block on `file://`.
 
 ```bash
-npm start          # python3 -m http.server 8000
+npm install
+npm start          # Vite dev server on port 8000
 ```
 
 Then open **http://localhost:8000/index.html** and press **LAUNCH RUN**.
+For the developer sandbox, open **http://localhost:8000/?lab=1**, click **TESTING GROUNDS**, or press **F2**.
+It includes god mode, all ships, editable ranks for all 45 augments, enemy/target spawning,
+every encounter and boss phase, slow motion, and lighting/sound previews. Test progress is never banked.
+See [the Testing Grounds guide](TESTING_GROUNDS.md); run its checks with `npm run test:lab`.
 
-Any static server works (`npx serve`, `php -S localhost:8000`, VS Code Live Server…). There is no
-build step and no bundler; Three.js r160 is vendored at `vendor/three.module.js` and wired through
-an importmap.
+Use **CHANGE SHIP** on the title screen to browse the six supplied voxel hulls.
+The hangar shows their actual recolored geometry; all ships share identical
+handling, weapons, health, shields and collision bounds. Selection is remembered
+locally and survives restarts. Arrow keys or a controller browse the open hangar;
+keys `1`–`6` select a hull and `Enter` confirms.
+Leave the server running while playing. If localhost cannot connect, restart
+`npm start` and reload the page. The original `python3 serve.py` command also
+starts Vite. Plain Python/Live Server hosting does not support the source imports;
+use Vite for development or serve the generated `dist/` folder after building.
+
+For a production bundle, run `npm run build`; Vite writes the deployable site to `dist/`.
+Three.js and its post-processing addons are installed through npm.
 
 ### Controls
 
@@ -54,9 +69,11 @@ PlayStation, most Bluetooth pads) is picked up automatically once you nudge a
 stick or press a button; the camera stick free-looks around the Star Hopper
 and always locks back to the front-facing camera the moment you release it.
 
-The Star Hopper repairs its hull slowly a few seconds after taking a hit, and a
-passive shield sits in front of the hull — a limited energy bar that soaks the
-next hits and rebuilds once you stop getting hit. A **barrel roll** is a quick
+Your ship repairs 2 hull/sec after 6 seconds without damage. Its 40-point shield
+waits 8 seconds after a partial hit, or **14 damage-free seconds after depletion**,
+then restores 4 shield/sec. Hull hits restart the full depletion delay. The HUD
+shows the countdown; upgrades improve capacity/recovery without bypassing the
+lockout. A **barrel roll** is a quick
 i-framed dash on a short cooldown; roll *through* incoming fire and it still
 counts as a Perfect Dodge.
 
@@ -64,7 +81,10 @@ counts as a Perfect Dodge.
 
 ## The level
 
-Traversal → objective → upgrade cache, five times over.
+Three approach beats with augment checkpoints → objective → repair break.
+The Outer Defense approach lasts 104 seconds of flight time: scout pickets,
+salvage lanes and laser gates, a shield escort and bounty ace, then a final rush.
+Choosing cards freezes flight, danger, Heat and the route timer.
 
 | # | Objective | The idea |
 |---|---|---|
@@ -78,16 +98,69 @@ Traversal → objective → upgrade cache, five times over.
 `OVERDRIVE`), while getting hit or camping bleeds it away. **Perfect Dodge** — boost within 0.22s of
 an incoming threat — refunds boost, buffs your guns, and pays a score bonus.
 
-Five upgrade caches, three cards each, fifteen upgrades total. Caches 1–4 come from the spec; the
-fifth (**Nexus Breaker / Reality Tear / Second Wind**) is the bonus cache on the concept-art
-progression board, dealt during the Nexus approach so you meet the Admiral at full build.
+Three caches precede each tower and the Inhibitor, for twelve augment selections.
+Each cache offers three usable choices from **45 repeatable augments** across
+weapons, survival, speed, loot and anomalies. Every augment stacks, weapons
+coexist, and the cards show what the next stack adds. Piercing lances, seeking
+swarms, orbiting guns, chain lightning, gravity wells, loot-charged volleys and
+dodge retaliation can combine from the first approach. A final Nexus cache
+brings the build to thirteen selections before the Admiral. Objective clears
+repair hull and boost; shield recovery continues. See [the complete augment
+guide](MAYHEM_ARSENAL.md) for all 45 effects and example builds.
+
+The weapon system uses seventeen distinct neon projectile styles and eighteen
+original sound cues selected from the supplied retro SFX collection. Four
+instanced GPU batches support 1,024 player bolts and 512 enemy shots. Enemy
+fans, four-lane volleys and gapped rings warn before firing; concentrated damage
+numbers are grouped to preserve combat visibility.
+
+The scenery uses about 28,000 extra decorative surface voxels in six instanced
+draw calls: drifting rock reefs, broken bastions, wrecks, fragments and passing
+ships. These sit around the combat corridor and are not collision obstacles.
+
+Seven original models from the supplied voxel archive now populate the game.
+Five distinct enemy hulls include weaving Micro Recons and twin-cannon Dual
+Strikers; giant robot guardians and passing convoys inhabit the route edges.
+The title screen pairs turquoise/violet voxel lettering and obsidian neon trim with a
+block-built pirate planet, neon orbital rings, a glowing pointer star and the
+ship hangar. A local digital pixel font spans the menus and HUD. The pause screen
+uses an orbital skull centerpiece and matching controls. Deep-black space and a
+very faint, static display texture preserve clear combat silhouettes and signals.
+
+Desktop presentation scales together through QHD, 4K and ultrawide windows.
+Camera, canvas and postprocessing resize together, including changes in monitor
+pixel density. Every tower and the Admiral has a skippable, pause-safe camera
+reveal with its own title and color. Replay them from Testing Grounds.
+
+Weapon stacks now change laser silhouettes, trails, elemental colors and sound;
+upgrade cards show actual stat deltas and the reactor HUD shows current output.
+Enemy hulls have locked, visible warnings before ion volleys, crossfire lances,
+mine clusters, shield pulses or blink attacks. Later sectors increase fleet
+pressure. Loot shimmers in white, gold, violet, teal and pink.
+
+The **official soundtrack** now owns the title, five-song ordinary gameplay
+shuffle, every tower/boss, and the final escape. Boss music continues from
+introduction through combat and phases; long sessions use a deliberate end
+fade and same-recording restart. After the Admiral falls, reach the final rift
+before the 135-second collapse deadline to earn victory. See
+[soundtrack and escape notes](SOUNDTRACK_ESCAPE.md) for timing, recovery and tests.
+The escape now escalates through five assault stages: up to 40 live attackers,
+reinforcing formations, a surrounding capital fleet breaking apart, expanding
+blast rings and dense glowing wreckage. Required cyan openings remain visible
+as the armada and destruction intensify toward the final rift.
+Music starts at 65% and SFX at 85%. Separate volume sliders and mute controls on
+the title and pause menus save your preferred mix across visits.
+
+Imported models are loaded before launch, share cached geometry, and fall back
+to procedural models if a file cannot load. Source paths are recorded in
+`assets/voxels/SOURCES.md`.
 
 ---
 
 ## Layout
 
 ```
-index.html          markup + importmap
+index.html          markup + Vite module entry
 src/
   core/             Game loop, LevelDirector (28-state machine), Scheduler, Input, Audio, Save
   player/           ship, stats, weapon
@@ -99,7 +172,7 @@ src/
   ui/               HUD, upgrade screen, results screen
   config/           all balance numbers, in data
   render/           voxel builder, models, structures, environment
-assets/             music + SFX
+assets/             music, SFX + imported voxel models
 legacy/             the original endless-runner prototype, kept for reference
 riftpirates_content/  the source material (PDFs, concept art, audio libraries)
 ```
@@ -119,7 +192,17 @@ Headless Chrome drives the real game and steps the simulation deterministically 
 run is verified in seconds. Start the server first, then:
 
 ```bash
-npm test           # all three suites
+npm test             # assets, augments, approaches, walkthrough, combat, dodge and music
+npm run test:mayhem   # stacked arsenal rendering, audio, pause/reset and shield HUD
+npm run test:menu     # desktop layout, voxel typography, reduced motion and launch
+npm run test:ships    # six cosmetic selections, equal stats, persistence and hangar controls
+npm run test:music    # official title/boss/finale mappings, continuity and pause/resume
+npm run test:escape   # ending, deadline, save isolation and legal-build movement pilots
+npm run test:carnage  # staged horde pressure, destruction pools, captures and cleanup
+npm run test:display  # QHD/4K/ultrawide, monitor-density switches, loot and augment previews
+npm run test:intros   # all five cinematic reveals, pause/skip, camera and lab replay
+npm run test:audio    # saved music/SFX faders, mute, keyboard and pause behavior
+npm run test:approach # three pre-objective choices, safety/pause/reset regression
 npm run test:level    # full playthrough: every state, all five objectives, boss, victory, restart
 npm run test:combat   # every attack in every encounter actually fires and hurts
 npm run test:dodge    # Perfect Dodge awards on a near miss, never on a hit

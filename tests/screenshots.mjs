@@ -5,8 +5,9 @@
  */
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const OUT = new URL('../shots/', import.meta.url).pathname;
+const OUT = fileURLToPath(new URL('../shots/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 
 const browser = await puppeteer.launch({
@@ -24,6 +25,7 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 
 await page.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
+await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled);
 await new Promise((r) => setTimeout(r, 900));
 
 const shot = async (name) => {
@@ -41,15 +43,17 @@ await new Promise((r) => setTimeout(r, 500));
 // exactly one real frame before each capture.
 await page.evaluate(() => {
   const g = window.RIFT;
-  window.__render = g.renderer.render.bind(g.renderer);
-  g.renderer.render = () => {};
-  window.__draw = () => window.__render(g.scene, g.camera);
+  window.__render = g.renderFrame.bind(g);
+  window.__update = g.update.bind(g);
+  g.update = () => {};
+  g.renderFrame = () => {};
+  window.__draw = () => window.__render(1);
 });
 const step = async (seconds) => {
   let left = Math.round(seconds * 60);
   while (left > 0) {
     const chunk = Math.min(left, 600);
-    await page.evaluate((n) => { for (let i = 0; i < n; i++) window.RIFT.update(1 / 60); }, chunk);
+    await page.evaluate((n) => { for (let i = 0; i < n; i++) window.__update(1 / 60); }, chunk);
     left -= chunk;
   }
   await page.evaluate(() => window.__draw());
@@ -59,15 +63,43 @@ const god = () => page.evaluate(() => {
   window.__realTakeDamage = window.RIFT.player.takeDamage;
   window.RIFT.player.takeDamage = () => false;
 });
-const goTo = (s) => page.evaluate((st) => window.RIFT.director.go(st), s);
+const goTo = (s) => page.evaluate((st) => {
+  const g = window.RIFT;
+  g.upgradeScreen.hide();
+  if (g.encounter) g.encounter.dispose();
+  g.encounter = null;
+  g.director.go(st);
+}, s);
 
 await god();
 
 await step(2);
 await shot('01-intro');
 
-await step(25);
+await step(12);
+await new Promise((r) => setTimeout(r, 2000));
 await shot('02-traversal-asteroids');
+
+for (let checkpoint = 0; checkpoint < 3; checkpoint++) {
+  const remaining = await page.evaluate(() => {
+    const d = window.RIFT.director;
+    return d.data.cfg.augmentAt[d.data.picks] - d.stateT;
+  });
+  await step(Math.max(0, remaining) + 0.1);
+  await new Promise((r) => setTimeout(r, 350));
+  await shot(`approach-cache-${checkpoint + 1}`);
+  await page.click('#upgradeCards .upCard');
+  await step(0.5);
+  await step(checkpoint === 0 ? 12 : 10);
+  await new Promise((r) => setTimeout(r, 2000));
+  await shot(`approach-beat-${checkpoint + 2}`);
+}
+
+if (process.argv.includes('--approach-only')) {
+  console.log('ERRORS:', errors.length ? errors.join('\n') : 'none');
+  await browser.close();
+  process.exit(errors.length ? 1 : 0);
+}
 
 await goTo('TOWER_1_INTRO');
 await step(6);

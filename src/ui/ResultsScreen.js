@@ -3,6 +3,7 @@ import { Save } from '../core/SaveSystem.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { PAR_TIME } from '../config/encounters.js';
 import { SCORE } from '../systems/ScoreSystem.js';
+import { UPGRADES } from '../systems/UpgradeSystem.js';
 
 /**
  * Results (spec §28, §42, §43). Shown on death and on victory — same screen,
@@ -30,7 +31,7 @@ export class ResultsScreen {
     const grade = g.score.grade();
     const scrap = g.scrap.total;
 
-    Save.bankRun({
+    if (!g.testRun) Save.bankRun({
       scrap,
       score,
       time: g.runTime,
@@ -39,8 +40,8 @@ export class ResultsScreen {
     });
 
     // ---- header ----
-    $('resultsEyebrow').textContent = victory ? 'NEXUS BROKEN' : 'RUN TERMINATED';
-    $('resultsTitle').textContent = victory ? 'THE RIFT ADMIRAL DEFEATED' : 'STAR HOPPER DESTROYED';
+    $('resultsEyebrow').textContent = g.testRun ? 'TEST SESSION / RESULTS NOT SAVED' : victory ? 'NEXUS BROKEN' : 'RUN TERMINATED';
+    $('resultsTitle').textContent = victory ? 'THE RIFT ADMIRAL DEFEATED' : `${g.player.shipName || 'STAR HOPPER'} DESTROYED`;
     $('resultsTitle').style.color = victory ? '#FFC53D' : '#E11D48';
 
     const deathLine = $('deathLine');
@@ -56,7 +57,7 @@ export class ResultsScreen {
     $('gradeVal').className = `grade g${grade.replace('+', 'plus')}`;
     $('scoreBig').textContent = score.toLocaleString();
     $('bestScoreVal').textContent = Save.data.bestScore.toLocaleString();
-    $('newBest').classList.toggle('hidden', score < Save.data.bestScore || score === 0);
+    $('newBest').classList.toggle('hidden', g.testRun || score < Save.data.bestScore || score === 0);
 
     // ---- stat grid ----
     const st = g.stats;
@@ -79,9 +80,9 @@ export class ResultsScreen {
       .join('');
 
     // ---- build ----
-    const build = g.upgrades.taken;
+    const build = Object.entries(g.upgrades.ranks);
     $('resultsBuild').innerHTML = build.length
-      ? build.map((id) => `<span class="chip">${id.replace(/([A-Z])/g, ' $1').toUpperCase()}</span>`).join('')
+      ? build.map(([id, rank]) => `<span class="chip" style="color:${UPGRADES[id].color}">${UPGRADES[id].name} ×${rank}</span>`).join('')
       : '<span class="chip dim">NO UPGRADES TAKEN</span>';
 
     this.el.classList.remove('hidden');

@@ -26,7 +26,17 @@
       <div class="barRow">
         <div class="bar thin" id="boostBar"><div id="boostFill"></div></div>
       </div>
+      <span id="shieldStatus" class="shieldStatus">SHIELD READY</span>
     </div>
+  </div>
+
+  <!-- top-centre: approach route, replaced by the objective during combat -->
+  <div id="approachPanel" class="hidden">
+    <div class="approachHead"><span id="approachTitle"></span><b id="approachCount">0 / 3 AUGMENTS</b></div>
+    <div id="approachTrack"><div id="approachFill"></div><div id="approachStops"></div></div>
+    <strong id="approachBeat"></strong>
+    <span id="approachHint"></span>
+    <div id="approachBounty" class="hidden"></div>
   </div>
 
   <!-- top-centre: objective -->
@@ -95,47 +105,95 @@
 </div>
 
 <!-- ======================= title ======================= -->
-<div id="titleScreen" class="screen">
-  <div class="logoWrap">
-    <div class="eyebrow">LEVEL 1</div>
-    <h1 class="logo"><span class="l1">RIFT</span><span class="l2">PIRATES</span></h1>
-    <div class="tagline">PLUNDER. UPGRADE. BREAK THE NEXUS.</div>
+<div id="titleScreen" class="screen riftMenu">
+  <div class="menuSpectrum" aria-hidden="true"></div>
+  <div class="menuGrain" aria-hidden="true"></div>
+  <header class="menuMasthead">
+    <span class="menuBrand"><span id="voxelSkull" aria-hidden="true"></span>HUGHESSENTIAL <i>/</i> STARVOXEL</span>
+    <span class="menuEdition"><i></i> V.01 <span>·</span> RIFT APPROACH</span>
+  </header>
+
+  <div id="menuShowcase" aria-hidden="true">
+    <div class="riftHalo"></div>
+    <div class="riftOrbit orbitA"></div><div class="riftOrbit orbitB"></div>
+    <div class="riftOrbit orbitC"></div><div class="riftOrbit orbitD"></div>
+    <span class="riftShard shardA"></span><span class="riftShard shardB"></span>
+    <span class="riftShard shardC"></span><span class="riftShard shardD"></span>
+    <div class="showcaseCoordinates">SECTOR 01 <span>✦</span> THE FRACTURING VOID</div>
   </div>
-  <p class="blurb">
-    Sail the fracturing void. Breach the pirate-tech defenses.<br>
-    Disable the Inhibitor. Destroy the Nexus.
-  </p>
-  <div class="chainRow">
-    <span>OUTER TOWER</span><i>&rarr;</i>
-    <span>PRESSURE TOWER</span><i>&rarr;</i>
-    <span>INNER CITADEL</span><i>&rarr;</i>
-    <span>INHIBITOR</span><i>&rarr;</i>
-    <span class="boss">THE RIFT ADMIRAL</span>
-  </div>
-  <div id="titleStats" class="stat"></div>
-  <button class="btnBig" id="launchBtn">LAUNCH RUN</button>
-  <div class="row">
-    <button class="btnGhost on" id="musicTgl">MUSIC: ON</button>
-    <button class="btnGhost on" id="sfxTgl">SFX: ON</button>
-  </div>
-  <div class="controlsHint">
-    <b>L-STICK</b> / <b>WASD</b> / DRAG TO STEER &nbsp;&middot;&nbsp; <b>R-STICK</b> CAMERA &nbsp;&middot;&nbsp;
-    <b>A</b> / <b>SPACE</b> TO FIRE &nbsp;&middot;&nbsp; <b>LT</b> / <b>F</b> TO AIM &nbsp;&middot;&nbsp;
-    <b>RT</b> / <b>SHIFT</b> TO BOOST &nbsp;&middot;&nbsp; <b>Y</b> / <b>C</b> TO BRAKE &nbsp;&middot;&nbsp;
-    <b>LB</b>/<b>RB</b> or <b>Q</b>/<b>E</b> TO BARREL ROLL &nbsp;&middot;&nbsp; <b>P</b> TO PAUSE
-  </div>
-  <div class="foot">A Three.js vertical slice &middot; HUGHESSENTIAL</div>
+
+  <main class="menuMain">
+    <div class="menuKicker"><i aria-hidden="true">///</i><span>SPACE IS BROKEN.</span> TAKE YOUR CUT.</div>
+    <h1 class="voxelLogo" aria-label="Rift Pirates">
+      <span class="voxelWord voxelRift" data-voxel-text="RIFT" data-voxel-palette="rift" aria-hidden="true">RIFT</span>
+      <span class="voxelWord voxelPirates" data-voxel-text="PIRATES" data-voxel-palette="pirates" aria-hidden="true">PIRATES</span>
+    </h1>
+    <div class="menuTagline"><span>PLUNDER.</span><span>MUTATE.</span><span>BREAK THE NEXUS.</span></div>
+    <p class="menuManifesto">One stolen ship. An impossible armada.<br>Get powered up. <em>Get beautifully destructive.</em></p>
+
+    <div class="menuActions">
+      <button class="btnBig menuLaunch" id="launchBtn" disabled aria-label="Launch run">
+        <span class="launchGlyph" data-voxel-text="LAUNCH RUN" data-voxel-palette="launch" aria-hidden="true">LAUNCH RUN</span>
+        <span class="launchArrow" aria-hidden="true">&gt;</span>
+      </button>
+      <div class="menuLaunchNote"><b>ENTER THE RIFT</b><span>THREE AUGMENTS BEFORE EVERY TOWER</span></div>
+    </div>
+    <div id="bootStatus" class="menuBoot" role="status"><span>ASSEMBLING THE ARMADA</span><progress id="bootProgress" max="1" value="0"></progress></div>
+    <div id="titleStats" class="stat menuStat"></div>
+    <div class="menuAudio audioMixer" aria-label="Audio settings">
+      <div class="audioChannel" data-audio-channel="music">
+        <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl">MUSIC: ON</button><output for="musicVolume" id="musicVolumeValue">65%</output></div>
+        <label class="audioVolumeLabel" for="musicVolume">Music volume</label>
+        <input type="range" id="musicVolume" min="0" max="100" step="1" value="65" data-audio-volume="music">
+      </div>
+      <div class="audioChannel" data-audio-channel="sfx">
+        <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl">SFX: ON</button><output for="sfxVolume" id="sfxVolumeValue">85%</output></div>
+        <label class="audioVolumeLabel" for="sfxVolume">Sound effects volume</label>
+        <input type="range" id="sfxVolume" min="0" max="100" step="1" value="85" data-audio-volume="sfx">
+      </div>
+    </div>
+  </main>
+
+  <footer class="menuFooter">
+    <div class="menuRoute" aria-label="Level route">
+      <span class="routeOrigin">THE RAID <b>→</b></span>
+      <span><i>01</i> OUTER DEFENSE</span><span><i>02</i> MIDRIFT</span>
+      <span><i>03</i> CITADEL</span><span><i>04</i> INHIBITOR</span><span class="routeBoss"><i>05</i> THE ADMIRAL</span>
+    </div>
+    <div class="menuBottomline">
+      <span class="menuControls"><b>WASD</b> FLY <b>SPACE</b> FIRE <b>F</b> LOCK <b>SHIFT</b> BOOST <b>Q / E</b> ROLL <b>P</b> PAUSE <span>· CONTROLLER READY</span></span>
+      <span class="menuSignature">PIRATES TAKE IT BACK. <b>✦</b></span>
+    </div>
+  </footer>
 </div>
 
 <!-- ======================= pause ======================= -->
-<div id="pauseScreen" class="screen hidden">
-  <div class="eyebrow">HOLDING POSITION</div>
-  <h2 class="pausedTitle">PAUSED</h2>
-  <button class="btnBig" id="resumeBtn">RESUME</button>
-  <div class="row">
-    <button class="btnGhost on" id="musicTgl2">MUSIC: ON</button>
-    <button class="btnGhost on" id="sfxTgl2">SFX: ON</button>
-    <button class="btnGhost danger" id="quitBtn">ABANDON RUN</button>
+<div id="pauseScreen" class="screen hidden riftPause">
+  <div class="pauseOrbit pauseOrbitA" aria-hidden="true"></div>
+  <div class="pauseOrbit pauseOrbitB" aria-hidden="true"></div>
+  <div class="pauseOrbit pauseOrbitC" aria-hidden="true"></div>
+  <span class="pauseCoordinate pauseCoordinateA" aria-hidden="true">SIGNAL LOCKED<br>TIME DILATION // 00.00</span>
+  <span class="pauseCoordinate pauseCoordinateB" aria-hidden="true">THE VOID CAN WAIT.<br>YOUR RAID IS STILL ALIVE.</span>
+  <div class="pauseConsole">
+    <div class="pauseSeal" data-voxel-skull aria-hidden="true"></div>
+    <div class="eyebrow">RIFT SUSPENDED / HOLDING POSITION</div>
+    <h2 class="pausedTitle" data-voxel-text="PAUSED" data-voxel-palette="rift" aria-label="Paused"></h2>
+    <p class="pauseMessage">CATCH YOUR BREATH, CAPTAIN.</p>
+    <button class="btnBig pauseResume" id="resumeBtn">RESUME THE RAID <span aria-hidden="true">&gt;</span></button>
+    <div class="pauseAudio audioMixer" aria-label="Audio settings">
+      <div class="audioChannel" data-audio-channel="music">
+        <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl2">MUSIC: ON</button><output for="musicVolume2" id="musicVolume2Value">65%</output></div>
+        <label class="audioVolumeLabel" for="musicVolume2">Music volume</label>
+        <input type="range" id="musicVolume2" min="0" max="100" step="1" value="65" data-audio-volume="music">
+      </div>
+      <div class="audioChannel" data-audio-channel="sfx">
+        <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl2">SFX: ON</button><output for="sfxVolume2" id="sfxVolume2Value">85%</output></div>
+        <label class="audioVolumeLabel" for="sfxVolume2">Sound effects volume</label>
+        <input type="range" id="sfxVolume2" min="0" max="100" step="1" value="85" data-audio-volume="sfx">
+      </div>
+    </div>
+    <button class="btnGhost danger pauseQuit" id="quitBtn">ABANDON RUN</button>
+    <div class="pauseKey">PRESS <b>P</b> OR <b>ESC</b> TO RETURN</div>
   </div>
 </div>
 
@@ -174,13 +232,6 @@
   </div>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "./vendor/three.module.js"
-  }
-}
-</script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

@@ -4,8 +4,8 @@
  * (progression spec §39).
  */
 export const P = {
-  ink: '#050214',
-  fog: '#0b0630',
+  ink: '#010207',
+  fog: '#03040b',
   nebA: '#071DBC',
   nebB: '#490C8F',
 

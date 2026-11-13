@@ -1,5 +1,6 @@
 import { P } from '../core/Palette.js';
 import { Audio2 } from '../core/AudioManager.js';
+import { blockedBetween } from './AugmentEffects.js';
 
 /**
  * Bounding-sphere collision only (spec §34). Also the home of Perfect Dodge
@@ -13,6 +14,21 @@ import { Audio2 } from '../core/AudioManager.js';
  */
 
 const DODGE_MARGIN = 2.6; // how close a threat must pass to count as dodged
+
+/** Earliest segment/sphere contact; fast lances cannot tunnel through targets. */
+export function segmentSphereTime(from, to, center, radius) {
+  const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+  const ox = from.x - center.x, oy = from.y - center.y, oz = from.z - center.z;
+  const c = ox * ox + oy * oy + oz * oz - radius * radius;
+  if (c <= 0) return 0;
+  const a = dx * dx + dy * dy + dz * dz;
+  if (a < 1e-12) return null;
+  const b = ox * dx + oy * dy + oz * dz;
+  const discriminant = b * b - a * c;
+  if (discriminant < 0) return null;
+  const t = (-b - Math.sqrt(discriminant)) / a;
+  return t >= 0 && t <= 1 ? t : null;
+}
 
 export class CollisionSystem {
   constructor(game) {
@@ -32,56 +48,65 @@ export class CollisionSystem {
     // ---- player bolts vs targets -------------------------------------------
     for (const b of g.projectiles.player) {
       if (!b.active) continue;
-
-      // Inhibitor's rotating shields eat shots that don't thread a gap.
-      let blocked = false;
-      for (const blocker of g.projectileBlockers) {
-        if (blocker.blocks(b.x, b.y, b.z)) {
-          blocked = true;
+      const from = { x: b.px ?? b.x, y: b.py ?? b.y, z: b.pz ?? b.z };
+      const end = { x: b.x, y: b.y, z: b.z };
+      b.hitTargets ||= new Set();
+      const hits = [];
+      for (const t of g.targets) {
+        if (!t.alive || !t.targetable || b.hitTargets.has(t)) continue;
+        const at = segmentSphereTime(from, end, t.pos, t.radius + b.radius);
+        if (at !== null) hits.push({ target: t, at });
+      }
+      hits.sort((a, b) => a.at - b.at);
+      let redirected = false;
+      for (const hit of hits) {
+        const t = hit.target;
+        if (!t.alive || !t.targetable) continue;
+        // Check the swept route only as far as this target. A shield behind a
+        // nearer enemy cannot incorrectly protect that enemy from the shot.
+        if (blockedBetween(g, from, end, hit.at)) {
+          g.projectiles.killPlayerBolt(b);
+          Audio2.play('shield_break', 0.2, 1.6, 0.1);
           break;
         }
-      }
-      if (blocked) {
-        g.projectiles.killPlayerBolt(b);
-        g.fx.explode(b.x, b.y, b.z, {
-          count: 2,
-          colors: [P.orange, P.white],
-          power: 5,
-          arcs: false,
-          flashScale: 0.4,
-        });
-        Audio2.play('shield_break', 0.25, 1.6, 0.1);
-        continue;
-      }
-
-      for (const t of g.targets) {
-        if (!t.alive || !t.targetable) continue;
-        const dx = t.pos.x - b.x;
-        const dy = t.pos.y - b.y;
-        const dz = t.pos.z - b.z;
-        if (dx * dx + dy * dy + dz * dz > (t.radius + b.radius) ** 2) continue;
-
-        const dealt = t.damage(b.damage, b.crit);
-        g.projectiles.killPlayerBolt(b);
-
+        b.x = from.x + (end.x - from.x) * hit.at;
+        b.y = from.y + (end.y - from.y) * hit.at;
+        b.z = from.z + (end.z - from.z) * hit.at;
+        b.hitTargets.add(t);
+        const dealt = g.augmentEffects
+          ? g.augmentEffects.damageTarget(t, b.damage, b.crit, b.procDepth > 0)
+          : t.damage(b.damage, b.crit);
         if (dealt > 0) {
           g.damageNumbers.spawn(b.x, b.y, b.z, Math.round(dealt), b.crit);
           g.heat.onDealDamage(dealt);
           Audio2.play(b.crit ? 'crit' : 'hit', b.crit ? 0.6 : 0.28, 1, 0.1);
           g.fx.explode(b.x, b.y, b.z, {
             count: b.crit ? 5 : 2,
-            colors: b.crit ? [P.gold, P.white, P.orange] : [P.magenta, P.white],
+            colors: [b.color || P.magenta, P.white],
             power: b.crit ? 9 : 5,
             arcs: false,
-            flashScale: b.crit ? 0.9 : 0.4,
+            flashScale: b.crit ? 0.55 : 0.25,
+            flashColor: b.color || P.magenta,
+            flashTime: 0.1,
           });
+          g.augmentEffects?.onHit(b, t, dealt);
         } else {
           // shielded: visibly bounce so the player learns to kill generators first
           g.damageNumbers.spawnBlocked(b.x, b.y, b.z);
           Audio2.play('shield_break', 0.3, 1.4, 0.1);
         }
+        // A blocked hit never spawns reactions and always absorbs the bolt.
+        if (!(dealt > 0)) { g.projectiles.killPlayerBolt(b); break; }
+        if (b.pierce > 0) { b.pierce--; continue; }
+        redirected = g.augmentEffects?.redirect(b, t) || false;
+        if (!redirected) g.projectiles.killPlayerBolt(b);
         break;
       }
+      if (b.active && !redirected) {
+        if (blockedBetween(g, from, end)) g.projectiles.killPlayerBolt(b);
+        else { b.x = end.x; b.y = end.y; b.z = end.z; }
+      }
+      if (b.active) b.mesh?.position.set(b.x, b.y, b.z);
     }
 
     // ---- enemy bolts vs player ---------------------------------------------
@@ -92,7 +117,11 @@ export class CollisionSystem {
       const dz = b.z;
       const d2 = dx * dx + dy * dy + dz * dz;
 
-      if (d2 < (b.radius + p.radius) ** 2) {
+      const contact = segmentSphereTime(
+        { x: b.px ?? b.x, y: b.py ?? b.y, z: b.pz ?? b.z }, b,
+        { x: px, y: py, z: 0 }, b.radius + p.radius
+      );
+      if (contact !== null) {
         g.projectiles.killEnemyBolt(b);
         if (p.takeDamage(b.damage, b.label)) tookDamage = true;
         g.fx.explode(b.x, b.y, b.z, {
@@ -172,31 +201,10 @@ export class CollisionSystem {
     g.hud.toast('RIFT DODGE', `+${Math.round(bonus * g.heat.multiplier)}`, P.cyan);
     g.hud.flashDodge();
 
-    // Reality Tear: the dodge itself becomes a weapon
-    if (p.stats.realityTear) {
-      const cleared = g.projectiles.clearEnemyNear(p.x, p.y, 14);
-      g.fx.explode(p.x, p.y, 0, {
-        count: 24,
-        colors: [P.cyan, P.magenta, P.white],
-        power: 20,
-        arcColor: P.magenta,
-        gravity: 0,
-      });
-      for (const e of g.enemies.active) {
-        if (!e.alive) continue;
-        if (Math.hypot(e.x - p.x, e.y - p.y) < 14 && Math.abs(e.z) < 20) {
-          e.target.damage(45);
-        }
-      }
-      if (cleared > 0) g.camera3.shake(0.35);
-    } else {
-      g.fx.explode(p.x, p.y, 0, {
-        count: 10,
-        colors: [P.cyan, P.white],
-        power: 13,
-        gravity: 0,
-        arcs: false,
-      });
-    }
+    g.augmentEffects?.onPerfectDodge();
+    g.fx.explode(p.x, p.y, 0, {
+      count: 10, colors: [P.cyan, P.white], power: 13,
+      gravity: 0, arcs: false,
+    });
   }
 }

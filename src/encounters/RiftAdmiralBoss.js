@@ -497,10 +497,9 @@ export class RiftAdmiralBoss extends TowerEncounter {
     this._closeCore();
     g.hud.stopTimer();
 
-    // all projectiles freeze and vanish; music cuts (spec §26)
+    // Projectiles vanish; the official boss theme continues through destruction.
     for (const b of g.projectiles.enemy) if (b.active) g.projectiles.killEnemyBolt(b);
     g.enemies.clear();
-    Audio2.stopMusic(0.3);
     Audio2.play('boss_death', 1, 0.85);
 
     g.score.add(SCORE.BOSS_DEFEATED, 'BOSS DEFEATED');

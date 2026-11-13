@@ -2,18 +2,20 @@ import * as THREE from 'three';
 import { P, DEBRIS } from '../core/Palette.js';
 import { buildVoxels, glowSprite } from '../render/VoxelBuilder.js';
 import { hopperVoxels } from '../render/Models.js';
+import { createPlayerShip, isPlayerShipId, PLAYER_SHIPS } from '../render/PlayerFleet.js';
 import { Input } from '../core/Input.js';
+import { EngineTrail } from '../effects/EngineTrail.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { clamp, lerp, rand, damp, TAU } from '../core/Utils.js';
 
 /** Base stats. Upgrades mutate a *copy* of this — nothing persists across runs. */
 export const BASE_STATS = () => ({
   maxHealth: 160, // generous by design (Player notes): threat comes from patterns, not fragility
-  healthRegen: 6, // hull points/sec, passive — rewards disengaging after a hit
-  regenDelay: 3.5, // seconds without damage before hull regen begins
-  damage: 12,
-  fireRate: 4.5,
-  projectileSpeed: 95,
+  healthRegen: 2, // repair builds can improve this; base hull cannot erase pressure
+  regenDelay: 6, // seconds without damage before hull regen begins
+  damage: 18,
+  fireRate: 6.5,
+  projectileSpeed: 105,
   moveSpeed: 19, // snappier baseline (see update(): response is what really sells it)
   boostSpeed: 31,
   boostCapacity: 100,
@@ -24,18 +26,19 @@ export const BASE_STATS = () => ({
   damageReduction: 0,
   criticalChance: 0,
   criticalMultiplier: 2.5,
-  shieldMax: 55, // passive shield — a limited energy bar the hull hides behind
-  shieldRegen: 15, // energy/sec, recharges once you stop taking hits
-  shieldDelay: 2.6, // seconds without damage before the shield rebuilds
+  shieldMax: 40,
+  shieldRegen: 4, // deliberately slow: ten seconds to rebuild the base shield
+  shieldDelay: 8, // damage-free seconds after a partial shield hit
+  shieldBreakDelay: 14, // depleted shields stay offline through a real danger window
   weakPointDamage: 1,
-  // boolean upgrade flags
-  broadsides: false,
-  riftDrain: false,
-  dodgeDrive: false,
-  overcharge: false,
-  heatSink: false,
-  realityTear: false,
-  secondWind: false,
+  // Stack counts; each acquisition adds another rank.
+  broadsides: 0,
+  riftDrain: 0,
+  dodgeDrive: 0,
+  overcharge: 0,
+  heatSink: 0,
+  realityTear: 0,
+  secondWind: 0,
   freeBlocks: 0,
 });
 
@@ -56,6 +59,8 @@ export class Player {
 
     this.group = new THREE.Group();
     this.hull = buildVoxels(hopperVoxels(), 0.32);
+    this.fallbackHull = this.hull;
+    this.shipHulls = new Map();
     this.group.add(this.hull);
 
     this.engines = [];
@@ -67,7 +72,7 @@ export class Player {
     }
 
     // boost trail — stronger while boosting (spec §5)
-    this.trail = glowSprite(P.cyan, 0, 0.85);
+    this.trail = glowSprite(P.cyan, 0, 0.3);
     this.trail.position.set(0, -0.2, 4.5);
     this.group.add(this.trail);
 
@@ -124,11 +129,35 @@ export class Player {
     this.group.add(this.shieldMesh);
 
     scene.add(this.group);
+    this.exhaust = new EngineTrail(scene);
     this.radius = 1.35;
     this.reset(BASE_STATS());
   }
 
+  /** Hull selection only changes render geometry. Collision and weapons stay identical. */
+  setShip(id) {
+    const shipId = isPlayerShipId(id) ? id : PLAYER_SHIPS[0].id;
+    if (!this.shipHulls.has(shipId)) {
+      const model = createPlayerShip(shipId, { size: 5.8 });
+      if (model) this.shipHulls.set(shipId, model);
+    }
+    this.group.remove(this.hull);
+    this.hull = this.shipHulls.get(shipId) || this.fallbackHull;
+    this.hull.visible = true;
+    this.shipId = shipId;
+    this.shipName = PLAYER_SHIPS.find((ship) => ship.id === shipId).name;
+    this.group.userData.shipId = shipId;
+    // Keep the cosmetic exhaust attached to the rear of each silhouette.
+    const bounds = new THREE.Box3().setFromObject(this.hull);
+    const rear = bounds.max.z + 0.12;
+    this.group.add(this.hull);
+    for (const engine of this.engines) engine.position.z = rear;
+    this.trail.position.z = rear + 1.4;
+    this.exhaust.reset();
+  }
+
   reset(stats) {
+    this.exhaust.reset();
     this.stats = stats;
     this.x = 0;
     this.y = 1;
@@ -136,6 +165,7 @@ export class Player {
     this.vy = 0;
     this.health = stats.maxHealth;
     this.shield = stats.shieldMax; // passive shield starts charged
+    this.shieldBroken = false;
     this.boost = stats.boostCapacity;
     this.boosting = false;
     this.dodgeT = 0; // >0 while inside the perfect-dodge window
@@ -150,12 +180,15 @@ export class Player {
     this.buffT = 0; // dodge-drive speed/fire buff
     this.critBuffT = 0; // perfect-dodge weapon-power buff
     this.blocksLeft = stats.freeBlocks;
+    this.blockCapacity = stats.freeBlocks;
+    this.secondWindUsed = 0;
     this.alive = true;
     this.timeSinceHit = 99;
     this.lastKiller = '';
     this.group.position.set(0, 1, 0);
     this.group.rotation.set(0, 0, 0);
     this.group.visible = true;
+    this.hull.visible = true;
     this.group.scale.set(1, 1, 1);
     this.shieldMesh.material.opacity = 0;
     this.frozen = false;
@@ -164,9 +197,11 @@ export class Player {
   }
 
   applyStats(stats) {
-    // keep current health ratio when max health changes mid-run
+    // Only newly acquired protection grants blocks. An unrelated augment must
+    // not silently refill protections already spent during this encounter.
+    this.blocksLeft += Math.max(0, stats.freeBlocks - this.blockCapacity);
+    this.blockCapacity = stats.freeBlocks;
     this.stats = stats;
-    this.blocksLeft = stats.freeBlocks;
   }
 
   get pos() {
@@ -174,11 +209,21 @@ export class Player {
   }
 
   get moveSpeed() {
-    return this.stats.moveSpeed * (this.buffT > 0 ? 1.4 : 1);
+    return this.stats.moveSpeed * (this.buffT > 0 ? 1 + 0.4 * Number(this.stats.dodgeDrive) : 1);
   }
 
   get fireRate() {
-    return this.stats.fireRate * (this.buffT > 0 ? 1.4 : 1);
+    return this.stats.fireRate * (this.buffT > 0 ? 1 + 0.4 * Number(this.stats.dodgeDrive) : 1);
+  }
+
+  get shieldRecoveryRemaining() {
+    if (this.shield >= this.stats.shieldMax || this.stats.shieldMax <= 0) return 0;
+    const delay = this.shieldBroken ? this.stats.shieldBreakDelay : this.stats.shieldDelay;
+    return Math.max(0, delay - this.timeSinceHit);
+  }
+
+  get secondWindCharges() {
+    return Math.max(0, Number(this.stats.secondWind) - this.secondWindUsed);
   }
 
   update(dt, ctx) {
@@ -300,8 +345,11 @@ export class Player {
 
     // ---- shield regen ----
     if (this.stats.shieldMax > 0) {
-      if (this.timeSinceHit > this.stats.shieldDelay) {
-        this.shield = Math.min(this.stats.shieldMax, this.shield + this.stats.shieldRegen * dt);
+      const delay = this.shieldBroken ? this.stats.shieldBreakDelay : this.stats.shieldDelay;
+      const rechargeDt = Math.min(dt, Math.max(0, this.timeSinceHit - delay));
+      if (rechargeDt > 0) {
+        this.shield = Math.min(this.stats.shieldMax, this.shield + this.stats.shieldRegen * rechargeDt);
+        if (this.shield > 0) this.shieldBroken = false;
       }
       const s = this.shield / this.stats.shieldMax;
       this.shieldMesh.material.opacity = s * 0.32;
@@ -325,15 +373,12 @@ export class Player {
     // ---- visuals ----
     const boostGlow = this.boosting ? 1 : 0;
     this.engines.forEach((sp, i) => {
-      const f = 1.15 + Math.sin(ctx.time * 31 + i) * 0.12 + boostGlow * 0.9;
+      const f = 1.15 + Math.sin(ctx.time * 31 + i) * 0.12 + boostGlow * 0.5;
       sp.scale.set(f, f * 1.6, 1);
     });
-    const tScale = damp(this.trail.scale.x, this.boosting ? 5.5 : 0, 12, dt);
+    const tScale = damp(this.trail.scale.x, this.boosting ? 2.2 : 0, 12, dt);
     this.trail.scale.set(tScale, tScale * 0.55, 1);
 
-    if (this.boosting && Math.random() < dt * 40) {
-      this.fx.jet(this.x, this.y - 0.2, 2.5, { x: 0, y: 0, z: 1 }, 2, [P.cyan, P.magenta, P.white]);
-    }
   }
 
   /** Called by the dodge system when an attack was evaded inside the window. */
@@ -342,13 +387,11 @@ export class Player {
     this.dodgePending = false;
     this.boost = Math.min(this.stats.boostCapacity, this.boost + 18); // energy refund
     this.critBuffT = 2.5; // brief weapon-power increase
-    if (this.stats.dodgeDrive) this.buffT = 4;
+    if (this.stats.dodgeDrive) this.buffT = 3 + Number(this.stats.dodgeDrive);
     if (this.stats.riftDrain) {
-      if (this.stats.shieldMax > 0 && this.shield < this.stats.shieldMax) {
-        this.shield = Math.min(this.stats.shieldMax, this.shield + 10);
-      } else {
-        this.health = Math.min(this.stats.maxHealth, this.health + 8);
-      }
+      const rank = Number(this.stats.riftDrain);
+      this.heal(8 * rank);
+      this.refundBoost(6 * rank);
     }
   }
 
@@ -362,7 +405,7 @@ export class Player {
 
   /** @returns {boolean} true if damage actually landed. */
   takeDamage(amount, source = 'UNKNOWN') {
-    if (!this.alive || this.invuln > 0) return false;
+    if (!this.alive || this.invuln > 0 || !(amount > 0)) return false;
 
     // Armor Plating grants a free block per encounter
     if (this.blocksLeft > 0) {
@@ -378,13 +421,23 @@ export class Player {
       return false;
     }
 
-    let dmg = amount * (1 - this.stats.damageReduction);
+    let dmg = amount * (1 - clamp(this.stats.damageReduction, 0, 1));
+    if (!(dmg > 0)) return false;
+    // Both shield hits and hull hits restart the recovery clock. While broken,
+    // that is the full fourteen-second lockout, not the partial-shield delay.
+    this.timeSinceHit = 0;
+    this.noDamageT = 0;
 
     if (this.shield > 0) {
       const absorbed = Math.min(this.shield, dmg);
       this.shield -= absorbed;
       dmg -= absorbed;
       Audio2.play('shield_break', 0.6, 1.1);
+      if (this.shield <= 0) {
+        this.shield = 0;
+        this.shieldBroken = true;
+        this.onShieldBreak?.();
+      }
       if (dmg <= 0) {
         this.invuln = 0.35;
         this.timeSinceHit = 0;
@@ -398,7 +451,7 @@ export class Player {
     this.noDamageT = 0;
     this.lastKiller = source;
     Audio2.play('player_hurt', 0.9, 1, 0.05);
-    if (navigator.vibrate) {
+    if (globalThis.navigator?.vibrate) {
       try {
         navigator.vibrate(60);
       } catch {
@@ -407,9 +460,10 @@ export class Player {
     }
 
     if (this.health <= 0) {
-      // Second Wind: one revive per run
-      if (this.stats.secondWind) {
-        this.stats.secondWind = false;
+      // Acquired ranks are persistent build identity; spent charges are not.
+      // Buying rank three after spending two grants exactly one new revive.
+      if (this.secondWindCharges > 0) {
+        this.secondWindUsed += 1;
         this.health = this.stats.maxHealth * 0.5;
         this.invuln = 2.2;
         Audio2.play('levelup', 1, 0.8);

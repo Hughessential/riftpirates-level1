@@ -28,15 +28,20 @@ export function buildVoxels(vox, scale = 1, opts = {}) {
   for (let i = 0; i < N; i++) {
     const v = vox[i];
     c.set(v.c);
-    // Emissive voxels are pushed brighter than 1.0 so bloom-free rendering still
-    // reads them as light sources against the dark hull.
+    // A tiny deterministic value shift keeps large walls from reading as one
+    // flat plastic slab. It costs no extra draw calls and gives every block a
+    // little forged-stone / hammered-metal variation under the PBR lights.
+    const grain = Math.sin(v.x * 12.9898 + v.y * 78.233 + v.z * 37.719) * 43758.5453;
+    const wear = 0.9 + (grain - Math.floor(grain)) * 0.18;
+    // Energy voxels deliberately live above display-white. The HDR presentation
+    // pipeline catches these values and gives each encounter its colored bloom.
     let r = c.r;
     let g = c.g;
     let b = c.b;
     if (emissiveKeys && emissiveKeys.has(v.c)) {
-      r = Math.min(1, r * 1.55 + 0.2);
-      g = Math.min(1, g * 1.55 + 0.2);
-      b = Math.min(1, b * 1.55 + 0.2);
+      r = r * 3.4 + 0.25;
+      g = g * 3.4 + 0.25;
+      b = b * 3.4 + 0.25;
     }
     for (let j = 0; j < nv; j++) {
       const o = (i * nv + j) * 3;
@@ -49,9 +54,12 @@ export function buildVoxels(vox, scale = 1, opts = {}) {
       nor[o] = bn[j * 3];
       nor[o + 1] = bn[j * 3 + 1];
       nor[o + 2] = bn[j * 3 + 2];
-      col[o] = r;
-      col[o + 1] = g;
-      col[o + 2] = b;
+      const face = emissiveKeys && emissiveKeys.has(v.c)
+        ? 1
+        : wear * (0.88 + Math.max(0, bn[j * 3 + 1]) * 0.14 - Math.max(0, -bn[j * 3 + 1]) * 0.1);
+      col[o] = r * face;
+      col[o + 1] = g * face;
+      col[o + 2] = b * face;
     }
   }
 
@@ -59,7 +67,16 @@ export function buildVoxels(vox, scale = 1, opts = {}) {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: opts.roughness ?? 0.74,
+      metalness: opts.metalness ?? 0.2,
+    })
+  );
+  mesh.castShadow = opts.castShadow ?? true;
+  mesh.receiveShadow = opts.receiveShadow ?? true;
 
   const grp = new THREE.Group();
 
@@ -70,6 +87,8 @@ export function buildVoxels(vox, scale = 1, opts = {}) {
       geoOut,
       new THREE.MeshBasicMaterial({ color: P.black, side: THREE.BackSide })
     );
+    outline.castShadow = false;
+    outline.receiveShadow = false;
     grp.add(outline);
   }
   grp.add(mesh);
@@ -118,9 +137,11 @@ function diamondTex() {
   g.translate(32, 32);
   g.rotate(Math.PI / 4);
   const gr = g.createLinearGradient(-18, -18, 18, 18);
-  gr.addColorStop(0, '#fff0ff');
-  gr.addColorStop(0.5, '#FF2ED2');
-  gr.addColorStop(1, '#7C1D6F');
+  // Neutral facets let the pickup palette supply true white/gold/teal/violet
+  // instead of multiplying every treasure tint through a baked pink texture.
+  gr.addColorStop(0, '#ffffff');
+  gr.addColorStop(0.45, '#eeeeee');
+  gr.addColorStop(1, '#747b91');
   g.fillStyle = gr;
   g.fillRect(-16, -16, 32, 32);
   g.strokeStyle = '#0A0716';

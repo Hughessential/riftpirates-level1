@@ -1,0 +1,51 @@
+/* Encounter-only cinema. Every animation is driven by the paused game clock. */
+.bossIntro{--boss-color:#20e7de;--intro-in:0;--intro-out:0;--intro-title:0;--intro-progress:0;
+  position:fixed;inset:0;z-index:18;overflow:hidden;pointer-events:none;color:#eaffff;
+  font-family:'Rift Pixel',monospace;opacity:calc(1 - var(--intro-out));
+  background:linear-gradient(90deg,rgba(0,0,4,.22),transparent 55%),linear-gradient(0deg,rgba(0,0,6,.82),transparent 40%)}
+.bossIntro[hidden]{display:none!important}
+.bossIntroBar{position:absolute;left:0;width:100%;height:clamp(40px,7.5vh,100px);background:#010206;
+  border-color:color-mix(in srgb,var(--boss-color) 38%,transparent);border-style:solid;border-width:0;
+  transform:scaleY(var(--intro-in));pointer-events:none}
+.bossIntroBarTop{top:0;transform-origin:top;border-bottom-width:1px}
+.bossIntroBarBottom{bottom:0;transform-origin:bottom;border-top-width:1px}
+.bossIntroHeader{position:absolute;left:4.2%;right:4.2%;top:2.5vh;display:flex;align-items:center;justify-content:space-between;
+  gap:20px;font-size:clamp(9px,.7vw,16px);letter-spacing:.16em;color:var(--boss-color);opacity:var(--intro-in)}
+.bossIntroHeader>div{display:flex;gap:18px}
+.bossIntroHeader button{font:inherit;letter-spacing:.08em;padding:6px 9px;background:#050811cc;border:1px solid #ffffff30;
+  color:#e6fdf9;pointer-events:auto;cursor:pointer}
+.bossIntroHeader button:hover,.bossIntroHeader button:focus-visible{color:var(--boss-color);border-color:var(--boss-color);outline:none}
+.bossIntroHeader button:disabled{opacity:.25;cursor:default}
+.bossIntroFrame{position:absolute;inset:13% 4.3% 14%;opacity:calc(var(--intro-in)*.4)}
+.bossIntroFrame i{position:absolute;width:25px;height:25px;border:solid var(--boss-color);border-width:1px 0 0 1px}
+.bossIntroFrame i:nth-child(2){right:0;transform:rotate(90deg)}
+.bossIntroFrame i:nth-child(3){right:0;bottom:0;transform:rotate(180deg)}
+.bossIntroFrame i:nth-child(4){bottom:0;transform:rotate(270deg)}
+.bossIntroMark{position:absolute;right:5%;top:12%;font-size:clamp(54px,8.5vw,180px);line-height:1;
+  color:transparent;-webkit-text-stroke:1px var(--boss-color);opacity:calc(var(--intro-title)*.22);letter-spacing:-.08em}
+.bossIntroSignal{position:absolute;left:5.5%;top:15%;display:flex;align-items:center;gap:12px;
+  font-size:clamp(8px,.7vw,14px);color:var(--boss-color);letter-spacing:.14em;opacity:var(--intro-in)}
+.bossIntroSignalDot{width:6px;height:6px;background:var(--boss-color);box-shadow:0 0 10px var(--boss-color)}
+.bossIntroSignal i{display:block;width:clamp(60px,8vw,150px);height:2px;background:#ffffff1a}
+.bossIntroSignal i b{display:block;height:100%;width:calc(var(--intro-progress)*100%);background:var(--boss-color)}
+.bossIntroCopy{position:absolute;left:5.5%;bottom:17.5%;width:min(80vw,1400px);text-align:left;
+  opacity:var(--intro-title);transform:translateY(calc((1 - var(--intro-title))*18px))}
+.bossIntroOverline{font-size:clamp(10px,.85vw,19px);color:var(--boss-color);letter-spacing:.25em;margin:0 0 15px}
+.bossIntroCopy h2{margin:0;font:inherit;font-size:clamp(30px,4.8vw,100px);font-weight:normal;line-height:1.2;letter-spacing:.005em;
+  filter:drop-shadow(0 0 12px color-mix(in srgb,var(--boss-color) 38%,transparent))}
+.bossIntroCopy h2 span{display:block;text-shadow:2px 2px 0 #010208,4px 4px 0 #010208,5px 5px 0 var(--boss-color)}
+.bossIntroCopy h2 span:last-child{color:var(--boss-color)}
+.bossIntroQuote{margin:18px 0 0;color:#c5c7df;font-size:clamp(9px,.9vw,18px);letter-spacing:.15em}
+.bossIntroFooter{position:absolute;left:5.5%;right:5.5%;bottom:2.6vh;display:flex;justify-content:space-between;gap:24px;
+  font-size:clamp(8px,.65vw,14px);line-height:1.7;letter-spacing:.08em;opacity:var(--intro-in)}
+.bossIntroThreat{color:var(--boss-color)}
+.bossIntroFooter strong{font-weight:normal;color:#7e829c;text-align:right}
+body.bossIntroActive #playerPanel,body.bossIntroActive #objBar,body.bossIntroActive #heatPanel,
+body.bossIntroActive #objectiveName,body.bossIntroActive #encTimer,body.bossIntroActive #rightPanel,
+body.bossIntroActive #banner,body.bossIntroActive #toasts,body.bossIntroActive #boostBtn,body.bossIntroActive #fireBtn,
+body.bossIntroActive #arsenalReadout{visibility:hidden}
+@media(max-width:900px){.bossIntroHeader{font-size:8px}.bossIntroHeader>span{max-width:35%;line-height:1.8}
+  .bossIntroHeader>div{gap:6px}.bossIntroCopy{bottom:21%;width:88vw}.bossIntroCopy h2{font-size:clamp(22px,5.4vw,46px)}
+  .bossIntroFooter strong{display:none}.bossIntroFooter{bottom:2vh}.bossIntroSignal{top:17%;font-size:7px}}
+@media(max-height:600px){.bossIntroCopy{bottom:17%}.bossIntroCopy h2{font-size:clamp(22px,7vh,44px)}
+  .bossIntroOverline{margin-bottom:8px}.bossIntroQuote{margin-top:8px}.bossIntroSignal{top:19%}}

@@ -1,5 +1,6 @@
 import { P } from '../core/Palette.js';
 import { $, clamp } from '../core/Utils.js';
+import { weaponPowerSignature, primaryWeaponOutput } from '../config/weapons.js';
 
 /**
  * Persistent HUD (spec §42). The level badge is welded to the left end of the
@@ -13,6 +14,7 @@ export class HUD {
       hp: $('hpFill'),
       hpText: $('hpText'),
       shield: $('shieldFill'),
+      shieldStatus: $('shieldStatus'),
       level: $('levelBadge'),
       levelRing: $('levelRing'),
       boost: $('boostFill'),
@@ -40,6 +42,17 @@ export class HUD {
     this._timerOn = false;
     this._acc = 0;
     this._lowHealthT = 0;
+    this.arsenal = document.createElement('aside');
+    this.arsenal.id = 'arsenalReadout';
+    this.arsenal.innerHTML = '<small>REACTOR / TIER 0</small><strong>PULSE</strong><span class="arsenalStats"></span><span class="arsenalMods"></span>';
+    this.el.hud.append(this.arsenal);
+    this.augmentFlash = 0;
+  }
+
+  flashAugment(augment) {
+    this.augmentFlash = 2.6;
+    this.arsenal.style.setProperty('--installed', augment.color);
+    this.arsenal.classList.add('installed');
   }
 
   show() {
@@ -64,11 +77,47 @@ export class HUD {
   }
 
   clearObjective() {
+    this.clearApproach();
     this.el.objBar.classList.add('hidden');
     this.el.objective.textContent = '';
     this.el.pips.innerHTML = '';
     this.setObjectiveWarning(false);
     this.setBossPhase(0, '');
+  }
+
+  setApproach(name, color, checkpoints) {
+    $('approachPanel').classList.remove('hidden');
+    $('approachPanel').style.setProperty('--route', color);
+    $('approachTitle').textContent = name;
+    $('approachStops').replaceChildren(...checkpoints.map((progress, i) => {
+      const marker = document.createElement('i');
+      marker.style.left = `${progress * 100}%`;
+      marker.title = `Augment ${i + 1}`;
+      return marker;
+    }));
+    this._updateApproach();
+  }
+
+  clearApproach() {
+    $('approachPanel').classList.add('hidden');
+    $('approachBounty').classList.add('hidden');
+  }
+
+  _updateApproach() {
+    const d = this.game.director?.data;
+    if (!d?.cfg || $('approachPanel').classList.contains('hidden')) return;
+    const t = this.game.director.stateT;
+    $('approachFill').style.width = `${clamp(t / d.cfg.duration, 0, 1) * 100}%`;
+    $('approachCount').textContent = `${d.picks} / 3 AUGMENTS`;
+    [...$('approachStops').children].forEach((marker, i) => marker.classList.toggle('installed', i < d.picks));
+    const beat = d.cfg.authored?.beats[d.beatIndex];
+    $('approachBeat').textContent = d.awaitingAugment ? 'AUGMENT CACHE SECURED' : beat?.title || 'PUSH THROUGH THE DEFENSES';
+    $('approachHint').textContent = d.awaitingAugment ? 'Choose a power — combat is paused' : beat?.detail || (d.picks < 3
+      ? `Next augment in ${Math.max(0, Math.ceil(d.cfg.augmentAt[d.picks] - t))}s · survive and collect scrap`
+      : 'All three augments installed · objective ahead');
+    const bounty = $('approachBounty');
+    bounty.classList.toggle('hidden', !d.bounty);
+    if (d.bounty) bounty.textContent = d.bountyResolved ? '★ BLOCKADE BOUNTY CLAIMED' : `BOUNTY: BLOCKADE ACE · ${Math.ceil(d.bounty.healthPct * 100)}% HULL`;
   }
 
   /** One pip per weak point, so the player can see what's left to break. */
@@ -185,6 +234,8 @@ export class HUD {
     if (this._acc < 0.05) return;
     this._acc = 0;
 
+    this._updateApproach();
+
     const p = g.player;
     const s = p.stats;
 
@@ -197,6 +248,14 @@ export class HUD {
     if (s.shieldMax > 0) {
       this.el.shield.style.width = `${clamp(p.shield / s.shieldMax, 0, 1) * 100}%`;
       this.el.shield.parentElement.classList.remove('hidden');
+      const recovering = p.shield < s.shieldMax;
+      const delay = p.shieldRecoveryRemaining || 0;
+      this.el.shieldStatus.textContent = p.shieldBroken
+        ? `SHIELD BROKEN / ${delay.toFixed(1)}S`
+        : recovering && delay > 0 ? `SHIELD RECOVERY / ${delay.toFixed(1)}S`
+        : recovering ? 'SHIELD RECHARGING'
+        : `SHIELD ${Math.ceil(p.shield)} / ${Math.round(s.shieldMax)}`;
+      this.el.shieldStatus.classList.toggle('broken', p.shieldBroken);
     } else {
       this.el.shield.parentElement.classList.add('hidden');
     }
@@ -236,6 +295,33 @@ export class HUD {
       }
     }
 
+    if (g.escape.active) {
+      const escape = g.escape.snapshot();
+      const seconds = Math.max(0, Math.ceil(escape.remaining));
+      this.el.timerLabel.textContent = `COLLAPSE IN ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+      this.updateTimer(escape.remaining);
+      this.el.objFill.style.width = `${escape.progress * 100}%`;
+      this.el.objSub.textContent = `${escape.phase} ${escape.intensity.tier}/5 / ${Math.ceil(escape.distanceLeft)}m / ${escape.armada?.alive || 0} HOSTILES`;
+      this.setObjectiveWarning(escape.remaining < 25);
+    }
+
+    const signature = weaponPowerSignature(s, { heatMultiplier: g.heat.multiplier,
+      shield: p.shield, treasureCharge: p.treasureCharge });
+    this.arsenal.style.setProperty('--reactor', signature.color);
+    this.arsenal.querySelector('small').textContent = `REACTOR / TIER ${signature.tier} / ${g.upgrades.taken.length} AUGMENTS`;
+    this.arsenal.querySelector('strong').textContent = signature.label;
+    const output = primaryWeaponOutput(s, { fireRate: p.fireRate, critBuffT: p.critBuffT,
+      heatMultiplier: g.heat.multiplier, shield: p.shield, treasureCharge: p.treasureCharge,
+      weakPoint: !!p.reticleLock && !!g.targeting?.current && g.targeting.current.kind !== 'enemy' });
+    this.arsenal.querySelector('.arsenalStats').textContent = `${Number(output.damage.toFixed(1))} SHOT · ${Number(output.fireRate.toFixed(1))}/SEC · ${Math.round(s.damageReduction * 100)}% ARMOR`;
+    const guns = Object.keys(signature.weaponRanks).filter(kind => signature.weaponRanks[kind] > 0);
+    const systems = guns.length ? `${guns.length} SYSTEMS` : 'PRIMARY';
+    this.arsenal.querySelector('.arsenalMods').textContent = signature.modifiers.length
+      ? `${systems} / ${signature.modifiers.slice(0, 3).map(mod => `${mod.label} ×${mod.rank}`).join(' / ')}`
+      : `${systems} ONLINE`;
+    this.augmentFlash = Math.max(0, this.augmentFlash - .05);
+    this.arsenal.classList.toggle('installed', this.augmentFlash > 0);
+
     // low-health alarm
     if (hpPct < 25 && p.alive) {
       this._lowHealthT -= 0.05;
@@ -247,6 +333,8 @@ export class HUD {
   }
 
   reset() {
+    this.augmentFlash = 0;
+    this.arsenal.classList.remove('installed');
     this.clearObjective();
     this.stopTimer();
     this.el.toasts.innerHTML = '';

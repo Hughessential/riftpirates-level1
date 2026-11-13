@@ -89,9 +89,10 @@ export class RiftHeatSystem {
 
   onPlayerDamaged() {
     // Getting hit is the single biggest setback — Heat Sink softens it (spec §20)
-    const loss = this.game.player.stats.heatSink ? 0.12 : 0.28;
+    const rank = Number(this.game.player.stats.heatSink) || 0;
+    const loss = 0.28 / (1 + rank * 1.3);
     this.heat = clamp(this.heat - loss, 0, 1);
-    this.combo = Math.floor(this.combo * (this.game.player.stats.heatSink ? 0.7 : 0.4));
+    this.combo = Math.floor(this.combo * (1 - .6 / (1 + rank)));
     if (this.combo <= 0) this.comboT = 0;
   }
 
@@ -104,9 +105,10 @@ export class RiftHeatSystem {
 
     // Heat bleeds while you aren't engaging — camping the arena edge is not a strategy.
     this.idleT += dt;
-    const decayDelay = this.game.player.stats.heatSink ? 2.2 : 1.2;
+    const rank = Number(this.game.player.stats.heatSink) || 0;
+    const decayDelay = 1.2 + rank;
     if (this.idleT > decayDelay && this.heat > 0) {
-      const rate = this.game.player.stats.heatSink ? 0.05 : 0.09;
+      const rate = 0.09 / (1 + .8 * rank);
       this.heat = clamp(this.heat - rate * dt, 0, 1);
     }
   }

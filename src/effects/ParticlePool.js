@@ -271,7 +271,10 @@ export class ParticlePool {
       b.rz += b.wz * dt;
 
       const k = 1 - b.t / b.T;
-      const s = b.s * (k > 0.35 ? 1 : k / 0.35);
+      // Debris scrolling past the ship must not expand across the camera lens.
+      // Keep the burst at the impact, then shrink it out before the near plane.
+      const foreground = Math.max(0, Math.min(1, (6 - b.pz) / 5));
+      const s = b.s * (k > 0.35 ? 1 : k / 0.35) * foreground;
       this._e.set(b.rx, b.ry, b.rz);
       this._q.setFromEuler(this._e);
       this._v.set(b.px, b.py, b.pz);
@@ -297,8 +300,8 @@ export class ParticlePool {
       }
       const sc = (2.5 + 9 * ft) * (f.scale || 1);
       f.sp.scale.set(sc, sc, 1);
-      f.sp.material.opacity = 0.85 * (1 - ft);
       f.sp.position.z += worldSpeed * dt;
+      f.sp.material.opacity = 0.85 * (1 - ft) * Math.max(0, Math.min(1, (6 - f.sp.position.z) / 5));
     }
 
     // sparks
@@ -323,7 +326,8 @@ export class ParticlePool {
       spa[i * 3 + 1] += this.sparkVel[i * 3 + 1] * dt;
       spa[i * 3 + 2] += (this.sparkVel[i * 3 + 2] + worldSpeed) * dt;
       const tw = Math.random() < 0.22 ? 0.12 : 1;
-      const br = (sk > 0.45 ? 1 : sk / 0.45) * tw;
+      const foreground = Math.max(0, Math.min(1, (6 - spa[i * 3 + 2]) / 5));
+      const br = (sk > 0.45 ? 1 : sk / 0.45) * tw * foreground;
       sca[i * 3] = this.sparkBase[i * 3] * br;
       sca[i * 3 + 1] = this.sparkBase[i * 3 + 1] * br * (0.35 + 0.65 * sk);
       sca[i * 3 + 2] = this.sparkBase[i * 3 + 2] * br * (0.2 + 0.8 * sk);

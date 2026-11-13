@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Dev server for Rift Pirates.
+"""Compatibility launcher for the Vite dev server: python3 serve.py.
 
-Same as `python3 -m http.server 8000`, but with caching disabled so code
-edits always show up on a plain reload (browsers heuristically cache ES
-modules served with Last-Modified headers, which makes previews run stale
-code).
+Source modules now use npm imports, so a plain static server cannot run them.
+Keep the original launch command working by forwarding to npm start.
 """
-import http.server
-
-
-class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
-    def end_headers(self):
-        self.send_header('Cache-Control', 'no-store, must-revalidate')
-        self.send_header('Expires', '0')
-        super().end_headers()
+import os
+from pathlib import Path
+import shutil
+import sys
 
 
 if __name__ == '__main__':
-    http.server.test(HandlerClass=NoCacheHandler, port=8000)
+    root = Path(__file__).resolve().parent
+    npm = shutil.which('npm')
+    if not npm:
+        sys.exit('Node.js/npm is required. Install Node.js, then run npm install and npm start.')
+    if not (root / 'node_modules' / 'vite').is_dir():
+        sys.exit('Dependencies are missing. Run npm install in the project folder, then try again.')
+    os.chdir(root)
+    os.execv(npm, [npm, 'start', '--', *sys.argv[1:]])

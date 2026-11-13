@@ -1,4 +1,5 @@
 import { SCORE } from '../systems/ScoreSystem.js';
+import { OUTER_APPROACH } from './approaches.js';
 
 /**
  * All encounter balance lives here (spec §38) so tuning never means touching
@@ -30,9 +31,9 @@ export const OUTER_TOWER = {
   turretDamage: 10,
 
   // Attack C: scout drones
-  droneSpawnInterval: 8,
+  droneSpawnInterval: 6.8,
   droneCount: 2,
-  maxDrones: 5,
+  maxDrones: 6,
 };
 
 export const MIDRIFT_TOWER = {
@@ -68,8 +69,8 @@ export const MIDRIFT_TOWER = {
   pressureRadius: 7,
 
   // enemy support
-  gunshipInterval: 9,
-  maxEnemies: 5,
+  gunshipInterval: 7.8,
+  maxEnemies: 6,
 };
 
 export const INNER_CITADEL = {
@@ -85,7 +86,7 @@ export const INNER_CITADEL = {
   defeatBanner: 'INNER CITADEL FALLEN',
 
   // Attack B: elite deployment
-  eliteInterval: 11,
+  eliteInterval: 9.5,
   eliteIntervalNoDock: 20, // killing the dock slows reinforcements
   maxElites: 3,
 
@@ -154,7 +155,11 @@ export const RIFT_ADMIRAL = {
 /** Traversal sector pacing (spec §12, §15, §18). */
 export const TRAVERSAL = {
   sector1: {
-    duration: 42,
+    sector: 0,
+    duration: 104,
+    augmentAt: [22, 54, 88],
+    authored: OUTER_APPROACH,
+    maxEnemies: 7,
     music: 'level1_a',
     spawnInterval: [2.4, 3.6],
     types: ['scout', 'scout', 'gunship'],
@@ -163,19 +168,25 @@ export const TRAVERSAL = {
     scrapCrates: 2,
   },
   sector2: {
-    duration: 58, // spec: 45-75s
+    sector: 1,
+    duration: 96,
+    augmentAt: [24, 52, 80],
     music: 'level1_b',
-    spawnInterval: [1.9, 3.0],
-    types: ['scout', 'gunship', 'gunship', 'heavy'],
+    spawnInterval: [1.6, 2.6],
+    maxEnemies: 8,
+    types: ['scout', 'gunship', 'gunship', 'heavy', 'shielder'],
     asteroidRate: 0.9,
-    gates: 3,
+    gates: 4,
     gravityDistortions: 2,
     scrapCrates: 3,
   },
   sector3: {
-    duration: 58,
+    sector: 2,
+    duration: 108,
+    augmentAt: [28, 60, 92],
     music: 'level1_c',
-    spawnInterval: [1.6, 2.6],
+    spawnInterval: [1.3, 2.2],
+    maxEnemies: 9,
     types: ['gunship', 'heavy', 'elite', 'shielder'],
     asteroidRate: 0.7,
     gates: 2,
@@ -183,12 +194,15 @@ export const TRAVERSAL = {
     scrapCrates: 3,
   },
   inhibitorApproach: {
-    duration: 36, // spec: 30-45s, shorter and more ceremonial
+    sector: 3,
+    duration: 78,
+    augmentAt: [18, 40, 62],
     music: 'level1_c',
-    spawnInterval: [3.5, 5],
-    types: ['gunship', 'heavy'],
+    spawnInterval: [1.6, 2.5],
+    maxEnemies: 9,
+    types: ['gunship', 'heavy', 'elite', 'shielder'],
     asteroidRate: 0.35,
-    gates: 0,
+    gates: 2,
     scrapCrates: 2,
     ceremonial: true,
   },

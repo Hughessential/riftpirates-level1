@@ -25,19 +25,34 @@ export class DamageNumbers {
   }
 
   spawn(x, y, z, value, crit = false) {
+    // A shotgun/chain build can land dozens of hits at one point. Sum nearby
+    // hits in a brief fixed window instead of covering the target with labels.
+    const recent = this.pool.find((o) => o.life > 0 && !o.blocked && o.crit === crit
+      && o.max - o.life < .12 && (o.pos.x - x) ** 2 + (o.pos.y - y) ** 2 + (o.pos.z - z) ** 2 < 9);
+    if (recent) {
+      recent.value += value;
+      recent.el.textContent = crit ? `${recent.value}!` : recent.value;
+      return;
+    }
     const o = this._free();
     o.pos.set(x, y, z);
     o.life = crit ? 0.95 : 0.65;
     o.max = o.life;
     o.rise = 0;
     o.drift = (Math.random() - 0.5) * 30;
+    o.value = value;
+    o.crit = crit;
+    o.blocked = false;
     o.el.textContent = crit ? `${value}!` : value;
     o.el.className = crit ? 'dmg crit' : 'dmg';
     o.el.style.display = 'block';
   }
 
   spawnBlocked(x, y, z) {
+    if (this.pool.some((o) => o.life > .2 && o.blocked
+      && (o.pos.x - x) ** 2 + (o.pos.y - y) ** 2 + (o.pos.z - z) ** 2 < 16)) return;
     const o = this._free();
+    o.blocked = true;
     o.pos.set(x, y, z);
     o.life = 0.5;
     o.max = 0.5;

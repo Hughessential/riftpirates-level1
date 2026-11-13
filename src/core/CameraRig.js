@@ -12,8 +12,9 @@ import { Input } from './Input.js';
  */
 
 export const FRAMING = {
-  traversal: { dist: 11, height: 4.6, fov: 68, look: -16 },
-  tower: { dist: 15, height: 5.6, fov: 70, look: -22 },
+  // Leave room below the ship for the long exhaust ribbons and dodge lanes.
+  traversal: { dist: 16, height: 7, fov: 68, look: -16 },
+  tower: { dist: 18, height: 7.5, fov: 70, look: -22 },
   boss: { dist: 22, height: 7.5, fov: 74, look: -30 },
   cinematic: { dist: 9, height: 3.5, fov: 88, look: -40 },
 };
@@ -33,7 +34,7 @@ export class CameraRig {
     this.cur = { ...FRAMING.traversal };
     this.yaw = 0; // right-stick orbit state
     this.pitch = 0;
-    this._base = new THREE.Vector3(0, 4.6, 11); // un-orbited camera position
+    this._base = new THREE.Vector3(0, FRAMING.traversal.height, FRAMING.traversal.dist);
     this._look = new THREE.Vector3();
     this._pivot = new THREE.Vector3();
     this._offC = new THREE.Vector3();
@@ -47,12 +48,30 @@ export class CameraRig {
     this.target = { ...FRAMING[mode] };
   }
 
+  /** Encounter reveals provide a complete pose; gameplay framing remains intact. */
+  setEncounterReveal(pose) { this.encounterReveal = pose; }
+  clearEncounterReveal() {
+    if (this.encounterReveal) this.cur = { ...this.target };
+    this.encounterReveal = null;
+  }
+
   shake(amount) {
     this.shakeAmt = Math.min(1.2, this.shakeAmt + amount);
   }
 
   update(dt, player, boosting) {
     const c = this.camera;
+
+    if (this.encounterReveal) {
+      const pose = this.encounterReveal;
+      c.position.copy(pose.position);
+      c.lookAt(pose.look);
+      c.fov = pose.fov;
+      c.updateProjectionMatrix();
+      this._base.copy(pose.position);
+      this.yaw = this.pitch = this.shakeAmt = 0;
+      return;
+    }
 
     // ease between framings so encounter transitions feel like one move
     this.cur.dist = damp(this.cur.dist, this.target.dist, 2.5, dt);
@@ -109,14 +128,15 @@ export class CameraRig {
   }
 
   reset() {
+    this.clearEncounterReveal();
     this.setMode('traversal');
     this.cur = { ...FRAMING.traversal };
     this.shakeAmt = 0;
     this.yaw = 0;
     this.pitch = 0;
-    this._base.set(0, 4.6, 11);
-    this.camera.position.set(0, 4.6, 11);
-    this.camera.fov = 68;
+    this._base.set(0, this.cur.height, this.cur.dist);
+    this.camera.position.copy(this._base);
+    this.camera.fov = this.cur.fov;
     this.camera.updateProjectionMatrix();
   }
 }

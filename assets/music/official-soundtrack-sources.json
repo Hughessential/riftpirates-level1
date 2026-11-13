@@ -1,0 +1,37 @@
+{
+  "sourceArchive": "RIFTPIRATES OFFICIAL SOUNDTRACK.zip",
+  "files": {
+    "Rift Pirates OFFICIAL Main Title Theme.mp3": {
+      "bytes": 5966575,
+      "sha256": "eac6f59747f466dd0896ad6998c4c457cfaec35fd10b67f3d87a9712a1553a73"
+    },
+    "Boss Battle OFFICAL soundtrack.mp3": {
+      "bytes": 5550937,
+      "sha256": "af59b330ef02193aae89c89fbd043b77b2f69c113db3e4e5585a6ae59e05f862"
+    },
+    "The Very Very End.mp3": {
+      "bytes": 2217278,
+      "sha256": "3a311e83172cae7bf19414f47ea6a423ed46631f3f82bcbd357bffa95fd1dc5c"
+    },
+    "arcade.mp3": {
+      "bytes": 6339165,
+      "sha256": "255f002d73dcdfcc4f87aa2a3571304a648c08dc9f57a0ffeb5ec6dc3cc95725"
+    },
+    "astral.mp3": {
+      "bytes": 6570074,
+      "sha256": "cf3e5fba1e12e0f3bbb93da0ae330d20e6f866fcc0db24847fae486bd0186187"
+    },
+    "neondrift.mp3": {
+      "bytes": 5413361,
+      "sha256": "f21cbfc329162710055540199d93b85d2840bf30ef78898ab80daa20f5b8ca94"
+    },
+    "pixelatedvoid.mp3": {
+      "bytes": 7907643,
+      "sha256": "3592fff8bc577ec5139a8ef2209db5420ba1d2254aa8d8fb6115db5edc3a9e03"
+    },
+    "thepirateking.mp3": {
+      "bytes": 4238599,
+      "sha256": "49e7e15c793a39c412fd068c631a7fe4b71729b279e5bf33056d5209cf7e9222"
+    }
+  }
+}

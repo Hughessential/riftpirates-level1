@@ -1,6 +1,7 @@
 /** The level's state machine (spec §36). Only systems relevant to the current state update. */
 export const STATE = {
   MENU: 'MENU',
+  TESTING: 'TESTING',
   INTRO: 'INTRO',
 
   TRAVERSAL_1: 'TRAVERSAL_1',
@@ -27,6 +28,7 @@ export const STATE = {
   UPGRADE_5: 'UPGRADE_5',
   BOSS_INTRO: 'BOSS_INTRO',
   BOSS_COMBAT: 'BOSS_COMBAT',
+  ESCAPE: 'ESCAPE',
 
   VICTORY: 'VICTORY',
   DYING: 'DYING',
@@ -36,11 +38,12 @@ export const STATE = {
 
 /** States where the player flies, shoots and can be hurt. */
 export const COMBAT_STATES = new Set([
+  STATE.TESTING,
   STATE.TRAVERSAL_1, STATE.TOWER_1_COMBAT,
   STATE.TRAVERSAL_2, STATE.TOWER_2_COMBAT,
   STATE.TRAVERSAL_3, STATE.TOWER_3_COMBAT,
   STATE.INHIBITOR_APPROACH, STATE.INHIBITOR_COMBAT,
-  STATE.BOSS_COMBAT,
+  STATE.BOSS_COMBAT, STATE.ESCAPE,
 ]);
 
 /** States where the world still animates but nothing can damage the player. */

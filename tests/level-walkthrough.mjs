@@ -3,6 +3,7 @@
  * an entire 12-minute run in seconds and assert every state transition.
  */
 import puppeteer from 'puppeteer-core';
+import assert from 'node:assert/strict';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const errors = [];
@@ -16,21 +17,23 @@ const browser = await puppeteer.launch({
     '--mute-audio', '--autoplay-policy=no-user-gesture-required', '--window-size=1440,900',
   ],
 });
+try {
 const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 900 });
 page.on('pageerror', (e) => errors.push(`${e.message} :: ${(e.stack || '').split('\n')[1]?.trim()}`));
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(`console: ${m.text()}`); });
 
 await page.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
-await new Promise((r) => setTimeout(r, 700));
+await page.waitForFunction(() => Boolean(window.RIFT));
 await page.click('#launchBtn');
-await new Promise((r) => setTimeout(r, 500));
 
 // Simulation-only: software GL makes rendering the bottleneck, and we're
 // verifying game logic here. Visuals get checked separately with screenshots.
 await page.evaluate(() => {
-  window.__realRender = window.RIFT.renderer.render.bind(window.RIFT.renderer);
-  window.RIFT.renderer.render = () => {};
+  window.__realRender = window.RIFT.renderFrame.bind(window.RIFT);
+  window.RIFT.renderFrame = () => {};
+  window.__step = window.RIFT.update.bind(window.RIFT);
+  window.RIFT.update = () => {};
 });
 
 /** Step the sim by `seconds` of game time at a fixed 60Hz. */
@@ -39,10 +42,23 @@ const step = async (seconds) => {
   while (left > 0) {
     const chunk = Math.min(left, 600);
     await page.evaluate((n) => {
-      for (let i = 0; i < n; i++) window.RIFT.update(1 / 60);
+      for (let i = 0; i < n; i++) window.__step(1 / 60);
     }, chunk);
     left -= chunk;
   }
+};
+
+const advanceUntil = async (state, maxSeconds = 20, choice = false) => {
+  for (let elapsed = 0; elapsed < maxSeconds; elapsed += 10) {
+    const reached = await page.evaluate(({ state, choice, seconds }) => {
+      const g = window.RIFT;
+      const done = () => choice ? g.upgradeScreen.open : g.director.state === state;
+      for (let i = 0; i < Math.ceil(seconds * 60) && !done(); i++) window.__step(1 / 60);
+      return done();
+    }, { state, choice, seconds: Math.min(10, maxSeconds - elapsed) });
+    if (reached) return;
+  }
+  assert.fail(`Did not reach ${choice ? 'upgrade choice' : state}: ${JSON.stringify(await snap())}`);
 };
 
 const snap = () =>
@@ -87,14 +103,32 @@ const killEncounter = () =>
     for (const t of e.targets) { t.targetable = true; t.damageScale = 1; t.damage(1e9); }
   });
 const pickUpgrade = async () => {
-  const ok = await page.evaluate(() => {
-    const btn = document.querySelector('#upgradeCards .upCard');
-    if (btn) { btn.click(); return true; }
-    return false;
+  const before = await page.evaluate(() => {
+    const g = window.RIFT;
+    return { taken: g.upgrades.taken.length, open: g.upgradeScreen.open,
+      count: document.querySelectorAll('#upgradeCards .upCard').length };
   });
-  await new Promise((r) => setTimeout(r, 400));
-  await step(1);
-  return ok;
+  assert.equal(before.open, true, 'Expected a visible upgrade choice');
+  assert.equal(before.count, 3, 'Every cache must offer three cards');
+  await page.evaluate(() => document.querySelector('#upgradeCards .upCard').click());
+  await step(0.5);
+  assert.equal(await page.evaluate(() => window.RIFT.upgrades.taken.length), before.taken + 1);
+  assert.equal(await page.evaluate(() => window.RIFT.upgradeScreen.open), false);
+};
+
+const approach = async (traversal, combat) => {
+  assert.equal((await snap()).dir, traversal);
+  const duration = await page.evaluate(() => window.RIFT.director.data.cfg.duration);
+  const before = await page.evaluate(() => window.RIFT.upgrades.taken.length);
+  for (let i = 0; i < 3; i++) {
+    await advanceUntil(null, duration + 3, true);
+    assert.equal((await snap()).dir, traversal, 'Augments must arrive before the objective');
+    await pickUpgrade();
+    assert.equal(await page.evaluate(() => window.RIFT.director.data.picks), i + 1);
+  }
+  await advanceUntil(combat, duration + 5);
+  assert.equal(await page.evaluate(() => window.RIFT.upgrades.taken.length), before + 3);
+  await log(`${traversal} complete`);
 };
 
 console.log('LABEL                    DIRECTOR            ENCOUNTER STATE');
@@ -103,47 +137,30 @@ console.log('-'.repeat(122));
 await godMode();
 await log('boot');
 
-await step(3);
-await log('after intro');
-await step(40);
-await log('traversal 1 (40s)');
-await step(6);
-await log('tower 1 intro');
-await step(10);
-await log('tower 1 combat (10s)');
-
-await killEncounter();
-await step(3);
-await log('tower 1 destroyed');
-
-const up1 = await page.evaluate(() => !document.getElementById('upgradeScreen').classList.contains('hidden'));
-console.log(`   >> upgrade cache 1 visible: ${up1}`);
-await pickUpgrade();
-await log('after upgrade 1');
-
-const cycle = async (name, traversalSecs) => {
-  await step(traversalSecs);
-  await step(6);
-  await log(`${name} intro`);
+await advanceUntil('TRAVERSAL_1', 4);
+for (const [traversal, combat, next] of [
+  ['TRAVERSAL_1', 'TOWER_1_COMBAT', 'TRAVERSAL_2'],
+  ['TRAVERSAL_2', 'TOWER_2_COMBAT', 'TRAVERSAL_3'],
+  ['TRAVERSAL_3', 'TOWER_3_COMBAT', 'INHIBITOR_APPROACH'],
+]) {
+  await approach(traversal, combat);
   await step(8);
-  await log(`${name} combat`);
+  await log(`${combat} active`);
+  const picks = await page.evaluate(() => window.RIFT.upgrades.taken.length);
   await killEncounter();
-  await step(4);
-  await log(`${name} destroyed`);
-  await pickUpgrade();
-};
-
-await cycle('tower 2', 58);
-await cycle('tower 3', 58);
+  await advanceUntil(next, 15);
+  assert.equal(await page.evaluate(() => window.RIFT.upgrades.taken.length), picks,
+    'Post-objective recovery must not add another augment');
+  await log(`${combat} cleared`);
+}
 
 // ---- inhibitor ----
-await step(36);
-await step(6);
-await log('inhibitor intro');
+await approach('INHIBITOR_APPROACH', 'INHIBITOR_COMBAT');
 await step(6);
 await log('inhibitor combat');
 const shieldsUp = await page.evaluate(() => window.RIFT.encounter.shieldsUp);
 console.log(`   >> inhibitor rotating shields blocking fire: ${shieldsUp}`);
+assert.equal(shieldsUp, true);
 
 await page.evaluate(() => {
   const e = window.RIFT.encounter;
@@ -156,25 +173,28 @@ const overload = await page.evaluate(() => ({
   coreTargetable: window.RIFT.encounter.core.targetable,
 }));
 console.log(`   >> all conduits down -> ${JSON.stringify(overload)}`);
+assert.deepEqual(overload, { overloading: true, shieldsUp: false, coreTargetable: true });
 await log('inhibitor overload');
 
 await page.evaluate(() => window.RIFT.encounter.core.damage(1e9));
-await step(4);
+await advanceUntil('NEXUS_TRANSITION', 15);
 await log('inhibitor destroyed');
 console.log(`   >> nexus rift opened: ${await page.evaluate(() => !!window.RIFT.rift)}`);
-
-await pickUpgrade();
-await log('after upgrade 4');
+assert.equal(await page.evaluate(() => Boolean(window.RIFT.rift)), true);
+assert.equal(await page.evaluate(() => window.RIFT.upgrades.taken.length), 12);
 
 // ---- nexus transition ----
-await step(11);
+await advanceUntil(null, 15, true);
 await log('nexus transition');
 const up5 = await page.evaluate(() => !document.getElementById('upgradeScreen').classList.contains('hidden'));
 console.log(`   >> upgrade cache 5 (progression-board bonus) visible: ${up5}`);
+assert.equal(up5, true);
+assert.equal((await snap()).dir, 'UPGRADE_5');
 await pickUpgrade();
+assert.equal(await page.evaluate(() => window.RIFT.upgrades.taken.length), 13);
 
 // ---- boss ----
-await step(8);
+await advanceUntil('BOSS_COMBAT', 9);
 await log('boss intro');
 await step(10);
 await log('boss phase 1');
@@ -187,6 +207,7 @@ for (const [i, pct] of [[2, 0.74], [3, 0.49], [4, 0.24]]) {
   }, pct);
   await step(6);
   await log(`boss phase ${i}`);
+  assert.equal(await page.evaluate(() => window.RIFT.encounter.phase + 1), i);
 }
 console.log(`   >> boss reached phase ${await page.evaluate(() => window.RIFT.encounter.phase + 1)} / 4`);
 
@@ -196,9 +217,30 @@ await page.evaluate(() => {
   e._bossDamage(20);
 });
 await step(6);
-await log('boss dying');
-await step(4);
-await log('victory');
+await log('boss destroyed / escape');
+assert.equal((await snap()).dir, 'ESCAPE', 'Admiral defeat must lead to the escape before victory');
+assert.equal(await page.$eval('#resultsScreen', el => el.classList.contains('hidden')), true,
+  'Admiral defeat does not finalize the run');
+// Progression coverage uses the existing god-mode harness, but the route still
+// has to be flown through the real movement controls. Mortal difficulty pilots
+// live in final-escape.mjs; this test does not make a balance claim.
+await page.evaluate(async () => {
+  const g = window.RIFT;
+  const { Input } = await import('/src/core/Input.js');
+  const read = Input.read.bind(Input);
+  Input.read = () => {
+    const route = g.escape.snapshot();
+    const target = route.nextGate || route.rift;
+    return { x: Math.max(-1, Math.min(1, (target.x - g.player.x) * .55)),
+      y: Math.max(-1, Math.min(1, (target.y - g.player.y) * .65)), boost: true };
+  };
+  try {
+    for (let frame = 0; frame < 140 * 60 && g.director.state === 'ESCAPE'; frame++) window.__step(1 / 60);
+  } finally { Input.read = read; Input.reset(); }
+});
+assert.equal((await snap()).dir, 'VICTORY', 'Reaching the rift completes the run');
+await step(3);
+await log('victory after escape');
 
 const results = await page.evaluate(() => {
   const el = document.getElementById('resultsScreen');
@@ -212,16 +254,23 @@ const results = await page.evaluate(() => {
   };
 });
 console.log('\nRESULTS:', JSON.stringify(results, null, 1));
+assert.equal(results.visible, true);
+assert.equal(results.title, 'THE RIFT ADMIRAL DEFEATED');
+assert.equal((await snap()).dir, 'VICTORY');
 
 // ---- restart without reload ----
 await page.click('#againBtn');
-await new Promise((r) => setTimeout(r, 500));
-await step(2);
+await step(3);
 const restart = await snap();
 console.log('RESTART:', JSON.stringify({
   dir: restart.dir, score: restart.score, hp: restart.hp, lvl: restart.lvl,
   upgrades: await page.evaluate(() => window.RIFT.upgrades.taken.length),
 }));
+assert.equal(restart.dir, 'TRAVERSAL_1');
+assert.equal(restart.score, 0);
+assert.equal(restart.hp, 160);
+assert.equal(restart.lvl, 1);
+assert.equal(await page.evaluate(() => window.RIFT.upgrades.taken.length), 0);
 
 // ---- death path (uses the real damage pipeline) ----
 await mortal();
@@ -238,10 +287,15 @@ const dead = await page.evaluate(() => ({
   killedBy: document.getElementById('deathLine').textContent.trim(),
 }));
 console.log('DEATH:', JSON.stringify(dead));
+assert.equal(dead.deathRan, true);
+assert.equal(dead.resultsVisible, true);
+assert.ok(dead.killedBy.includes('MIDRIFT SWEEPING LASER'));
 
 console.log('\n===== ERRORS =====');
 if (!errors.length) console.log('none');
 else [...new Set(errors)].slice(0, 20).forEach((e) => console.log('  ' + e));
 
-await browser.close();
-process.exit(errors.length ? 1 : 0);
+assert.deepEqual(errors, [], 'Browser must not report runtime errors');
+} finally {
+  await browser.close();
+}

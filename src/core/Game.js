@@ -7,9 +7,14 @@ import { Input } from './Input.js';
 import { Scheduler } from './Scheduler.js';
 import { CameraRig } from './CameraRig.js';
 import { LevelDirector } from './LevelDirector.js';
+import { TestingGrounds } from './TestingGrounds.js';
+import { FinalEscape } from '../encounters/FinalEscape.js';
 
 import { initTextures, buildVoxels, glowSprite, Tex } from '../render/VoxelBuilder.js';
 import { Environment } from '../render/Environment.js';
+import { CinematicRenderer } from '../render/CinematicRenderer.js';
+import { RiftWorldShowcase } from '../render/RiftWorldShowcase.js';
+import { displayMetrics, applyDisplayLayout } from '../render/DisplayLayout.js';
 
 import { Player, BASE_STATS } from '../player/Player.js';
 import { PlayerWeapon } from '../player/PlayerWeapon.js';
@@ -17,6 +22,7 @@ import { PlayerWeapon } from '../player/PlayerWeapon.js';
 import { ProjectilePool } from '../combat/ProjectilePool.js';
 import { TargetingSystem } from '../combat/TargetingSystem.js';
 import { CollisionSystem } from '../combat/CollisionSystem.js';
+import { AugmentEffects } from '../combat/AugmentEffects.js';
 
 import { EnemySpawner } from '../enemies/EnemySpawner.js';
 
@@ -56,19 +62,63 @@ export class Game {
       antialias: false,
       powerPreference: 'high-performance',
     });
+    this.display = displayMetrics(innerWidth, innerHeight, devicePixelRatio, this.renderer.capabilities.maxTextureSize);
+    applyDisplayLayout(this.display);
     this.renderer.setClearColor(new THREE.Color(P.ink), 1);
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.75));
+    this.renderer.setPixelRatio(this.display.pixelRatio);
     this.renderer.setSize(innerWidth, innerHeight);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.18;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     document.body.insertBefore(this.renderer.domElement, document.body.firstChild);
+    this.renderer.domElement.id = 'gameCanvas';
 
-    this.scene.add(new THREE.HemisphereLight(0x8a7bff, 0x1a0b3a, 0.9));
-    const sun = new THREE.DirectionalLight(0xffe9ff, 0.8);
-    sun.position.set(6, 14, 10);
-    this.scene.add(sun);
-    // rim light from the player's side so hulls read against the void
-    const rim = new THREE.DirectionalLight(0x22d3ee, 0.35);
-    rim.position.set(-8, 2, 14);
+    // Cinematic three-point lighting: warm structure key, cyan player rim and
+    // a magenta void fill. Encounter energy remains the brightest information.
+    this.scene.add(new THREE.HemisphereLight(0x6f66bb, 0x090318, 0.72));
+
+    const key = new THREE.DirectionalLight(0xffdfc4, 2.5);
+    key.position.set(12, 22, 16);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.left = -48;
+    key.shadow.camera.right = 48;
+    key.shadow.camera.top = 36;
+    key.shadow.camera.bottom = -28;
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 180;
+    key.shadow.bias = -0.00035;
+    key.shadow.normalBias = 0.025;
+    this.scene.add(key);
+
+    const rim = new THREE.DirectionalLight(0x22d3ee, 2.15);
+    rim.position.set(-16, 7, 18);
     this.scene.add(rim);
+
+    this.voidFill = new THREE.DirectionalLight(0xff2ed2, 1.05);
+    this.voidFill.position.set(14, -6, -24);
+    this.scene.add(this.voidFill);
+
+    const playerPool = new THREE.PointLight(0x5befff, 8, 44, 2);
+    playerPool.position.set(0, 3, 8);
+    this.scene.add(playerPool);
+
+    this.riftPool = new THREE.PointLight(0xb22cff, 11, 100, 2);
+    this.riftPool.position.set(0, 8, -34);
+    this.scene.add(this.riftPool);
+
+    this.lightMood = {
+      color: new THREE.Color(0xb22cff),
+      target: new THREE.Color(0xb22cff),
+      energy: 11,
+      targetEnergy: 11,
+      bloom: 0.78,
+      targetBloom: 0.78,
+    };
+
+    this.presentation = new CinematicRenderer(this.renderer, this.scene, this.camera);
 
     initTextures();
 
@@ -85,6 +135,8 @@ export class Game {
     this.fx = new ParticlePool(this.scene);
     this.damageNumbers = new DamageNumbers(this.camera);
     this.env = new Environment(this.scene, this);
+    this.worldShowcase = new RiftWorldShowcase(this.scene);
+    this.worldShowcase.resize(this.camera.aspect);
 
     this.player = new Player(this.scene, this.fx);
     this.projectiles = new ProjectilePool(this.scene);
@@ -92,6 +144,8 @@ export class Game {
     this.weapon = new PlayerWeapon(this.player, this.projectiles, this.targeting);
     this.collisions = new CollisionSystem(this);
     this.enemies = new EnemySpawner(this.scene, this);
+    this.augmentEffects = new AugmentEffects(this);
+    this.player.onShieldBreak = () => this.augmentEffects.onShieldBreak();
 
     this.heat = new RiftHeatSystem(this);
     this.score = new ScoreSystem(this);
@@ -105,18 +159,22 @@ export class Game {
     this.death = new DeathSequence(this.scene, this);
 
     this.director = new LevelDirector(this);
+    this.escape = new FinalEscape(this);
+    this.testing = new TestingGrounds(this);
 
     // --- run state ---
     this.time = 0;
     this.runTime = 0;
     this.paused = false;
     this.running = false;
+    this.titleMode = true;
     this.difficulty = { fireScale: 1, damageScale: 1 };
     this.stats = this._blankStats();
 
     // Player damage has to fan out to several systems; do it in one place.
     const takeDamage = this.player.takeDamage.bind(this.player);
     this.player.takeDamage = (amount, source) => {
+      if (this.testing.active && this.testing.settings.godMode && !this.testing.bypassGod) return false;
       const before = this.player.health;
       const hit = takeDamage(amount, source);
       if (hit) {
@@ -134,8 +192,12 @@ export class Game {
     };
 
     addEventListener('resize', () => this._resize());
+    document.addEventListener('fullscreenchange', () => this._resize());
+    window.visualViewport?.addEventListener('resize', () => this._resize());
+    this._watchDisplayDensity();
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.running && !this.paused) this.togglePause();
+      this.syncMusicPause();
     });
   }
 
@@ -153,9 +215,53 @@ export class Game {
   }
 
   _resize() {
-    this.camera.aspect = innerWidth / innerHeight;
+    this.display = displayMetrics(innerWidth, innerHeight, devicePixelRatio, this.renderer.capabilities.maxTextureSize);
+    applyDisplayLayout(this.display);
+    this.camera.aspect = this.display.aspect;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(innerWidth, innerHeight);
+    this.renderer.setPixelRatio(this.display.pixelRatio);
+    this.renderer.setSize(this.display.width, this.display.height);
+    this.presentation.setSize(this.display.width, this.display.height);
+    this.worldShowcase.resize(this.camera.aspect);
+    // A viewport resize may arrive before the media-query change event when
+    // moving between displays. Rebind immediately so a rapid return is caught.
+    if (this._watchedDensity !== (devicePixelRatio || 1)) this._watchDisplayDensity();
+  }
+
+  _watchDisplayDensity() {
+    this._densityQuery?.removeEventListener('change', this._densityChanged);
+    this._watchedDensity = devicePixelRatio || 1;
+    this._densityQuery = matchMedia(`(resolution: ${this._watchedDensity}dppx)`);
+    this._densityChanged = () => this._resize();
+    this._densityQuery.addEventListener('change', this._densityChanged);
+  }
+
+  renderFrame(dt = 0) {
+    // Some browser/display drivers change DPR without emitting resize or a
+    // resolution-query event. Catch that before submitting the next frame.
+    if (this._watchedDensity !== (devicePixelRatio || 1)) this._resize();
+    this._updateLighting(dt);
+    this.presentation.render(dt);
+  }
+
+  /** Cross-fades the whole arena into each objective's identity color. */
+  setWorldMood(color, energy = 1, bloom = 0.82) {
+    this.lightMood.target.set(color);
+    this.lightMood.targetEnergy = 11 * energy;
+    this.lightMood.targetBloom = bloom;
+  }
+
+  _updateLighting(dt) {
+    const mood = this.lightMood;
+    const k = 1 - Math.exp(-Math.max(0, dt) * 2.1);
+    mood.color.lerp(mood.target, k);
+    mood.energy += (mood.targetEnergy - mood.energy) * k;
+    mood.bloom += (mood.targetBloom - mood.bloom) * k;
+    this.riftPool.color.copy(mood.color);
+    this.riftPool.intensity = mood.energy;
+    this.voidFill.color.copy(mood.color);
+    this.presentation.setBloom(this.testing?.active && this.testing.settings.bloom !== null
+      ? this.testing.settings.bloom : mood.bloom);
   }
 
   // ------------------------------------------------------------------ helpers
@@ -218,16 +324,96 @@ export class Game {
   }
 
   onBossDefeated() {
+    if (!this.running || this._resultsFinalized || this.director.state !== STATE.BOSS_COMBAT) return;
+    if (this.testing.active) this.testing.sceneId = 'escape';
+    this.director.go(STATE.ESCAPE);
+  }
+
+  completeEscape() {
+    if (!this.running || !this.player.alive || this._resultsFinalized || this.director.state !== STATE.ESCAPE) return;
+    if (this.escape.outcome !== 'escaped') return;
+    this._escapeCleared = true;
+    this.enemies.clear();
+    this.clearHazards();
+    this.projectiles.reset();
     this.director.go(STATE.VICTORY);
+  }
+
+  failEscape(source = 'GALACTIC COLLAPSE') {
+    if (!this.running || this._resultsFinalized || this.director.state !== STATE.ESCAPE) return;
+    // Missing the deadline is a failed route, not a damage hit that armor,
+    // a revive charge or lab god mode could turn into extra countdown time.
+    this.player.health = 0;
+    this.player.alive = false;
+    this._onPlayerDeath(source);
+  }
+
+  syncMusicPause() {
+    Audio2.setMusicPaused('game', this.paused);
+    Audio2.setMusicPaused('lab', this.testing.active && this.testing.panelOpen);
+    Audio2.setMusicPaused('background', document.hidden);
+    // Study speed changes simulation only. Hold the original recording during
+    // frame study; return at the matching timeline position without repitching.
+    Audio2.setMusicPaused('escape-study', this.director.state === STATE.ESCAPE &&
+      this.testing.active && this.testing.settings.timeScale !== 1);
+    if (this.director.state === STATE.ESCAPE) Audio2.syncEscapeTime(this.escape.elapsed);
   }
 
   // ------------------------------------------------------------------- run flow
 
-  startRun() {
+  prepareTitle() {
+    this.director.clearPresentation();
+    this.escape.dispose();
+    this.testing.deactivate();
+    this.testRun = false;
+    this.running = false;
+    this.titleMode = true;
+    this.paused = false;
+    this.scheduler.clear();
+    this.upgradeScreen.hide();
+    this.enemies.clear();
+    this.projectiles.reset();
+    this.clearHazards();
+    this.env.clearAll();
+    this.env.clearApproach();
+    this.env.setSpeed(4);
+    this.env.livingDebris.group.visible = false;
+    this.targets.length = 0;
+    if (this.encounter) this.encounter.dispose();
+    this.encounter = null;
+    this.closeNexusRift();
+    this.fx.reset();
+    this.damageNumbers.reset();
+    this.scrap.reset();
+    this.player.group.visible = false;
+    this.player.exhaust.reset();
+    this.weapon.reset();
+    this.augmentEffects.reset();
+    this.camera3.reset();
+    this.camera.position.set(0, 4.6, 11);
+    this.camera.lookAt(0, 3, -24);
+    this.worldShowcase.update(0, 0, { menu: true });
+    this.setWorldMood(P.magenta, 1.4, 0.85);
+    $('titleCard').classList.add('hidden');
+    this.syncMusicPause();
+  }
+
+  startRun({ testing = false } = {}) {
+    this.director.clearPresentation();
+    this.escape.dispose();
+    if (!testing) this.testing.deactivate();
+    this._resultsFinalized = false;
+    this._escapeCleared = false;
+    this.killedBy = '';
+    this.testRun = testing;
     this.time = 0;
     this.runTime = 0;
     this.paused = false;
     this.running = true;
+    this.titleMode = false;
+    this.env.livingDebris.group.visible = true;
+    this.worldShowcase.reset();
+    this.worldShowcase.update(0, 0, { menu: false });
 
     // wipe every scrap of the previous run
     this.targets.length = 0;
@@ -255,8 +441,11 @@ export class Game {
     this.targeting.reset();
     this.weapon.reset();
     this.stats = this._blankStats();
+    this.augmentEffects.reset();
 
     this.player.reset(this.upgrades.stats);
+    this.player.setShip(Save.data.selectedShip);
+    this.player.group.visible = true;
     this.camera3.reset();
 
     this.hud.reset();
@@ -272,9 +461,13 @@ export class Game {
 
     this.director.reset();
     this.director.go(STATE.INTRO);
+    this.syncMusicPause();
   }
 
   _onPlayerDeath(source) {
+    if (!this.running || this._resultsFinalized || this.death.active) return;
+    this.director.clearPresentation();
+    this.escape.dispose();
     this.killedBy = source;
     this.director.state = STATE.DYING;
     Input.enabled = false;
@@ -285,26 +478,35 @@ export class Game {
   }
 
   showResults({ victory }) {
+    if (this._resultsFinalized) return;
+    this.director.clearPresentation();
+    this._resultsFinalized = true;
+    this.escape.dispose();
+    this.player.exhaust.reset();
     this.running = false;
     Input.enabled = false;
+    this.upgradeScreen.hide();
     this.hud.hide();
     $('boostBtn').classList.add('hidden');
     $('fireBtn').classList.add('hidden');
     this.resultsScreen.show({ victory, killedBy: this.killedBy });
+    this.syncMusicPause();
   }
 
   togglePause() {
+    if (this.testing.active && this.testing.panelOpen) return;
     if (!this.running) return;
     if (this.director.state === STATE.DYING) return;
     this.paused = !this.paused;
     $('pauseScreen').classList.toggle('hidden', !this.paused);
-    Input.enabled = !this.paused;
+    Input.enabled = !this.paused && !this.director.inUpgrade && !this.director.intro.active && !this.testing?.panelOpen;
     if (this.paused) {
       Audio2.pauseMusic();
     } else {
       Audio2.resume();
       Audio2.resumeMusic();
     }
+    this.syncMusicPause();
   }
 
   quitRun() {
@@ -321,6 +523,8 @@ export class Game {
   // ------------------------------------------------------------------- update
 
   update(rawDt) {
+    if (rawDt > 0) this.testing.fps += (1 / rawDt - this.testing.fps) * .05;
+    this.syncMusicPause();
     Audio2.update(rawDt);
     // gamepad is polled every frame — even while paused, so Start can resume
     Input.pollGamepad();
@@ -339,16 +543,22 @@ export class Game {
       if (padEv.connected) Audio2.play('ui_select', 0.5, 1.2);
     }
 
+    if (this.testing.active && this.testing.panelOpen) {
+      this.renderFrame(rawDt);
+      return;
+    }
+
     if (!this.running) {
       // attract mode: the world still drifts behind the menus
       this.env.update(rawDt * 0.3);
       this.fx.update(rawDt, 0);
-      this.renderer.render(this.scene, this.camera);
+      this.worldShowcase.update(rawDt, this.env.speed, { menu: this.titleMode });
+      this.renderFrame(rawDt);
       return;
     }
 
     if (this.paused) {
-      this.renderer.render(this.scene, this.camera);
+      this.renderFrame(rawDt);
       return;
     }
 
@@ -358,30 +568,41 @@ export class Game {
     // --- death sequence owns time while it runs ---
     if (this.death.active) {
       this.death.update(rawDt);
-      const dt = rawDt * this.death.timeScale;
+      const dt = rawDt * this.death.timeScale * (this.testing.active ? this.testing.settings.timeScale : 1);
       this.time += dt;
       this._updateWorld(dt);
       if (this.death.finished) {
         this.death.end();
         this.showResults({ victory: false });
       }
-      this.renderer.render(this.scene, this.camera);
+      this.renderFrame(rawDt);
       return;
     }
 
-    const dt = rawDt;
+    const dt = rawDt * (this.testing.active ? this.testing.settings.timeScale : 1);
+    // Choices stop approach time, heat decay, enemies, hazards and player motion.
+    // The scheduler still runs so the card dismissal/recovery can complete.
+    const choosing = this.director.inUpgrade || this.upgradeScreen.open || this.upgradeScreen.closing;
+    this.scheduler.update(dt);
+    if (choosing || this.director.inUpgrade || this.upgradeScreen.open || this.upgradeScreen.closing) {
+      this.fx.update(dt, 0);
+      this.hud.update(dt);
+      this.renderFrame(dt);
+      return;
+    }
     this.time += dt;
     if (this.director.inCombat) this.runTime += dt;
 
-    this.scheduler.update(dt);
     this.director.update(dt);
-    this._updateWorld(dt);
+    if (this.director.state === STATE.ESCAPE) Audio2.syncEscapeTime(this.escape.elapsed);
+    if (!this.director.inUpgrade) this._updateWorld(dt);
 
     this.hud.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.renderFrame(dt);
   }
 
   _updateWorld(dt) {
+    this.testing.beforeWorld(dt);
     const dying = this.director.state === STATE.DYING;
     const active = !this.director.inUpgrade;
 
@@ -399,8 +620,14 @@ export class Game {
 
     // --- world ---
     this.env.update(dt);
+    this.worldShowcase.update(dt, this.env.speed, { menu: false });
+    // The ending has its own collapse debris. Keep the known decorative fleets
+    // out of the aperture sightline without changing ordinary sectors or menus.
+    const heroSequence = this.director.state === STATE.ESCAPE || this.director.intro.active;
+    this.worldShowcase.worldRoot.visible = !heroSequence;
+    this.env.livingDebris.group.visible = !heroSequence;
     if (active) {
-      this.enemies.update(dt);
+      if (!this.testing.active || !this.testing.settings.freezeEnemies) this.enemies.update(dt);
       if (this.encounter) this.encounter.update(dt);
     }
 
@@ -415,8 +642,10 @@ export class Game {
     }
 
     // --- combat resolution ---
-    this.projectiles.update(dt, this.env.speed);
+    this.augmentEffects.update(dt, { active: !dying && this.director.inCombat });
+    this.projectiles.update(dt, this.env.speed, this);
     if (!dying && this.director.inCombat) this.collisions.update(dt);
+    this.projectiles.flush?.();
 
     this.scrap.update(dt, this.env.speed);
     this.heat.update(dt);
@@ -425,6 +654,9 @@ export class Game {
     this.fx.update(dt, this.env.speed);
     this.damageNumbers.update(dt);
     this.camera3.update(dt, this.player, this.player.boosting);
+    if (!this.testing.active || this.testing.settings.trail) {
+      this.player.exhaust.update(dt, this.player, this.camera, { emit: !dying });
+    }
 
     // the Nexus rift spins while it's open
     if (this.rift && this.director.state !== STATE.NEXUS_TRANSITION) {

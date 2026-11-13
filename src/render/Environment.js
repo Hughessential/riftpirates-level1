@@ -9,6 +9,7 @@ import { Target, PRIORITY } from '../combat/Target.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { rand, chance, TAU } from '../core/Utils.js';
 import { ARENA } from '../player/Player.js';
+import { ApproachScenery, LivingDebrisField } from './ApproachScenery.js';
 
 /**
  * The world that scrolls past. The player never actually moves forward — the
@@ -33,7 +34,7 @@ export class Environment {
 
     this.nebulae = [];
     for (let i = 0; i < 6; i++) {
-      const nb = glowSprite(i % 2 ? P.nebA : P.nebB, rand(60, 120), 0.13);
+      const nb = glowSprite(i % 2 ? P.nebA : P.nebB, rand(60, 120), 0.045);
       nb.position.set(rand(-80, 80), rand(-30, 40), rand(-200, -90));
       scene.add(nb);
       this.nebulae.push(nb);
@@ -47,6 +48,9 @@ export class Environment {
     this.nexusGlow = glowSprite(P.magenta, 30, 0);
     this.nexusGlow.position.set(0, 8, -185);
     scene.add(this.nexusGlow);
+
+    this.approachScenery = new ApproachScenery(scene);
+    this.livingDebris = new LivingDebrisField(scene);
 
     // --- pools ---
     this.asteroids = this._pool(
@@ -102,7 +106,7 @@ export class Environment {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     return new THREE.Points(
       g,
-      new THREE.PointsMaterial({ color, size, transparent: true, opacity: 0.9, depthWrite: false })
+      new THREE.PointsMaterial({ color, size, transparent: true, opacity: 0.72, depthWrite: false })
     );
   }
 
@@ -132,12 +136,20 @@ export class Environment {
     this.nexusGlow.scale.set(s, s, 1);
   }
 
+  setApproachProgress(progress, color = P.cyan) {
+    this.approachScenery.setProgress(progress, color);
+  }
+
+  clearApproach() {
+    this.approachScenery.clear();
+  }
+
   // --- spawning ------------------------------------------------------------
 
-  spawnAsteroid(big = false) {
+  spawnAsteroid(big = false, opts = {}) {
     const o = this._free(this.asteroids);
     if (!o) return;
-    o.g.position.set(rand(-26, 26), rand(-10, 16), SPAWN_Z);
+    o.g.position.set(opts.x ?? rand(-26, 26), opts.y ?? rand(-10, 16), opts.z ?? SPAWN_Z);
     o.g.visible = true;
     o.active = true;
     o.spin = { x: rand(-0.6, 0.6), y: rand(-0.6, 0.6) };
@@ -179,26 +191,26 @@ export class Environment {
     o.zf = 0.8;
   }
 
-  spawnCrate() {
+  spawnCrate(opts = {}) {
     const o = this._free(this.crates);
     if (!o) return;
-    o.g.position.set(rand(ARENA.minX + 3, ARENA.maxX - 3), rand(-5, 10), SPAWN_Z);
+    o.g.position.set(opts.x ?? rand(ARENA.minX + 3, ARENA.maxX - 3), opts.y ?? rand(-5, 10), opts.z ?? SPAWN_Z);
     o.g.visible = true;
     o.active = true;
     o.spin = { x: 1.2, y: 0.9 };
     o.zf = 0.85;
   }
 
-  spawnGate() {
+  spawnGate(opts = {}) {
     const o = this.gates.find((g) => !g.active);
     if (!o) return;
-    o.g.position.set(rand(-6, 6), rand(-4, 9), SPAWN_Z);
-    o.g.rotation.z = rand(0, Math.PI);
+    o.g.position.set(opts.x ?? rand(-6, 6), opts.y ?? rand(-4, 9), opts.z ?? SPAWN_Z);
+    o.g.rotation.z = opts.rotation ?? rand(0, Math.PI);
     o.g.visible = true;
     o.active = true;
-    o.drift = rand(-0.5, 0.5);
+    o.drift = opts.drift ?? rand(-0.5, 0.5);
     o.phase = rand(0, TAU);
-    o.spin = rand(-0.35, 0.35);
+    o.spin = opts.spin ?? rand(-0.35, 0.35);
   }
 
   /** Asteroids are shootable, so autofire always has something to do. */
@@ -248,6 +260,8 @@ export class Environment {
     // ease the world speed so stopping for a tower fight is a move, not a cut
     this.speed += (this.targetSpeed - this.speed) * Math.min(1, dt * 1.6);
     const ws = this.speed;
+    this.approachScenery.update(dt, ws);
+    this.livingDebris.update(dt, ws);
 
     this._moveStars(this.starA, ws, dt, 1);
     this._moveStars(this.starB, ws, dt, 0.45);
@@ -317,7 +331,7 @@ export class Environment {
     for (const o of this.gates) {
       if (!o.active) continue;
       o.g.position.z += ws * dt;
-      o.g.position.x += Math.sin(o.phase + this.game.time * 0.6) * o.drift;
+      o.g.position.x += Math.sin(o.phase + this.game.time * 0.6) * o.drift * dt;
       o.g.rotation.z += o.spin * dt;
       o.beam.material.opacity = 0.55 + 0.4 * Math.sin(this.game.time * 12);
 
@@ -374,6 +388,7 @@ export class Environment {
 
   reset() {
     this.clearAll();
+    this.clearApproach();
     this.speed = 0;
     this.targetSpeed = 0;
     this.warpStars(0);

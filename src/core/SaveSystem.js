@@ -5,6 +5,10 @@
  */
 const KEY = 'riftpirates-level1-v1';
 
+export const AUDIO_DEFAULTS = { musicVolume: .65, sfxVolume: .85 };
+export const clampAudioVolume = (value, fallback) =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+
 const mem = {};
 const store = {
   get(k) {
@@ -32,7 +36,9 @@ const DEFAULTS = {
   clears: 0,
   music: 1,
   sfx: 1,
+  ...AUDIO_DEFAULTS,
   seenIntro: 0, // lets us offer a skip on the Nexus cinematic after the first view
+  selectedShip: 'rift-talon', // cosmetic hull only; never changes run stats
 };
 
 export const Save = {
@@ -49,6 +55,9 @@ export const Save = {
       }
     } catch {
       /* corrupt save — fall back to defaults rather than blocking the run */
+    }
+    for (const [key, fallback] of Object.entries(AUDIO_DEFAULTS)) {
+      this.data[key] = clampAudioVolume(this.data[key], fallback);
     }
     return this.data;
   },

@@ -1,4 +1,4 @@
-import { Save } from './SaveSystem.js';
+import { Save, AUDIO_DEFAULTS, clampAudioVolume } from './SaveSystem.js';
 import { rand } from './Utils.js';
 
 /**
@@ -41,35 +41,81 @@ const SFX_FILES = {
   boss_taunt: 'boss_taunt.wav',
 };
 
-const MUSIC_FILES = {
-  title: 'title.m4a',
-  level1_a: 'level1_a.m4a',
-  level1_b: 'level1_b.m4a',
-  level1_c: 'level1_c.m4a',
-  boss: 'boss.m4a',
+/** Distinct original samples from the supplied Juhani Junkala CC0 pack. */
+export const WEAPON_AUDIO = {
+  pulse: { volume: .28, duration: .25, gap: .1, rate: 1.04, priority: 0 },
+  twin: { volume: .34, duration: .11, gap: .12, rate: 1.35, priority: 1 },
+  broadsides: { volume: .46, duration: .4, gap: .22, rate: .8, priority: 2 },
+  helix: { volume: .4, duration: .26, gap: .2, rate: 1.12, priority: 2 },
+  prism: { volume: .5, duration: .54, gap: .3, rate: .94, priority: 3 },
+  scatter: { volume: .48, duration: .34, gap: .25, rate: .82, priority: 2 },
+  seeker: { volume: .44, duration: .44, gap: .3, rate: 1.2, priority: 2 },
+  mortar: { volume: .52, duration: .66, gap: .4, rate: .68, priority: 3 },
+  orbital: { volume: .32, duration: .28, gap: .22, rate: 1.5, priority: 1 },
+  echo: { volume: .27, duration: .15, gap: .16, rate: 1.05, priority: 1 },
+  wake: { volume: .42, duration: .12, gap: .24, rate: 1.32, priority: 2 },
+  capacitor: { volume: .5, duration: .5, gap: .3, rate: .78, priority: 3 },
+  tesla: { volume: .42, duration: .25, gap: .18, rate: 1.25, priority: 3 },
+  blast: { volume: .35, duration: .25, gap: .18, rate: .82, priority: 2 },
+  retaliation: { volume: .5, duration: .48, gap: .3, rate: .7, priority: 3, file: 'revenge' },
+  siphon: { volume: .42, duration: .4, gap: .3, rate: 1.05, priority: 2 },
+  fragment: { volume: .3, duration: .2, gap: .2, rate: 1.4, priority: 1 },
+  singularity: { volume: .48, duration: .7, gap: .45, rate: .66, priority: 3 },
+};
+for (const [kind, profile] of Object.entries(WEAPON_AUDIO)) SFX_FILES[`weapon_${kind}`] = `mayhem/${profile.file || kind}.wav`;
+
+// Source filenames are authoritative; the embedded MP3 titles differ.
+export const MUSIC_FILES = {
+  title: 'Rift Pirates OFFICIAL Main Title Theme.mp3',
+  battle: 'Boss Battle OFFICAL soundtrack.mp3',
+  escape: 'The Very Very End.mp3',
+  arcade: 'arcade.mp3',
+  astral: 'astral.mp3',
+  neondrift: 'neondrift.mp3',
+  pixelatedvoid: 'pixelatedvoid.mp3',
+  thepirateking: 'thepirateking.mp3',
   defeat: 'defeat.m4a',
   victory: 'victory.mp3',
 };
+export const GAMEPLAY_MUSIC = ['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking'];
+const THEME_TAIL = 1.4; // Deliberate end fade, not a claimed seamless musical loop.
 
-class AudioManagerImpl {
+export class AudioManagerImpl {
   constructor() {
     this.ctx = null;
     this.ready = false;
     this.buffers = {};
     this.music = {};
     this.currentMusic = null;
-    this.musicVol = 0.55;
+    this.musicVol = clampAudioVolume(Save.data.musicVolume, AUDIO_DEFAULTS.musicVolume);
+    this.sfxVol = clampAudioVolume(Save.data.sfxVolume, AUDIO_DEFAULTS.sfxVolume);
     this._fades = [];
+    this.musicOwner = null;
+    this._generation = 0;
+    this._desired = null;
+    this._pauseReasons = new Set();
+    this._shuffleBag = [];
+    this._gameplayTrack = null;
+    this._lastGameplay = null;
+    this._unavailable = new Set();
     // Rate-limits identical sounds fired in the same frame — a 20-projectile
     // barrage should not stack 20 copies of one sample into a clipping wall.
     this._lastPlay = {};
+    this._weaponVoices = 0;
+    this._weaponLast = {};
+    this._weaponActive = [];
+    this._weaponTrim = {};
   }
 
   async init() {
     if (this.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    this.ctx = new AC();
+    try { this.ctx = new AC(); } catch { return; }
+    // Save.load runs after this singleton is constructed. Read the persisted
+    // mixer at audio unlock, including edits made before the first gesture.
+    this.musicVol = clampAudioVolume(Save.data.musicVolume, AUDIO_DEFAULTS.musicVolume);
+    this.sfxVol = clampAudioVolume(Save.data.sfxVolume, AUDIO_DEFAULTS.sfxVolume);
 
     this.master = this.ctx.createGain();
     this.master.gain.value = 1;
@@ -82,23 +128,43 @@ class AudioManagerImpl {
     this.warpFilter.connect(this.ctx.destination);
 
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.value = Save.data.sfx ? 0.85 : 0;
-    this.sfxGain.connect(this.master);
+    this.sfxGain.gain.value = Save.data.sfx ? this.sfxVol : 0;
+    this.sfxLimiter = this.ctx.createDynamicsCompressor();
+    this.sfxLimiter.threshold.value = -14;
+    this.sfxLimiter.knee.value = 12;
+    this.sfxLimiter.ratio.value = 6;
+    this.sfxLimiter.attack.value = .003;
+    this.sfxLimiter.release.value = .12;
+    this.sfxGain.connect(this.sfxLimiter);
+    this.sfxLimiter.connect(this.master);
+    this.weaponGain = this.ctx.createGain();
+    this.weaponGain.gain.value = 1;
+    this.weaponGain.connect(this.sfxGain);
 
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = Save.data.music ? this.musicVol : 0;
     this.musicGain.connect(this.master);
 
     this.ready = true;
+    if (this._desired) this._startCurrent();
     await this._loadSfx();
   }
 
   async _loadSfx() {
     const jobs = Object.entries(SFX_FILES).map(async ([key, file]) => {
       try {
-        const res = await fetch(`assets/sfx/${file}`);
+        const res = await fetch(`sfx/${file}`);
         const arr = await res.arrayBuffer();
         this.buffers[key] = await this.ctx.decodeAudioData(arr);
+        if (key.startsWith('weapon_')) {
+          const samples = this.buffers[key].getChannelData(0);
+          let energy = 0;
+          for (const sample of samples) energy += sample * sample;
+          // Match perceived level between the supplied samples, without editing
+          // their source files or flattening the dynamics of the soundtrack.
+          const rms = Math.sqrt(energy / Math.max(1, samples.length));
+          this._weaponTrim[key] = Math.min(2.2, Math.max(.65, .19 / Math.max(.02, rms)));
+        }
       } catch {
         /* a missing sample just means that cue is silent */
       }
@@ -107,7 +173,10 @@ class AudioManagerImpl {
   }
 
   resume() {
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    const current = this.currentMusic && this.music[this.currentMusic];
+    if (current?.el.ended && !this._pauseReasons.size && Save.data.music) this._finishTrack(current);
+    else if (current?.el.paused) this._playEntry(current);
   }
 
   play(name, vol = 1, rate = 1, jitter = 0) {
@@ -118,6 +187,14 @@ class AudioManagerImpl {
     const now = this.ctx.currentTime;
     if (this._lastPlay[name] && now - this._lastPlay[name] < 0.03) return;
     this._lastPlay[name] = now;
+    if (this.weaponGain && ['laser_warning', 'low_health', 'player_hurt', 'shield_break', 'phase_change'].includes(name)) {
+      const gain = this.weaponGain.gain;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(.28, now + .015);
+      gain.setValueAtTime(.28, now + .16);
+      gain.linearRampToValueAtTime(1, now + .34);
+    }
 
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
@@ -127,6 +204,61 @@ class AudioManagerImpl {
     src.connect(g);
     g.connect(this.sfxGain);
     src.start();
+    src.onended = () => { src.disconnect(); g.disconnect(); };
+  }
+
+  /** Prioritized weapon voices give rare guns room; danger cues duck this bus. */
+  playWeapon(kind, power = 1, { strength = 1, priority } = {}) {
+    if (!this.ready || !Save.data.sfx) return;
+    const profile = WEAPON_AUDIO[kind] || WEAPON_AUDIO.pulse;
+    const buffer = this.buffers[`weapon_${kind}`];
+    if (!buffer) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._weaponLast[kind] ?? -Infinity) < profile.gap) return;
+    const importance = priority ?? profile.priority;
+    // Repeated base fire must not crowd out a new lance, swarm or reactor burst.
+    if (importance === 0 && this._weaponVoices >= 7) return;
+    if (this._weaponVoices >= 18) {
+      const expendable = this._weaponActive.find(voice => voice.priority < importance && !voice.stopping);
+      if (!expendable) return;
+      expendable.stopping = true;
+      expendable.gain.gain.cancelScheduledValues(now);
+      expendable.gain.gain.setValueAtTime(0, now);
+      expendable.source.stop(now);
+      // Reclaim synchronously: WebAudio's ended event arrives on a later task.
+      // A full salvo in this task must never allocate a second bank of tails.
+      expendable.release();
+    }
+    this._weaponLast[kind] = now;
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    const depth = Math.min(8, Math.max(0, Number(power) - 1));
+    source.playbackRate.value = profile.rate / (1 + depth * .025);
+    const gain = this.ctx.createGain();
+    const duration = Math.min(buffer.duration / source.playbackRate.value, profile.duration * (1 + depth * .025));
+    const trim = this._weaponTrim[`weapon_${kind}`] || 1;
+    const volume = profile.volume * trim * Math.min(1.3, 1 + depth * .04)
+      * Math.max(0, Math.min(1.25, strength)) / Math.sqrt(1 + this._weaponVoices * .075);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(volume, now + .003);
+    gain.gain.setValueAtTime(volume, now + Math.max(.004, duration - .045));
+    gain.gain.linearRampToValueAtTime(0, now + duration);
+    source.connect(gain);
+    gain.connect(this.weaponGain || this.sfxGain);
+    const voice = { source, gain, priority: importance, stopping: false, kind, released: false };
+    this._weaponActive.push(voice);
+    this._weaponVoices++;
+    voice.release = () => {
+      if (voice.released) return;
+      voice.released = true;
+      this._weaponVoices = Math.max(0, this._weaponVoices - 1);
+      const index = this._weaponActive.indexOf(voice);
+      if (index >= 0) this._weaponActive.splice(index, 1);
+      source.disconnect(); gain.disconnect();
+    };
+    source.onended = voice.release;
+    source.start(now);
+    source.stop(now + duration + .005);
   }
 
   // ---- music ----------------------------------------------------------------
@@ -135,10 +267,11 @@ class AudioManagerImpl {
     if (this.music[name]) return this.music[name];
     const file = MUSIC_FILES[name];
     if (!file) return null;
-    const el = new Audio(`assets/music/${file}`);
-    el.loop = true;
+    const el = new Audio(`music/${encodeURIComponent(file)}`);
+    el.loop = false;
     el.preload = 'auto';
-    const entry = { el, gain: null, node: null };
+    el.volume = 0;
+    const entry = { name, el, gain: null, node: null, level: 0, tail: 1, generation: 0 };
     if (this.ctx) {
       try {
         entry.gain = this.ctx.createGain();
@@ -146,43 +279,158 @@ class AudioManagerImpl {
         entry.node = this.ctx.createMediaElementSource(el);
         entry.node.connect(entry.gain);
         entry.gain.connect(this.musicGain);
+        el.volume = 1;
       } catch {
-        // Safari can refuse createMediaElementSource; drive element volume instead.
+        // The fallback includes the user's music volume/mute, just like WebAudio.
         entry.gain = null;
-        el.volume = 0;
       }
     }
     this.music[name] = entry;
     return entry;
   }
 
-  /** Crossfade to a track. Passing null fades everything out. */
-  playMusic(name, fade = 1.2, loop = true) {
-    if (!this.ready) return;
-    if (this.currentMusic === name) return;
-    const prev = this.currentMusic;
-    this.currentMusic = name;
+  _applyLevel(entry) {
+    const volume = Math.max(0, Math.min(1, entry.level * entry.tail));
+    if (entry.gain) entry.gain.gain.value = volume;
+    else entry.el.volume = Save.data.music ? volume * this.musicVol : 0;
+  }
 
-    if (prev && this.music[prev]) this._fadeTo(this.music[prev], 0, fade, true);
-    if (!name) return;
+  _playEntry(entry) {
+    if (this._pauseReasons.size || !Save.data.music || entry.name !== this.currentMusic) return;
+    const token = this._generation;
+    try {
+      const promise = entry.el.play();
+      promise?.then(() => {
+        // A delayed browser unlock must never resurrect a discarded track.
+        if (token !== this._generation || entry.name !== this.currentMusic || this._pauseReasons.size || !Save.data.music) {
+          if (entry.generation === token) entry.el.pause();
+        }
+      }).catch(() => {});
+    } catch { /* Missing/blocked music never blocks gameplay. */ }
+  }
 
-    const entry = this._el(name);
+  _startCurrent() {
+    const selection = this._desired;
+    if (!this.ready || !selection || !selection.name) return;
+    const entry = this._el(selection.name);
     if (!entry) return;
-    entry.el.loop = loop;
-    entry.el.currentTime = 0;
-    const p = entry.el.play();
-    if (p && p.catch) p.catch(() => {});
-    this._fadeTo(entry, 1, fade, false);
+    const token = this._generation;
+    entry.generation = token;
+    entry.tail = 1;
+    entry.el.loop = false;
+    entry.el.playbackRate = 1;
+    if (!selection.resume) {
+      try { entry.el.currentTime = 0; } catch { /* Metadata can arrive after selection. */ }
+    }
+    entry.el.onended = () => {
+      if (token !== this._generation || entry.name !== this.currentMusic || !entry.el.ended) return;
+      if (this._pauseReasons.size) return; // Resume handles a track paused exactly at its end.
+      this._finishTrack(entry);
+    };
+    entry.el.onerror = () => {
+      if (token !== this._generation || entry.name !== this.currentMusic) return;
+      this._unavailable.add(entry.name);
+      if (this.musicOwner === 'gameplay') this._advanceGameplay();
+      // Dedicated themes remain owned by their scene even if the file is unavailable.
+    };
+    this._fadeTo(entry, 1, selection.fade, false);
+    this._playEntry(entry);
   }
 
-  stopMusic(fade = 0.8) {
-    this.playMusic(null, fade);
+  _select(name, owner, fade, repeat, { restart = false, resume = false } = {}) {
+    if (this.currentMusic === name && this.musicOwner === owner && !restart) return;
+    const prev = this.currentMusic && this.music[this.currentMusic];
+    this._generation++;
+    this.currentMusic = name;
+    this.musicOwner = owner;
+    this._desired = name ? { name, fade, repeat, resume } : null;
+    this._pauseReasons.delete('game');
+    // At most one outgoing crossfade and one current recording can be playing.
+    for (const entry of Object.values(this.music)) {
+      if (entry !== prev || entry.name === name) {
+        this._fades = this._fades.filter(f => f.entry !== entry);
+        entry.el.pause();
+        entry.level = 0;
+        this._applyLevel(entry);
+      }
+    }
+    if (prev && prev.name !== name) this._fadeTo(prev, 0, fade, true);
+    if (name) this._startCurrent();
   }
+
+  _nextGameplay() {
+    const available = GAMEPLAY_MUSIC.filter(name => !this._unavailable.has(name));
+    if (!available.length) return null;
+    this._shuffleBag = this._shuffleBag.filter(name => available.includes(name));
+    if (!this._shuffleBag.length) {
+      this._shuffleBag = available.slice();
+      for (let i = this._shuffleBag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this._shuffleBag[i], this._shuffleBag[j]] = [this._shuffleBag[j], this._shuffleBag[i]];
+      }
+      if (this._shuffleBag.length > 1 && this._shuffleBag.at(-1) === this._lastGameplay) {
+        [this._shuffleBag[0], this._shuffleBag[this._shuffleBag.length - 1]] =
+          [this._shuffleBag.at(-1), this._shuffleBag[0]];
+      }
+    }
+    this._lastGameplay = this._shuffleBag.pop();
+    return this._lastGameplay;
+  }
+
+  _advanceGameplay() {
+    this._gameplayTrack = this._nextGameplay();
+    this._select(this._gameplayTrack, 'gameplay', .8, false, { restart: true });
+  }
+
+  _finishTrack(entry) {
+    if (this.musicOwner === 'gameplay') this._advanceGameplay();
+    else if (this._desired?.repeat) {
+      // Play the complete source again, with a softened restart; never route a
+      // long boss/escape session into the ordinary gameplay shuffle.
+      this._select(entry.name, this.musicOwner, THEME_TAIL, true, { restart: true });
+    }
+  }
+
+  playGameplay(fade = 1.5) {
+    const previous = this._gameplayTrack;
+    const media = previous && this.music[previous]?.el;
+    const completed = media && (media.ended || (Number.isFinite(media.duration) && media.currentTime >= media.duration));
+    if (!previous || completed || this._unavailable.has(previous)) this._gameplayTrack = this._nextGameplay();
+    this._select(this._gameplayTrack, 'gameplay', fade, false, { resume: previous === this._gameplayTrack });
+  }
+
+  playTitle(fade = 1.5) { this._select('title', 'title', fade, true); }
+  playBattle(fade = 1.5, { restart = false } = {}) { this._select('battle', 'battle', fade, true, { restart }); }
+  playEscape(fade = .7, { restart = true } = {}) { this._select('escape', 'escape', fade, true, { restart }); }
+
+  /** The escape simulation owns its deadline, even without working audio. */
+  syncEscapeTime(elapsed) {
+    const current = this.music.escape;
+    if (this.musicOwner !== 'escape' || !current) return;
+    const duration = current.el.duration;
+    if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(elapsed)) return;
+    const target = Math.max(0, elapsed) % duration;
+    // Only correct a meaningful stall, resume, or lab time-scale discrepancy.
+    // Ordinary frames play the original recording continuously at its own tempo.
+    if (Math.abs(current.el.currentTime - target) > 1) {
+      try { current.el.currentTime = target; } catch { /* Media may still be seeking. */ }
+    }
+  }
+
+  /** Compatibility for existing results/lab hooks; all old traversal cues shuffle. */
+  playMusic(name, fade = 1.2, loop = true) {
+    if (['level1_a', 'level1_b', 'level1_c'].includes(name)) return this.playGameplay(fade);
+    if (name === 'title') return this.playTitle(fade);
+    if (name === 'battle' || name === 'boss') return this.playBattle(fade);
+    if (name === 'escape') return this.playEscape(fade, { restart: false });
+    this._select(name, name ? 'results' : null, fade, loop);
+  }
+
+  stopMusic(fade = .8) { this._select(null, null, fade, false); }
 
   _fadeTo(entry, target, dur, stopAtEnd) {
-    this._fades = this._fades.filter((f) => f.entry !== entry);
-    const from = entry.gain ? entry.gain.gain.value : entry.el.volume;
-    this._fades.push({ entry, from, to: target, t: 0, dur: Math.max(0.01, dur), stopAtEnd });
+    this._fades = this._fades.filter(f => f.entry !== entry);
+    this._fades.push({ entry, from: entry.level, to: target, t: 0, dur: Math.max(.01, dur), stopAtEnd });
   }
 
   /** Death-sequence audio smear: 0 = clean, 1 = fully muffled + pitched down. */
@@ -190,8 +438,7 @@ class AudioManagerImpl {
     if (!this.ready) return;
     const f = 22050 * Math.pow(1 - 0.985 * amount, 2.2);
     this.warpFilter.frequency.setTargetAtTime(Math.max(180, f), this.ctx.currentTime, 0.05);
-    const cur = this.currentMusic && this.music[this.currentMusic];
-    if (cur) cur.el.playbackRate = Math.max(0.55, 1 - 0.45 * amount);
+    // Preserve the official soundtrack tempo; only the existing mix filter warps.
   }
 
   resetWarp() {
@@ -201,18 +448,23 @@ class AudioManagerImpl {
   }
 
   update(dt) {
-    if (!this._fades.length) return;
+    if (this._pauseReasons.size) return;
     for (let i = this._fades.length - 1; i >= 0; i--) {
       const f = this._fades[i];
       f.t += dt;
       const k = Math.min(1, f.t / f.dur);
-      const v = f.from + (f.to - f.from) * k;
-      if (f.entry.gain) f.entry.gain.gain.value = v;
-      else f.entry.el.volume = Math.max(0, Math.min(1, v));
+      f.entry.level = f.from + (f.to - f.from) * k;
+      this._applyLevel(f.entry);
       if (k >= 1) {
         if (f.stopAtEnd) f.entry.el.pause();
         this._fades.splice(i, 1);
       }
+    }
+    const current = this.currentMusic && this.music[this.currentMusic];
+    if (current) {
+      const remaining = current.el.duration - current.el.currentTime;
+      current.tail = Number.isFinite(remaining) ? Math.min(1, Math.max(0, remaining / THEME_TAIL)) : 1;
+      this._applyLevel(current);
     }
   }
 
@@ -220,26 +472,51 @@ class AudioManagerImpl {
     Save.data.music = on ? 1 : 0;
     Save.save();
     if (this.musicGain) this.musicGain.gain.value = on ? this.musicVol : 0;
+    for (const entry of Object.values(this.music)) {
+      this._applyLevel(entry);
+      if (!on) entry.el.pause();
+    }
+    if (on) this.resume();
   }
 
   setSfxEnabled(on) {
     Save.data.sfx = on ? 1 : 0;
     Save.save();
-    if (this.sfxGain) this.sfxGain.gain.value = on ? 0.85 : 0;
+    if (this.sfxGain) this.sfxGain.gain.value = on ? this.sfxVol : 0;
   }
 
-  pauseMusic() {
-    const cur = this.currentMusic && this.music[this.currentMusic];
-    if (cur) cur.el.pause();
+  setMusicVolume(value) {
+    this.musicVol = clampAudioVolume(value, AUDIO_DEFAULTS.musicVolume);
+    Save.data.musicVolume = this.musicVol;
+    Save.save();
+    if (this.musicGain) this.musicGain.gain.value = Save.data.music ? this.musicVol : 0;
+    for (const entry of Object.values(this.music)) this._applyLevel(entry);
   }
 
-  resumeMusic() {
-    const cur = this.currentMusic && this.music[this.currentMusic];
-    if (cur && Save.data.music) {
-      const p = cur.el.play();
-      if (p && p.catch) p.catch(() => {});
+  setSfxVolume(value) {
+    this.sfxVol = clampAudioVolume(value, AUDIO_DEFAULTS.sfxVolume);
+    Save.data.sfxVolume = this.sfxVol;
+    Save.save();
+    if (this.sfxGain) this.sfxGain.gain.value = Save.data.sfx ? this.sfxVol : 0;
+  }
+
+  setMusicPaused(reason, paused) {
+    if (this._pauseReasons.has(reason) === Boolean(paused)) return;
+    if (paused) this._pauseReasons.add(reason);
+    else this._pauseReasons.delete(reason);
+    if (this._pauseReasons.size) {
+      for (const entry of Object.values(this.music)) entry.el.pause();
+    } else {
+      const current = this.currentMusic && this.music[this.currentMusic];
+      if (current?.el.ended) this._finishTrack(current);
+      else if (current) this._playEntry(current);
+      // An outgoing fade stays paused after a pause/resume, avoiding duplicate
+      // tails; its gain still settles to zero on the following updates.
     }
   }
+
+  pauseMusic() { this.setMusicPaused('game', true); }
+  resumeMusic() { this.setMusicPaused('game', false); }
 }
 
 export const Audio2 = new AudioManagerImpl();

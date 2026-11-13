@@ -1,4 +1,5 @@
 node_modules/
+dist/
 
 # Source material for the build: 47-page spec PDF, concept art, and the full
 # SFX/music libraries. ~337MB — kept out of the repo. The subset the game

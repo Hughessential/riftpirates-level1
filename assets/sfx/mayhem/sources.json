@@ -1,0 +1,20 @@
+{
+  "pulse": "Weapons/Lasers/sfx_wpn_laser3.wav",
+  "twin": "Weapons/Single Shot Sounds/sfx_weapon_singleshot4.wav",
+  "broadsides": "Weapons/Cannon/sfx_wpn_cannon1.wav",
+  "helix": "Weapons/Lasers/sfx_wpn_laser8.wav",
+  "prism": "Weapons/Lasers/sfx_wpn_laser11.wav",
+  "scatter": "Weapons/Shotgun/sfx_weapon_shotgun1.wav",
+  "seeker": "Weapons/Grenade Whistles/sfx_wpn_missilelaunch.wav",
+  "mortar": "Weapons/Cannon/sfx_wpn_cannon5.wav",
+  "orbital": "Weapons/Lasers/sfx_wpn_laser6.wav",
+  "echo": "Weapons/Lasers/sfx_wpn_laser2.wav",
+  "wake": "Weapons/Single Shot Sounds/sfx_weapon_singleshot14.wav",
+  "capacitor": "Weapons/Lasers/sfx_wpn_laser12.wav",
+  "tesla": "Weapons/Lasers/sfx_wpn_laser10.wav",
+  "blast": "Explosions/Shortest/sfx_exp_shortest_hard2.wav",
+  "revenge": "Weapons/Lasers/sfx_wpn_laser7.wav",
+  "siphon": "Weapons/Lasers/sfx_wpn_laser5.wav",
+  "fragment": "Weapons/Lasers/sfx_wpn_laser4.wav",
+  "singularity": "Weapons/Cannon/sfx_wpn_cannon3.wav"
+}
