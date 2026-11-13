@@ -30,6 +30,7 @@ export class TestingGroundsPanel {
     this.activeTab = 'pilot';
     this.search = '';
     this.category = 'ALL';
+    this.rarity = 'ALL';
     this.lastMessage = 'Configure your experiment, then close the console to fly.';
 
     this.dialog = document.createElement('dialog');
@@ -64,10 +65,10 @@ export class TestingGroundsPanel {
             <p class="labHint">Damage controls deliberately bypass god mode so you can test shield-break and low-health effects.</p>
           </section>
           <section class="labPage" id="labPage-augments" role="tabpanel" aria-labelledby="labTab-augments" hidden>
-            <div class="labSectionHead"><div><span class="labEyebrow">45 AUGMENTS / EVERY COMBINATION</span><h3>BUILD A MONSTER</h3></div><span class="labPill" id="labBuildCount">0 STACKS</span></div>
-            <div class="labPresets"><button type="button" data-preset="all">ALL 45 / RANK 1</button><button type="button" data-preset="arsenal">FULL ARSENAL</button><button type="button" data-preset="empty" class="labDanger">CLEAR BUILD</button></div>
+            <div class="labSectionHead"><div><span class="labEyebrow">${Object.keys(UPGRADES).length} AUGMENTS / EVERY COMBINATION</span><h3>BUILD A MONSTER</h3></div><span class="labPill" id="labBuildCount">0 STACKS</span></div>
+            <div class="labPresets"><button type="button" data-action="testWallet">TEST WALLET +5,000</button><button type="button" data-preset="all">ALL ${Object.keys(UPGRADES).length} / RANK 1</button><button type="button" data-preset="arsenal">FULL ARSENAL</button><button type="button" data-preset="empty" class="labDanger">CLEAR BUILD</button></div>
             <div class="labAugmentFilters"><label class="labSearch"><span class="labVisuallyHidden">Search augments</span><input id="labAugmentSearch" type="search" placeholder="SEARCH NAME, EFFECT OR WEAPON…" autocomplete="off"></label><label><span class="labVisuallyHidden">Filter augment category</span><select id="labAugmentCategory"><option value="ALL">ALL CATEGORIES</option>${Object.keys(AUGMENT_CATEGORIES).map(id => option([id, id])).join('')}</select></label></div>
-            <div id="labAugmentList" class="labAugmentList"></div><p id="labNoAugments" class="labHint" hidden>No augments match that search.</p>
+            <label>RARITY <select id="labAugmentRarity">${['ALL', 'STANDARD', 'RARE', 'ULTRA-RARE', 'MYTHIC'].map(id => option([id, id])).join('')}</select></label><div id="labAugmentList" class="labAugmentList"></div><p id="labNoAugments" class="labHint" hidden>No augments match that search.</p>
             <p class="labHint">Set any rank from 0–50. Zero removes that augment. Changes apply to your current ship immediately.</p>
           </section>
           <section class="labPage" id="labPage-arena" role="tabpanel" aria-labelledby="labTab-arena" hidden>
@@ -136,7 +137,7 @@ export class TestingGroundsPanel {
       row.style.setProperty('--augment-color', up.color);
       row.dataset.augment = id;
       // All content is from the checked-in augment catalogue, never user HTML.
-      row.innerHTML = `<div class="labAugmentIcon" aria-hidden="true">${up.icon.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div><div class="labAugmentCopy"><small>${up.category}</small><h4>${up.name}</h4><p>${up.desc}</p><span>${up.stack}</span></div><div class="labRank"><button type="button" data-rank-step="-1" aria-label="Remove one ${up.name} stack">−</button><label><span class="labVisuallyHidden">${up.name} rank</span><input type="number" min="0" max="50" step="1" value="0" data-rank-input="${id}" inputmode="numeric"></label><button type="button" data-rank-step="1" aria-label="Add one ${up.name} stack">+</button><small>STACKS</small></div>`;
+      row.innerHTML = `<div class="labAugmentIcon" aria-hidden="true">${up.icon.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div><div class="labAugmentCopy"><small>${up.category} / ${up.rarity || 'STANDARD'}</small><h4>${up.name}</h4><p>${up.desc}</p><span>${up.stack}</span></div><div class="labRank"><button type="button" data-rank-step="-1" aria-label="Remove one ${up.name} stack">−</button><label><span class="labVisuallyHidden">${up.name} rank</span><input type="number" min="0" max="50" step="1" value="0" data-rank-input="${id}" inputmode="numeric"></label><button type="button" data-rank-step="1" aria-label="Add one ${up.name} stack">+</button><small>STACKS</small></div>`;
       row.addEventListener('click', event => {
         const step = event.target.closest('[data-rank-step]');
         if (!step) return;
@@ -177,6 +178,7 @@ export class TestingGroundsPanel {
     $('#labTimeScale').addEventListener('change', event => this.run(() => this.testing.setSetting('timeScale', Number(event.target.value))));
     $('#labBloom').addEventListener('input', event => this.run(() => this.testing.setBloom(Number(event.target.value))));
     $('#labAugmentSearch').addEventListener('input', event => { this.search = event.target.value.toLowerCase().trim(); this._filterAugments(); });
+    $('#labAugmentRarity').addEventListener('change', event => { this.rarity = event.target.value; this._filterAugments(); });
     $('#labAugmentCategory').addEventListener('change', event => { this.category = event.target.value; this._filterAugments(); });
 
     // Capture before gameplay's global keys: typing a name must never fly,
@@ -231,6 +233,7 @@ export class TestingGroundsPanel {
       dummies: [() => t.spawnDummies(), 'TARGET DUMMIES READY. WATCH DAMAGE + DPS IN THE READOUT.'],
       bullets: [() => t.spawnBulletPattern(), 'HOSTILE FAN READY. CLOSE THE CONSOLE TO DODGE.'],
       scrap: [() => t.spawnScrap(), 'SCRAP CACHE DROPPED.'],
+      testWallet: [() => t.creditTestScrap(), '5,000 TEST SCRAP ADDED. NEVER BANKED.'],
       clear: [() => t.clearArena(), 'RANGE CLEARED. YOUR BUILD IS KEPT.'],
       heat: [() => t.setHeat(Number(value('labHeat'))), `RIFT HEAT SET TO ${value('labHeat')}.`],
       bloomReset: [() => t.setBloom(null), 'BLOOM FOLLOWS THE SCENE AGAIN.'],
@@ -280,6 +283,7 @@ export class TestingGroundsPanel {
     for (const [id, row] of this.augmentRows) {
       const up = UPGRADES[id];
       const matches = (this.category === 'ALL' || up.category === this.category)
+        && (this.rarity === 'ALL' || (up.rarity || 'STANDARD') === this.rarity)
         && `${up.name} ${up.desc} ${up.stack}`.toLowerCase().includes(this.search);
       row.hidden = !matches;
       if (matches) visible++;

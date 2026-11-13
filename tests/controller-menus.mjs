@@ -46,7 +46,7 @@ try {
   assert.equal(await page.evaluate(() => RIFT.hangar.dialog.open), false);
   await page.evaluate(() => { __go('#launchBtn'); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.running), true);
-  await page.evaluate(() => { RIFT.upgradeScreen.show(1, '#22ffee', () => {}); __input.enabled=false; __tick(); __press(15); __press(0); });
+  await page.evaluate(() => { RIFT.scrap.wallet.credit(5000); RIFT.upgradeScreen.show(1, '#22ffee', () => {}); __input.enabled=false; __tick(); __press(15); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), 1, 'Augment selection installs exactly one upgrade');
   await page.evaluate(() => { RIFT.upgradeScreen.hide(); RIFT.director.go('TOWER_1_INTRO'); RIFT.director.update(1); __tick(); __pad.buttons[0]={pressed:true,value:1}; __tick(); RIFT.director.update(.016); __pad.buttons[0]={pressed:false,value:0}; __tick(); });
   assert.equal(await page.evaluate(() => RIFT.director.state), 'TOWER_1_COMBAT', 'Fresh confirm skips an eligible boss intro');

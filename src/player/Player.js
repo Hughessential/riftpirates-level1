@@ -209,11 +209,11 @@ export class Player {
   }
 
   get moveSpeed() {
-    return this.stats.moveSpeed * (this.buffT > 0 ? 1 + 0.4 * Number(this.stats.dodgeDrive) : 1);
+    return this.stats.moveSpeed * (this.buffT > 0 ? 1 + 0.4 * Number(this.stats.dodgeDrive) : 1) * (this.cosmicEffects?.moveMultiplier(false) || 1);
   }
 
   get fireRate() {
-    return this.stats.fireRate * (this.buffT > 0 ? 1 + 0.4 * Number(this.stats.dodgeDrive) : 1);
+    return this.stats.fireRate * (this.buffT > 0 ? 1 + 0.4 * Number(this.stats.dodgeDrive) : 1) * (this.cosmicEffects?.fireMultiplier() || 1);
   }
 
   get shieldRecoveryRemaining() {
@@ -240,6 +240,7 @@ export class Player {
       this.dodgePending = false;
       this.dodgeSpoiled = false;
       Audio2.play('boost', 0.5, 1.4, 0.08);
+      this.cosmicEffects?.onDodgeStart(inp.x || 1, 'boost');
     }
     if (!inp.boost) this.boosting = false;
 
@@ -269,6 +270,7 @@ export class Player {
       this.dodgeSpoiled = false;
       Audio2.play('boost', 0.55, 1.9, 0.05);
       this.fx.jet(this.x, this.y, 2.5, { x: this.rollDir, y: 0, z: 0 }, 4, [P.cyan, P.white]);
+      this.cosmicEffects?.onDodgeStart(this.rollDir, 'roll');
     }
     if (this.rollT > 0) this.rollT -= dt;
 
@@ -278,7 +280,7 @@ export class Player {
     // so direction changes read as instant without losing all inertia.
     // Braking (Y / C) slows the ship for precision flying; boost wins.
     const braking = !this.frozen && !this.boosting && Input.braking;
-    const speed = (this.boosting ? this.stats.boostSpeed : this.moveSpeed) * (braking ? 0.45 : 1);
+    const speed = (this.boosting ? this.stats.boostSpeed * (this.cosmicEffects?.moveMultiplier(true) || 1) : this.moveSpeed) * (braking ? 0.45 : 1);
     const response = 13;
     this.vx = damp(this.vx, inp.x * speed, response, dt);
     this.vy = damp(this.vy, inp.y * speed * 0.9, response, dt);
@@ -348,7 +350,7 @@ export class Player {
       const delay = this.shieldBroken ? this.stats.shieldBreakDelay : this.stats.shieldDelay;
       const rechargeDt = Math.min(dt, Math.max(0, this.timeSinceHit - delay));
       if (rechargeDt > 0) {
-        this.shield = Math.min(this.stats.shieldMax, this.shield + this.stats.shieldRegen * rechargeDt);
+        this.shield = Math.min(this.stats.shieldMax, this.shield + this.stats.shieldRegen * rechargeDt * (this.cosmicEffects?.shieldRegenMultiplier() || 1));
         if (this.shield > 0) this.shieldBroken = false;
       }
       const s = this.shield / this.stats.shieldMax;
@@ -421,7 +423,7 @@ export class Player {
       return false;
     }
 
-    let dmg = amount * (1 - clamp(this.stats.damageReduction, 0, 1));
+    let dmg = amount * (1 - clamp(this.stats.damageReduction, 0, 1)) * (1 - (this.cosmicEffects?.damageReduction() || 0));
     if (!(dmg > 0)) return false;
     // Both shield hits and hull hits restart the recovery clock. While broken,
     // that is the full fourteen-second lockout, not the partial-shield delay.
@@ -475,6 +477,7 @@ export class Player {
         });
         return true;
       }
+      if (this.cosmicEffects?.tryRescue(true)) return true;
       this.health = 0;
       this.alive = false;
     }

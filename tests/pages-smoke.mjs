@@ -6,7 +6,7 @@ function runtimeAssets(directory, prefix = '') {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = `${prefix}${entry.name}`;
     if (entry.isDirectory()) return runtimeAssets(new URL(`${entry.name}/`, directory), `${path}/`);
-    return /\.(mp3|m4a|wav|vox|ttf)$/.test(path) ? [path.split('/').map(encodeURIComponent).join('/')] : [];
+    return /\.(mp3|m4a|wav|vox|ttf|webp)$/.test(path) ? [path.split('/').map(encodeURIComponent).join('/')] : [];
   });
 }
 

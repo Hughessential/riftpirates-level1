@@ -65,7 +65,7 @@ export class CollisionSystem {
         // Check the swept route only as far as this target. A shield behind a
         // nearer enemy cannot incorrectly protect that enemy from the shot.
         if (blockedBetween(g, from, end, hit.at)) {
-          g.projectiles.killPlayerBolt(b);
+          g.projectiles.killPlayerBolt(b, 'blocked');
           Audio2.play('shield_break', 0.2, 1.6, 0.1);
           break;
         }
@@ -96,14 +96,14 @@ export class CollisionSystem {
           Audio2.play('shield_break', 0.3, 1.4, 0.1);
         }
         // A blocked hit never spawns reactions and always absorbs the bolt.
-        if (!(dealt > 0)) { g.projectiles.killPlayerBolt(b); break; }
+        if (!(dealt > 0)) { g.projectiles.killPlayerBolt(b, 'blocked'); break; }
         if (b.pierce > 0) { b.pierce--; continue; }
         redirected = g.augmentEffects?.redirect(b, t) || false;
         if (!redirected) g.projectiles.killPlayerBolt(b);
         break;
       }
       if (b.active && !redirected) {
-        if (blockedBetween(g, from, end)) g.projectiles.killPlayerBolt(b);
+        if (blockedBetween(g, from, end)) g.projectiles.killPlayerBolt(b, 'blocked');
         else { b.x = end.x; b.y = end.y; b.z = end.z; }
       }
       if (b.active) b.mesh?.position.set(b.x, b.y, b.z);
@@ -122,8 +122,9 @@ export class CollisionSystem {
         { x: px, y: py, z: 0 }, b.radius + p.radius
       );
       if (contact !== null) {
+        if (g.augmentEffects?.cosmic?.intercept(b)) continue;
         g.projectiles.killEnemyBolt(b);
-        if (p.takeDamage(b.damage, b.label)) tookDamage = true;
+        if (p.takeDamage(b.damage * (g.augmentEffects?.cosmic?.hostileDamageFactor(b) || 1), b.label)) tookDamage = true;
         g.fx.explode(b.x, b.y, b.z, {
           count: 6,
           colors: [P.orange, P.red, P.white],

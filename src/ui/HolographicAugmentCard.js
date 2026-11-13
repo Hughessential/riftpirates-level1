@@ -8,6 +8,7 @@ const TIERS = {
 };
 const ART = new Set(['arsenal', 'survival', 'mobility', 'salvage', 'anomaly']);
 const text = (parent, selector, value) => { parent.querySelector(selector).textContent = value; };
+const scrap = value => Math.max(0, Math.floor(Number(value) || 0)).toLocaleString('en-US');
 
 /** Presentation metadata only. Existing unclassified augments remain STANDARD;
  * this component never changes rarity odds, prices, offers or combat strength. */
@@ -29,7 +30,8 @@ export function createHolographicAugmentCard(up, { index = 0, delta = '', onSele
   card.dataset.rarity = tier.key;
   card.dataset.augmentId = up.id || '';
   card.style.setProperty('--holo-index', index);
-  card.setAttribute('aria-label', `${up.name}. ${tier.label}. ${current ? `Rank ${current} to ${rank}` : `Install rank ${rank}`}. ${up.desc}. ${delta}`);
+  card.dataset.description = `${up.name}. ${tier.label}. ${current ? `Rank ${current} to ${rank}` : `Install rank ${rank}`}. ${up.desc}. ${up.stack || ''}. ${delta}`;
+  card.setAttribute('aria-label', card.dataset.description);
   // Only decoration is HTML. User-facing metadata is assigned as live text.
   card.innerHTML = `
     <span class="holoFrame" aria-hidden="true"></span>
@@ -53,6 +55,7 @@ export function createHolographicAugmentCard(up, { index = 0, delta = '', onSele
       <p class="upStackEffect"></p>
       <span class="holoTelemetry"><span>SHIP MODIFICATION</span><b class="holoRank"></b></span>
       <p class="upActualDelta"></p>
+      <span class="holoEconomy"><span><small>PRICE / SCRAP</small><b class="holoPrice"></b></span><span><small class="holoMoneyLabel"></small><b class="holoBalance"></b></span></span>
       <span class="upTake"><span class="holoAction"></span><b aria-hidden="true">↗</b></span>
     </span>`;
   const image = card.querySelector('img');
@@ -69,6 +72,10 @@ export function createHolographicAugmentCard(up, { index = 0, delta = '', onSele
   text(card, '.holoRank', current ? `${current} → ${rank}` : `RANK ${rank}`);
   text(card, '.upActualDelta', delta);
   text(card, '.holoAction', current ? `STACK ${current} → ${rank}` : 'INSTALL AUGMENT');
+  if (Number.isFinite(up.price)) {
+    card.dataset.price = up.price;
+    updateHolographicAugmentCardWallet(card, up.walletBalance || 0);
+  } else card.querySelector('.holoEconomy').hidden = true;
   const dust = card.querySelector('.holoDust');
   for (let i = 0; i < tier.particles; i++) {
     const voxel = document.createElement('i');
@@ -80,6 +87,22 @@ export function createHolographicAugmentCard(up, { index = 0, delta = '', onSele
   }
   if (onSelect) card.addEventListener('click', () => onSelect(up.id, card));
   return card;
+}
+
+/** Wallet presentation only; purchases still go through UpgradeSystem's guarded transaction. */
+export function updateHolographicAugmentCardWallet(card, balance) {
+  if (card.dataset.price == null) return;
+  const price = Number(card.dataset.price);
+  const wallet = Math.max(0, Math.floor(Number(balance) || 0));
+  const missing = Math.max(0, price - wallet);
+  card.dataset.affordable = String(missing === 0);
+  card.dataset.wallet = wallet;
+  card.setAttribute('aria-disabled', String(missing > 0));
+  text(card, '.holoPrice', scrap(price));
+  text(card, '.holoMoneyLabel', missing ? 'MISSING / SCRAP' : 'REMAINING / SCRAP');
+  text(card, '.holoBalance', scrap(missing || wallet - price));
+  text(card, '.holoAction', missing ? 'SAVE FOR THIS AUGMENT' : 'PURCHASE & INSTALL');
+  card.setAttribute('aria-label', `${card.dataset.description}. Price ${scrap(price)} scrap. Wallet ${scrap(wallet)}. ${missing ? `Missing ${scrap(missing)} scrap. Cannot purchase yet` : `${scrap(wallet - price)} scrap remaining after purchase`}.`);
 }
 
 export function activateHolographicAugmentCard(card) {

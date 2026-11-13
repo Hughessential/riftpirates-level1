@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Audio2 } from '../core/AudioManager.js';
 import { WEAPON_AUGMENTS } from '../config/weapons.js';
+import { CosmicAugmentEffects } from './CosmicAugmentEffects.js';
 
 const COLORS = {
   tesla: '#4c91ff', fragment: '#ff73e8', frost: '#a4edff', burn: '#ff9b35',
@@ -53,10 +54,12 @@ export class AugmentEffects {
     this.arcPart = new THREE.Object3D();
     this.arcColor = new THREE.Color();
     this.visualRoot.add(this.arcMesh);
+    this.cosmic = new CosmicAugmentEffects(this);
     this.reset();
   }
 
   reset() {
+    this.cosmic?.reset();
     this.burns = new Map();
     this.fields = [];
     this.arcs = [];
@@ -77,6 +80,7 @@ export class AugmentEffects {
     for (const enemy of this.game.enemies?.active || []) {
       enemy.augmentSlowT = 0;
       enemy.augmentSlowFactor = 1;
+      enemy.cosmicStunT = 0; enemy.cosmicSlowT = 0; enemy.cosmicSlowFactor = 1;
     }
   }
 
@@ -84,7 +88,8 @@ export class AugmentEffects {
   damageTarget(target, amount, crit = false, secondary = true) {
     if (!target.alive || !target.targetable || !(amount > 0)) return 0;
     if (secondary) this.secondaryDepth++;
-    try { return target.damage(amount, crit); }
+    const vulnerable = (target.cosmicVulnerableUntil || 0) > (this.cosmic?.time || 0) && target.damageScale >= 1;
+    try { return target.damage(Math.min(1e12, amount * (vulnerable ? 1.3 : 1)), crit); }
     finally { if (secondary) this.secondaryDepth--; }
   }
 
@@ -95,7 +100,7 @@ export class AugmentEffects {
   _damage(target, amount, origin, color) {
     if (this.frameDamage >= 100 || !this._valid(target, origin)) return 0;
     this.frameDamage++;
-    const dealt = this.damageTarget(target, amount, false, true);
+    const dealt = this.damageTarget(target, amount * (this.cosmic?.amp() || 1), false, true);
     if (dealt > 0) {
       this.game.heat?.onDealDamage(dealt);
       this.game.damageNumbers?.spawn(target.pos.x, target.pos.y, target.pos.z, Math.round(dealt), false);
@@ -144,7 +149,12 @@ export class AugmentEffects {
   }
 
   onHit(bolt, target, dealt) {
-    if (!(dealt > 0) || bolt.procDepth > 0) return;
+    if (!(dealt > 0)) return;
+    if (bolt.procDepth > 0) {
+      if (bolt.splash > 0) this._burst(point(bolt), bolt.splash, bolt.damage * .65, bolt.color || COLORS.gravity, target);
+      return;
+    }
+    this.cosmic?.onHit(bolt, target, dealt);
     const s = this.game.player.stats;
     const origin = point(bolt);
     const damage = Math.max(0, bolt.damage);
@@ -244,6 +254,7 @@ export class AugmentEffects {
   onKill(enemy) {
     if (!enemy.target || this.creditedKills.has(enemy.target)) return;
     this.creditedKills.add(enemy.target);
+    this.cosmic?.onKill(enemy, this.secondaryDepth > 0);
     const s = this.game.player.stats;
     const blood = rank(s, 'bloodReactor');
     if (blood && this.game.player.shield <= 0) this.game.player.heal(2 * blood);
@@ -257,6 +268,7 @@ export class AugmentEffects {
   }
 
   onPerfectDodge() {
+    this.cosmic?.onPerfectDodge();
     const g = this.game, p = g.player, s = p.stats;
     const tear = rank(s, 'realityTear');
     const siphon = rank(s, 'bulletSiphon');
@@ -306,7 +318,8 @@ export class AugmentEffects {
     Audio2.playWeapon?.('retaliation', revenge);
   }
 
-  onScrap(amount) {
+  onScrap(amount, event) {
+    this.cosmic?.onScrap(amount, event);
     const p = this.game.player;
     const treasure = rank(p.stats, 'treasureMunitions');
     if (treasure) p.treasureCharge = Math.min(300 * treasure, (p.treasureCharge || 0) + Math.max(0, amount) * 1.5 * treasure);
@@ -326,6 +339,7 @@ export class AugmentEffects {
       for (const enemy of this.game.enemies?.active || []) {
         enemy.augmentSlowT = 0;
         enemy.augmentSlowFactor = 1;
+        enemy.cosmicStunT = 0; enemy.cosmicSlowT = 0; enemy.cosmicSlowFactor = 1;
       }
     }
     const queued = this.killQueue.splice(0, 16);
@@ -371,6 +385,7 @@ export class AugmentEffects {
       bolt.augmentTimeScale = this.dilationT > 0 && bolt.z > -35
         && Math.hypot(bolt.x - p.x, bolt.y - p.y) < 20 ? 1 / (1 + 0.35 * dilation) : 1;
     }
+    this.cosmic?.update(dt, { active });
     for (const ring of this.rings) {
       if (!ring.active) continue;
       ring.life -= dt;

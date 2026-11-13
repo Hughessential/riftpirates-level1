@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { UpgradeSystem, UPGRADES } from '../src/systems/UpgradeSystem.js';
 import { PlayerWeapon } from '../src/player/PlayerWeapon.js';
 import { Input } from '../src/core/Input.js';
-import { Scheduler } from '../src/core/Scheduler.js';
-import { UpgradeScreen } from '../src/ui/UpgradeScreen.js';
+import { RunWallet } from '../src/systems/RunWallet.js';
 import { BASE_STATS } from '../src/player/Player.js';
 import { WEAPON_STYLES } from '../src/config/weapons.js';
 
@@ -16,21 +15,24 @@ function makeSystem(seed = 1) {
   };
   let state = seed >>> 0;
   const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
-  const upgrades = new UpgradeSystem({ player }, random);
+  const wallet = new RunWallet(); wallet.credit(100000000);
+  const game = { player, scrap: { wallet }, xp: { level: 1 } };
+  const upgrades = new UpgradeSystem(game, random);
   player.stats = upgrades.stats;
-  return { upgrades, player };
+  return { upgrades, player, game };
 }
 
 // Use actual randomized offers rather than granting an impossible/unoffered ID.
+let offerCounter = 0;
 function offerId(upgrades, id) {
-  for (let i = 0; i < 1000; i++) {
-    const cards = upgrades.offer({ sector: i % 4, checkpoint: i % 3 });
+  for (let i = 0; i < 10000; i++) {
+    const cards = upgrades.offer({ sector: 0, checkpoint: ++offerCounter });
     if (cards.some((card) => card.id === id)) return cards.find((card) => card.id === id);
   }
   assert.fail(`${id} must be reachable through normal approach offers`);
 }
 
-assert.equal(Object.keys(UPGRADES).length, 45, 'The catalogue contains exactly 45 distinct augments');
+assert.equal(Object.keys(UPGRADES).length, 75, 'The original45 and30cosmic augments coexist');
 assert.equal(new Set(Object.values(UPGRADES).map((up) => up.category)).size, 5, 'Weapon, survival, mobility, salvage and anomaly builds are represented');
 for (const [index, [id, definition]] of Object.entries(UPGRADES).entries()) {
   const { upgrades } = makeSystem(index + 500);
@@ -40,7 +42,7 @@ for (const [index, [id, definition]] of Object.entries(UPGRADES).entries()) {
     const offered = offerId(upgrades, id);
     assert.equal(offered.rank, rank);
     assert.equal(offered.currentRank, rank - 1);
-    assert.equal(upgrades.pick(id), true);
+    assert.equal(upgrades.pick(id, upgrades.activeOffer?.token), true);
     assert.equal(upgrades.rank(id), rank);
     assert.equal(upgrades.stats[id], rank, `${id} behavior receives every acquired stack`);
     assert.equal(upgrades.canPick(id), true, `${id} does not become exclusive after buying it`);
@@ -55,7 +57,7 @@ for (const [index, [id, definition]] of Object.entries(UPGRADES).entries()) {
   const { upgrades } = makeSystem(75);
   for (let rank = 1; rank <= 2; rank++) for (const id of Object.keys(UPGRADES)) {
     offerId(upgrades, id);
-    assert.equal(upgrades.pick(id), true);
+    assert.equal(upgrades.pick(id, upgrades.activeOffer?.token), true);
   }
   for (const id of Object.keys(UPGRADES)) assert.equal(upgrades.stats[id], 2, `${id} survives the full mixed build`);
   assert.ok(upgrades.stats.damageReduction > 0 && upgrades.stats.damageReduction < 1);
@@ -84,8 +86,8 @@ for (let route = 0; route < 243; route++) {
       assert.ok(['SURVIVAL', 'MOBILITY'].includes(cards[1].category));
     }
     const index = Math.floor(route / (3 ** (checkpoint % 5))) % 3;
-    assert.equal(upgrades.pick(cards[index].id), true);
-    assert.equal(upgrades.pick(cards[index].id), false, 'one selection consumes the offer');
+    assert.equal(upgrades.pick(cards[index].id, cards[index].offerToken), true);
+    assert.equal(upgrades.pick(cards[index].id, cards[index].offerToken), false, 'one selection consumes the offer');
   }
   assert.equal(upgrades.taken.length, 13);
   for (const [id, rank] of Object.entries(upgrades.ranks)) {
@@ -95,25 +97,26 @@ for (let route = 0; route < 243; route++) {
 }
 
 {
-  const { upgrades, player } = makeSystem();
-  assert.equal(upgrades.pick('broadsides'), false, 'unoffered picks are rejected');
+  const { upgrades, player, game } = makeSystem();
+  assert.equal(upgrades.pick('broadsides', upgrades.activeOffer?.token), false, 'unoffered picks are rejected');
   assert.equal(upgrades.canPick('__proto__'), false, 'Prototype properties are not valid augments');
   offerId(upgrades, 'broadsides');
-  assert.equal(upgrades.pick('broadsides'), true);
+  assert.equal(upgrades.pick('broadsides', upgrades.activeOffer?.token), true);
   assert.equal(upgrades.canPick('broadsides'), true, 'Weapon augments can be rebought');
 
   upgrades.offer(0);
+  game.xp.level = 2;
   player.stats.maxHealth += 8;
   player.stats.damage *= 1.04;
   const xpDamage = player.stats.damage;
-  assert.equal(upgrades.pick('hullBoost'), true);
+  assert.equal(upgrades.pick('hullBoost', upgrades.activeOffer?.token), true);
   assert.equal(player.stats.maxHealth, 228, 'XP hull persists through upgrade');
   assert.equal(player.stats.damage, xpDamage, 'XP damage persists through upgrade');
   assert.equal(player.health, 160, 'hull upgrade heals once, not twice');
-  upgrades.offer(0);
-  assert.equal(upgrades.pick('hullBoost'), true);
+  offerId(upgrades, 'hullBoost');
+  assert.equal(upgrades.pick('hullBoost', upgrades.activeOffer?.token), true);
   assert.equal(upgrades.canPick('hullBoost'), true, 'Stat augments also remain repeatable');
-  const repeat = upgrades.offer(0).find((card) => card.id === 'hullBoost');
+  const repeat = offerId(upgrades, 'hullBoost');
   assert.equal(repeat.rank, 3);
   assert.equal(repeat.currentRank, 2);
 
@@ -184,71 +187,5 @@ for (let route = 0; route < 243; route++) {
   Input.reset();
 }
 
-// Minimal UI doubles keep this test focused on selection/scheduler ownership:
-// a stale close callback must never restart or advance a new run.
-{
-  class Element {
-    constructor() {
-      this.children = [];
-      this.classes = new Set();
-      this.style = { setProperty() {} };
-      this.classList = {
-        add: (name) => this.classes.add(name),
-        remove: (name) => this.classes.delete(name),
-        toggle: (name, active) => active ? this.classes.add(name) : this.classes.delete(name),
-      };
-    }
-    set innerHTML(_value) { this.children = []; }
-    addEventListener() {}
-    appendChild(child) { this.children.push(child); }
-  }
-  const elements = new Map();
-  globalThis.document = {
-    getElementById(id) {
-      if (!elements.has(id)) elements.set(id, new Element());
-      return elements.get(id);
-    },
-    createElement: () => new Element(),
-  };
-  globalThis.addEventListener = () => {};
-  globalThis.removeEventListener = () => {};
-  globalThis.requestAnimationFrame = () => 1;
-  globalThis.cancelAnimationFrame = () => {};
-  const { upgrades, player } = makeSystem();
-  const game = {
-    upgrades, player, paused: false,
-    scheduler: new Scheduler(), hud: { toast() {}, flashAugment() {} }, fx: { explode() {} },
-  };
-  const screen = new UpgradeScreen(game);
-  let completed = 0;
-  const show = () => screen.show({ sector: 0, checkpoint: 0 }, '#22d3ee', () => completed++);
-
-  show();
-  assert.equal(screen.cards.children.length, 3);
-  game.paused = true;
-  screen._pick(screen._offers[0].id);
-  assert.equal(upgrades.taken.length, 0, 'paused clicks do not install augments');
-  game.paused = false;
-  screen._pick(screen._offers[0].id);
-  assert.equal(screen.closing, true);
-  game.scheduler.update(0.2);
-  assert.equal(completed, 0, 'dismissal waits for game time');
-  screen.hide();
-  game.scheduler.update(1);
-  assert.equal(completed, 0, 'hide cancels a pending dismissal');
-
-  show();
-  screen._pick(screen._offers[0].id);
-  show();
-  game.scheduler.update(1);
-  assert.equal(completed, 0, 'replacement screen cannot receive stale callback');
-  assert.equal(screen.open, true);
-  screen._pick(screen._offers[0].id);
-  game.scheduler.update(0.3);
-  assert.equal(completed, 1, 'valid selection completes exactly once');
-  assert.equal(screen.closing, false);
-  game.scheduler.update(1);
-  assert.equal(completed, 1);
-}
-
-console.log('Augments: all 45 repeatable perks, mixed stacks, 243 builds, XP preservation, modular guns, manual fire and stale-dismissal checks passed.');
+// Native DOM selection/scheduler coverage lives in holographic-cards.mjs.
+console.log('Augments: all75 repeatable powers, mixed stacks,243 paid builds, XP preservation and manual-fire weapons passed.');

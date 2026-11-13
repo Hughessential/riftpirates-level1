@@ -27,7 +27,10 @@
     "test:pages": "node tests/pages-smoke.mjs",
     "test:assets": "node tests/asset-loading.mjs && node tests/imported-assets.mjs && node tests/player-fleet.mjs && node tests/asset-loading-browser.mjs",
     "test:render": "node tests/adaptive-resolution.mjs && node tests/render-performance.mjs",
-    "test:controllers": "node tests/controller-menus.mjs"
+    "test:controllers": "node tests/controller-menus.mjs",
+    "test:cards": "node tests/holographic-cards.mjs",
+    "test:economy": "node tests/augment-economy.mjs && node tests/loot-economy.mjs && node tests/economy-save.mjs",
+    "test:cosmic": "node tests/cosmic-augments.mjs && node tests/cosmic-effects.mjs"
   },
   "private": true,
   "devDependencies": {

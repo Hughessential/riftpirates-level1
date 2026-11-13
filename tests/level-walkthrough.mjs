@@ -110,7 +110,7 @@ const pickUpgrade = async () => {
   });
   assert.equal(before.open, true, 'Expected a visible upgrade choice');
   assert.equal(before.count, 3, 'Every cache must offer three cards');
-  await page.evaluate(() => document.querySelector('#upgradeCards .upCard').click());
+  await page.evaluate(() => (window.RIFT.scrap.wallet.credit(10000), document.querySelector('#upgradeCards .upCard').click()));
   await step(0.5);
   assert.equal(await page.evaluate(() => window.RIFT.upgrades.taken.length), before.taken + 1);
   assert.equal(await page.evaluate(() => window.RIFT.upgradeScreen.open), false);

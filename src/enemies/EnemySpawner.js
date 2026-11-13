@@ -61,6 +61,13 @@ class Enemy {
     this.shotSequence = 0;
     this.augmentSlowFactor = 1;
     this.augmentSlowT = 0;
+    this.cosmicStunT = 0;
+    this.cosmicSlowT = 0;
+    this.cosmicSlowFactor = 1;
+    this.cosmicShieldCrackT = 0;
+    game.enemies.lootSerial = (game.enemies.lootSerial || 0) + 1;
+    this.lootSourceId = `enemy:${game.enemies.lootSerial}`;
+    this.lootStage = game.director?.state || 'TESTING';
     this.actionScale = 1;
     this.strafeDir = Math.random() < 0.5 ? -1 : 1;
     this.repositionT = rand(3, 6);
@@ -82,7 +89,7 @@ class Enemy {
       priority: t.highPriority ? PRIORITY.ENEMY - 4 : PRIORITY.ENEMY,
       kind: 'enemy',
       label: t.name,
-      scrap: Math.round(t.scrap * (opts.scrapScale ?? 1)),
+      scrap: Math.round(t.scrap * 5 * (opts.scrapScale ?? 1)),
       score: t.score,
       xp: t.xp,
       onDamage: (dmg, crit) => {
@@ -112,7 +119,10 @@ class Enemy {
     });
     Audio2.play('enemy_death', 0.5, this.elite ? 0.8 : 1.05, 0.08);
 
-    g.scrap.burst(this.x, this.y, this.z, this.target.scrap);
+    g.scrap.burst(this.x,this.y,this.z,this.target.scrap,1,{
+      sourceId:this.lootSourceId,kind:this.elite?'elite':'enemy',budgetGroup:`enemies:${this.lootStage}`,
+      budgetLimit:this.lootStage==='ESCAPE'?200:this.lootStage.includes('COMBAT')?48:96,
+    });
     g.score.add(t.score, this.elite ? 'ELITE KILL' : 'ENEMY KILL');
     g.heat.onKill();
     g.xp.add(t.xp);
@@ -145,8 +155,13 @@ class Enemy {
     const p = game.player;
     // Status duration expires in game time; only the affected enemy's action
     // clock slows, so cryo/gravity never change player input or the world clock.
-    const slow = this.augmentSlowT > 0 ? clamp(this.augmentSlowFactor, 0.2, 1) : 1;
+    const cryoSlow = this.augmentSlowT > 0 ? clamp(this.augmentSlowFactor, 0.2, 1) : 1;
+    const slow = this.cosmicStunT > 0 ? 0 : Math.min(cryoSlow,this.cosmicSlowT > 0 ? this.cosmicSlowFactor : 1);
     this.actionScale = slow;
+    this.cosmicStunT = Math.max(0,this.cosmicStunT-dt);
+    this.cosmicSlowT = Math.max(0,this.cosmicSlowT-dt);
+    this.cosmicShieldCrackT = Math.max(0,this.cosmicShieldCrackT-dt);
+    if (!this.cosmicSlowT) this.cosmicSlowFactor = 1;
     this.augmentSlowT = Math.max(0, this.augmentSlowT - dt);
     if (!this.augmentSlowT) this.augmentSlowFactor = 1;
     dt *= slow;
@@ -465,6 +480,7 @@ export class EnemySpawner {
       }
       e.shielded = shielded;
       e.target.damageScale = overcharged ? .18 : shielded ? 0.3 : 1;
+      if (e.cosmicShieldCrackT > 0) e.target.damageScale = 1-(1-e.target.damageScale)*.85;
     }
     for (const s of shielders) {
       if (s.shieldRing) s.shieldRing.visible = true;

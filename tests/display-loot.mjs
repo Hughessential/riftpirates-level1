@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import puppeteer from 'puppeteer-core';
 import { displayMetrics } from '../src/render/DisplayLayout.js';
-import { ScrapSystem, LOOT_COLORS } from '../src/systems/ScrapSystem.js';
+import { ScrapSystem, LOOT_DENOMINATIONS } from '../src/systems/ScrapSystem.js';
 import { augmentDelta } from '../src/ui/AugmentFeedback.js';
 import { UpgradeSystem, UPGRADES } from '../src/systems/UpgradeSystem.js';
 import * as THREE from 'three';
@@ -16,13 +16,13 @@ const g = { player: { x: 0, y: 0, alive: true, stats: { scrapRadius: 0, scrapMul
   camera: new THREE.PerspectiveCamera(), heat: { onScrapCollected() {} }, score: { add() {} } };
 const loot = new ScrapSystem(new THREE.Scene(), g);
 loot.burst(0, 0, -20, 20, 0);
-assert.deepEqual(new Set(loot.pool.filter(p => p.active).map(p => p.tint)), new Set(LOOT_COLORS));
+assert.deepEqual(new Set(loot.pool.filter(p => p.active).map(p => p.tint)), new Set([LOOT_DENOMINATIONS[0].color]));
 assert.equal(loot.pool.filter(p => p.active).reduce((n, p) => n + p.value, 0), 20);
 loot.update(0, 0);
 assert.equal(loot.halos.count, 10);
 for (const p of loot.pool.filter(p => p.active)) p.x = p.y = p.z = 0;
 loot.update(0, 0);
-assert.equal(loot.collected, 20, 'All five glow colors preserve their real pickup value');
+assert.equal(loot.collected, 20, 'Denomination shards preserve their real pickup value');
 assert.equal(loot.halos.count, 0);
 loot.burst(0, 0, -20, 800, 0); loot.update(0, 0); loot.reset();
 assert.equal(loot.halos.count, 0);
@@ -105,5 +105,5 @@ try {
   });
   await page.screenshot({ path: 'shots/loot-palette.png' });
   assert.deepEqual(errors, []);
-  console.log('PASS: external display aspect, density changes, proportionate menu, five loot colors/value/reset, real augment previews.');
+  console.log('PASS: external display aspect, density changes, proportionate menu, denomination loot/value/reset, real augment previews.');
 } finally { await browser.close(); }

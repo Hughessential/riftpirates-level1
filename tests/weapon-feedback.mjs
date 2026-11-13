@@ -74,11 +74,13 @@ assert.equal(scene.children.length, 4);
 const effectGame = { scene: new THREE.Scene(), player: { stats: {}, x: 0, y: 0 }, targets: [],
   projectiles: { enemy: [] }, enemies: { active: [] } };
 const effects = new AugmentEffects(effectGame);
+const effectObjectCount = effects.visualRoot.children.length;
+assert.equal(effects.cosmic.mesh.instanceMatrix.count, 64, 'Cosmic decoration has one bounded instance bank');
 for (let i = 0; i < 60; i++) effects._arc({ x: i, y: 0, z: -20 }, { x: i + 3, y: 2, z: -30 }, '#428aff');
 effects.update(.02);
 assert.equal(effects.arcs.length, 48, 'Chain effects stay capped during dense hit reactions');
 assert.equal(effects.arcMesh.count, 144, 'Visible lightning uses one fixed three-segment instance bank');
-assert.equal(effects.visualRoot.children.length, 13, 'Repeated proc events do not allocate scene objects');
+assert.equal(effects.visualRoot.children.length, effectObjectCount, 'Repeated proc events do not allocate scene objects');
 effects.update(.2);
 assert.equal(effects.arcMesh.count, 0, 'Lightning geometry retires after its short visible life');
 effects.reset();

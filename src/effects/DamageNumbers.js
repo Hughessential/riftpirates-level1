@@ -3,6 +3,12 @@ import { $ } from '../core/Utils.js';
 
 /** Pooled DOM sprites projected from world space. Crits read differently (spec §17). */
 const POOL = 26;
+const damageLabel = value => {
+  const n = Math.max(0, Math.round(Number(value) || 0));
+  if (n < 10000) return String(n);
+  const scale = n >= 1e12 ? 1e12 : n >= 1e9 ? 1e9 : n >= 1e6 ? 1e6 : 1e3;
+  return `${Number((n / scale).toFixed(1))}${scale === 1e12 ? 'T' : scale === 1e9 ? 'B' : scale === 1e6 ? 'M' : 'K'}`;
+};
 
 export class DamageNumbers {
   constructor(camera) {
@@ -31,7 +37,7 @@ export class DamageNumbers {
       && o.max - o.life < .12 && (o.pos.x - x) ** 2 + (o.pos.y - y) ** 2 + (o.pos.z - z) ** 2 < 9);
     if (recent) {
       recent.value += value;
-      recent.el.textContent = crit ? `${recent.value}!` : recent.value;
+      recent.el.textContent = `${damageLabel(recent.value)}${crit ? '!' : ''}`;
       return;
     }
     const o = this._free();
@@ -43,7 +49,7 @@ export class DamageNumbers {
     o.value = value;
     o.crit = crit;
     o.blocked = false;
-    o.el.textContent = crit ? `${value}!` : value;
+    o.el.textContent = `${damageLabel(value)}${crit ? '!' : ''}`;
     o.el.className = crit ? 'dmg crit' : 'dmg';
     o.el.style.display = 'block';
   }

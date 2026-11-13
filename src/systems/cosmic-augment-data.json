@@ -1,0 +1,568 @@
+[
+  {
+    "id": "blackwakeRounds",
+    "name": "Blackwake Rounds",
+    "rarity": "RARE",
+    "category": "ARSENAL",
+    "card_text": "Shots gain black-electric tracers. Every 8th shot bursts into void shrapnel.",
+    "trigger": "Each 8th primary shot spawned; its collision or normal expiry creates the burst.",
+    "extra_rank_scaling": "+2 shards and +5 percentage points shard damage per extra rank; cap 18 physical shards per burst.",
+    "guardrails": "Count only authored primary shots. Shards cannot create shards, award extra scrap, or re-trigger hit-based augment events.",
+    "parameters": {
+      "shot_interval": 8,
+      "shards_rank1": 6,
+      "shards_added_per_rank": 2,
+      "shards_render_cap": 18,
+      "damage_ratio_rank1": 0.45,
+      "damage_ratio_plus_per_rank": 0.05
+    }
+  },
+  {
+    "id": "riftstepSurge",
+    "name": "Riftstep Surge",
+    "rarity": "RARE",
+    "category": "MOBILITY",
+    "card_text": "Dodges become short blinks. A slicing afterimage cuts through enemies.",
+    "trigger": "On existing dodge-roll start, travel in chosen safe direction and leave one damaging echo.",
+    "extra_rank_scaling": "+0.75 blink units and +25 slash damage per rank; collision-limited maximum 8 units.",
+    "guardrails": "Do not blink through walls, outside bounds, or across bosses. Preserve Perfect Dodge detection, invulnerability window, and input controls.",
+    "parameters": {
+      "blink_units_rank1": 5,
+      "blink_units_plus_per_rank": 0.75,
+      "blink_units_cap": 8,
+      "slash_damage_rank1": 70,
+      "slash_damage_plus_per_rank": 25
+    }
+  },
+  {
+    "id": "lootstormHalo",
+    "name": "Lootstorm Halo",
+    "rarity": "RARE",
+    "category": "SALVAGE",
+    "card_text": "Glowing diamonds orbit you, block bullets, then fire back as crystal shrapnel.",
+    "trigger": "On legitimate scrap pickup, recharge an orbit gem; incoming eligible projectile consumes one gem.",
+    "extra_rank_scaling": "+1 gem capacity per rank (cap 6), +8 retaliatory damage per fragment per rank.",
+    "guardrails": "No duplicate currency; consuming a gem does not call scrap pickup again. Only one projectile intercepted per gem; keep independent of 14s shield recovery.",
+    "parameters": {
+      "gem_capacity_rank1": 3,
+      "gem_capacity_plus_per_rank": 1,
+      "gem_capacity_cap": 6,
+      "retaliation_shards": 5,
+      "shard_damage_rank1": 24,
+      "damage_plus_per_rank": 8
+    }
+  },
+  {
+    "id": "emperorsPressure",
+    "name": "Emperor’s Pressure",
+    "rarity": "RARE",
+    "category": "ANOMALY",
+    "card_text": "Entering combat emits a crushing aura that stuns weak foes and cracks shields.",
+    "trigger": "At combat encounter entry and no more than once each 18 combat seconds afterward.",
+    "extra_rank_scaling": "+2 radius units and +0.2s normal-enemy stun per rank; control duration capped at 1.6s.",
+    "guardrails": "Never interrupt boss scripting, forcibly expose boss cores, or stun elite/boss AI. Re-entry events must be deduplicated.",
+    "parameters": {
+      "radius_rank1": 10,
+      "radius_plus_per_rank": 2,
+      "stun_seconds_rank1": 0.8,
+      "stun_seconds_plus_per_rank": 0.2,
+      "stun_seconds_cap": 1.6,
+      "shield_damage_fraction": 0.15,
+      "cooldown_seconds": 18
+    }
+  },
+  {
+    "id": "phantomBroadside",
+    "name": "Phantom Broadside",
+    "rarity": "RARE",
+    "category": "ARSENAL",
+    "card_text": "Every primary volley is echoed by spectral pirate cannons.",
+    "trigger": "Primary volleys schedule one non-recursive spectral copy after 0.12s.",
+    "extra_rank_scaling": "+15 percentage points echo strength per rank; visual ghost cannons cap at four per volley.",
+    "guardrails": "Echoes are secondary damage and cannot schedule more echoes. Reuse existing broadside effects without replacing original guns.",
+    "parameters": {
+      "echo_delay_seconds": 0.12,
+      "echo_ratio_rank1": 0.35,
+      "echo_ratio_plus_per_rank": 0.15,
+      "ghost_cannons_visual_cap": 4
+    }
+  },
+  {
+    "id": "voltageCrown",
+    "name": "Voltage Crown",
+    "rarity": "RARE",
+    "category": "ANOMALY",
+    "card_text": "Weak-point hits chain teal lightning through nearby enemies.",
+    "trigger": "A primary weak-point hit selects the nearest eligible unharmed chain targets.",
+    "extra_rank_scaling": "+1 additional target per rank (cap 8); +5 percentage points arc damage per rank.",
+    "guardrails": "No repeat target within one chain and no recursive chain triggers. Respect line-of-sight and targetability.",
+    "parameters": {
+      "targets_rank1": 3,
+      "targets_plus_per_rank": 1,
+      "targets_cap": 8,
+      "damage_ratio_rank1": 0.35,
+      "damage_ratio_plus_per_rank": 0.05
+    }
+  },
+  {
+    "id": "nebulaSkin",
+    "name": "Nebula Skin",
+    "rarity": "RARE",
+    "category": "SURVIVAL",
+    "card_text": "A shimmering aura shield regenerates rapidly while moving.",
+    "trigger": "While ship speed exceeds 30% of normal cruise speed AND standard shield lockout has ended.",
+    "extra_rank_scaling": "+0.3x regen multiplier per rank; do not grant instant shield capacity or lockout bypass.",
+    "guardrails": "The existing 14-second shield recovery delay remains authoritative; damage resets that countdown as before.",
+    "parameters": {
+      "speed_threshold_fraction": 0.3,
+      "regen_multiplier_rank1": 1.6,
+      "regen_multiplier_plus_per_rank": 0.3,
+      "shield_lockout_override": false
+    }
+  },
+  {
+    "id": "dreadwakeEngine",
+    "name": "Dreadwake Engine",
+    "rarity": "RARE",
+    "category": "MOBILITY",
+    "card_text": "Kill chains trigger brutal speed bursts and damaging wake trails.",
+    "trigger": "Four confirmed unique enemy kills within a sliding 5-second combat window.",
+    "extra_rank_scaling": "+10 percentage points speed and +10 wake DPS per rank; duration capped at 5s.",
+    "guardrails": "Internal 8s cooldown. Wake damage does not refresh the same kill chain recursively. Avoid overlap with the existing trail system.",
+    "parameters": {
+      "kills_needed": 4,
+      "window_seconds": 5,
+      "speed_bonus_rank1": 0.3,
+      "speed_bonus_plus_per_rank": 0.1,
+      "duration_seconds": 3,
+      "duration_cap_seconds": 5,
+      "wake_dps_rank1": 25,
+      "wake_dps_plus_per_rank": 10,
+      "cooldown_seconds": 8
+    }
+  },
+  {
+    "id": "predatorsGaze",
+    "name": "Predator’s Gaze",
+    "rarity": "RARE",
+    "category": "ARSENAL",
+    "card_text": "Aimed targets are marked and suffer bonus critical damage.",
+    "trigger": "Aim/lock remains on one target for 0.4 seconds; applies a four-second mark.",
+    "extra_rank_scaling": "+5 critical-chance points and +0.15x critical multiplier per rank; chance capped at 100%.",
+    "guardrails": "Bosses/weak points remain targetable only in existing valid windows; marking does not bypass exposure mechanics.",
+    "parameters": {
+      "lock_seconds": 0.4,
+      "mark_seconds": 4,
+      "crit_chance_bonus_rank1": 0.25,
+      "crit_chance_plus_per_rank": 0.05,
+      "crit_damage_bonus_rank1": 0.4,
+      "crit_damage_plus_per_rank": 0.15
+    }
+  },
+  {
+    "id": "scrapTyphoon",
+    "name": "Scrap Typhoon",
+    "rarity": "RARE",
+    "category": "SALVAGE",
+    "card_text": "Collected scrap spins around you as a slicing storm.",
+    "trigger": "Each real scrap pickup energizes one spinning scrap blade for six combat seconds.",
+    "extra_rank_scaling": "+1 blade per rank (cap 8) and +8 damage per blade per rank.",
+    "guardrails": "No phantom scrap currency. Use one pickup transaction, no secondary scrap duplication or repeated target damage per frame.",
+    "parameters": {
+      "blades_rank1": 3,
+      "blades_plus_per_rank": 1,
+      "blades_cap": 8,
+      "duration_seconds": 6,
+      "contact_damage_rank1": 24,
+      "contact_damage_plus_per_rank": 8,
+      "same_target_cooldown_seconds": 0.5
+    }
+  },
+  {
+    "id": "conquerorsCircuit",
+    "name": "Conqueror’s Circuit",
+    "rarity": "ULTRA-RARE",
+    "category": "ANOMALY",
+    "card_text": "Perfect dodges unleash black-lightning shockwaves and slow everything nearby.",
+    "trigger": "Verified Perfect Dodge resolution; never a regular or failed dodge.",
+    "extra_rank_scaling": "+70 shockwave damage and +2 radius units per rank; keep projectile slow floor at 20% normal speed.",
+    "guardrails": "Use gameplay dt; bosses may take damage but their phases/timers and the escape clock must not be frozen.",
+    "parameters": {
+      "radius_rank1": 12,
+      "radius_plus_per_rank": 2,
+      "damage_rank1": 180,
+      "damage_plus_per_rank": 70,
+      "projectile_speed_factor": 0.35,
+      "slow_duration_seconds": 2,
+      "slow_factor_floor": 0.2
+    }
+  },
+  {
+    "id": "leviathanPulse",
+    "name": "Leviathan Pulse",
+    "rarity": "ULTRA-RARE",
+    "category": "ARSENAL",
+    "card_text": "Secondary fire becomes a gigantic expanding teal-purple energy ring.",
+    "trigger": "Valid secondary-fire activation using the existing weapon input and energy rules.",
+    "extra_rank_scaling": "+2 ring radius and +100 hit damage per extra rank; maintain weapon trigger/cost semantics.",
+    "guardrails": "Do not disable or replace secondary fire, remove its cooldown, or damage a target every animation frame.",
+    "parameters": {
+      "radius_rank1": 18,
+      "radius_plus_per_rank": 2,
+      "damage_rank1": 250,
+      "damage_plus_per_rank": 100,
+      "per_target_hits_per_ring": 1
+    }
+  },
+  {
+    "id": "starbreakerChoir",
+    "name": "Starbreaker Choir",
+    "rarity": "ULTRA-RARE",
+    "category": "ARSENAL",
+    "card_text": "Drone shots harmonize into a piercing beam chorus.",
+    "trigger": "Every 4 combat seconds while player is firing; sync existing orbitals or conjure two nonpersistent ghost drones.",
+    "extra_rank_scaling": "+130 beam DPS per rank; visual emitters cap at 4; interval stays 4s.",
+    "guardrails": "Always works even if the player has not picked Ghost Fleet. Beam tick damage must be frame-rate independent.",
+    "parameters": {
+      "pulse_interval_seconds": 4,
+      "beam_duration_seconds": 0.7,
+      "beam_dps_rank1": 300,
+      "beam_dps_plus_per_rank": 130,
+      "visual_emitters_cap": 4
+    }
+  },
+  {
+    "id": "riftSovereign",
+    "name": "Rift Sovereign",
+    "rarity": "ULTRA-RARE",
+    "category": "SURVIVAL",
+    "card_text": "Activating an augment spawns a temporary throne field with huge fire-rate and defense boosts.",
+    "trigger": "Selecting any augment arms a field that activates on resumption of the next combat state.",
+    "extra_rank_scaling": "+2 field seconds and +15 percentage points fire rate per extra rank; damage reduction max 65%.",
+    "guardrails": "Augments are currently passive picks, not hotbar abilities: use upgrade pick/onPick and defer clock until gameplay resumes. Do not decrement while choosing.",
+    "parameters": {
+      "duration_seconds_rank1": 8,
+      "duration_plus_per_rank": 2,
+      "fire_rate_bonus_rank1": 1.0,
+      "fire_rate_plus_per_rank": 0.15,
+      "damage_reduction_rank1": 0.35,
+      "damage_reduction_cap": 0.65
+    }
+  },
+  {
+    "id": "eclipseArsenal",
+    "name": "Eclipse Arsenal",
+    "rarity": "ULTRA-RARE",
+    "category": "ARSENAL",
+    "card_text": "Weapons auto-cycle through plasma, void blades, rail shots, and crystal missiles.",
+    "trigger": "Every three combat seconds while actively attacking, emit one additional special volley type in repeating order.",
+    "extra_rank_scaling": "+70 total volley damage per rank; active weapon loadout remains intact.",
+    "guardrails": "Never replace or suppress any of the existing simultaneous weapons. Bonus volley cannot itself trigger other special cycles.",
+    "parameters": {
+      "cycle_interval_seconds": 3,
+      "damage_total_rank1": 180,
+      "damage_total_plus_per_rank": 70,
+      "cycle": [
+        "plasma",
+        "void_blade",
+        "rail",
+        "crystal_missiles"
+      ],
+      "crystal_missiles": 3
+    }
+  },
+  {
+    "id": "throneOfThunder",
+    "name": "Throne of Thunder",
+    "rarity": "ULTRA-RARE",
+    "category": "ANOMALY",
+    "card_text": "Standing your ground builds a storm crown that calls down bolts.",
+    "trigger": "Remain under 40% move speed for 1.2 combat seconds; activates an electrical crown for 6s.",
+    "extra_rank_scaling": "+55 damage per rank and +1s active duration per rank; storm active duration cap 9s.",
+    "guardrails": "An 8s cooldown starts on storm end; repositioning does not force existing player movement rules to change.",
+    "parameters": {
+      "stationary_speed_threshold": 0.4,
+      "charge_seconds": 1.2,
+      "active_seconds_rank1": 6,
+      "active_plus_per_rank": 1,
+      "active_cap_seconds": 9,
+      "strike_interval_seconds": 0.8,
+      "strike_damage_rank1": 140,
+      "strike_damage_plus_per_rank": 55,
+      "cooldown_seconds": 8
+    }
+  },
+  {
+    "id": "voidDominion",
+    "name": "Void Dominion",
+    "rarity": "ULTRA-RARE",
+    "category": "ANOMALY",
+    "card_text": "Kills extend a fear aura that weakens enemy fire and drags foes inward.",
+    "trigger": "On unique enemy kill: extend a three-second aura, capped at 8s remaining.",
+    "extra_rank_scaling": "+1 radius and +5 percentage points shot damage reduction per rank; reduction capped at 60%.",
+    "guardrails": "Do not pull invulnerable or phase-locked bosses. Kills caused by the aura may damage but cannot recursively generate aura extensions without unique primary kill credit.",
+    "parameters": {
+      "radius_rank1": 7,
+      "radius_plus_per_rank": 1,
+      "duration_added_per_kill_seconds": 3,
+      "remaining_duration_cap_seconds": 8,
+      "shot_damage_reduction_rank1": 0.2,
+      "reduction_plus_per_rank": 0.05,
+      "reduction_cap": 0.6
+    }
+  },
+  {
+    "id": "overlordsReflex",
+    "name": "Overlord’s Reflex",
+    "rarity": "ULTRA-RARE",
+    "category": "MOBILITY",
+    "card_text": "After taking a hit, time nearly stops and you phase through danger briefly.",
+    "trigger": "First legitimate shield/hull damage after a 25s combat cooldown.",
+    "extra_rank_scaling": "+0.20s slow duration and +0.12s phase duration per rank; phase cap 1.5s.",
+    "guardrails": "Do not slow music, input, boss narrative clocks, or final escape deadline. Respect existing damage/phase state and no self-trigger loops.",
+    "parameters": {
+      "cooldown_seconds": 25,
+      "hostile_speed_factor": 0.15,
+      "slow_seconds_rank1": 1.2,
+      "slow_plus_per_rank": 0.2,
+      "phase_seconds_rank1": 0.55,
+      "phase_plus_per_rank": 0.12,
+      "phase_seconds_cap": 1.5
+    }
+  },
+  {
+    "id": "diamondApocalypse",
+    "name": "Diamond Apocalypse",
+    "rarity": "ULTRA-RARE",
+    "category": "SALVAGE",
+    "card_text": "Loot crystals duplicate and detonate in violent chain reactions.",
+    "trigger": "Each tenth genuine scrap pickup spawns visually duplicated NON-CURRENCY crystal bombs.",
+    "extra_rank_scaling": "+1 illusion crystal per rank (cap 7) and +60 blast damage per rank.",
+    "guardrails": "Never award bonus scrap, score, pickups or currency from the duplicates. Max 7 detonations per burst; blast kills cannot generate fresh crystal duplication.",
+    "parameters": {
+      "real_pickups_needed": 10,
+      "illusions_rank1": 3,
+      "illusions_plus_per_rank": 1,
+      "illusions_cap": 7,
+      "blast_damage_rank1": 120,
+      "blast_damage_plus_per_rank": 60,
+      "blast_radius": 7
+    }
+  },
+  {
+    "id": "blackFlagAscension",
+    "name": "Black Flag Ascension",
+    "rarity": "ULTRA-RARE",
+    "category": "SURVIVAL",
+    "card_text": "Low health triggers a terrifying aura, lifesteal, and extreme attack speed.",
+    "trigger": "On crossing below 30% max hull during combat, if not already activated and 35s cooldown elapsed.",
+    "extra_rank_scaling": "+15 percentage points fire rate, +1% lifesteal and +3 HP/sec cap per rank.",
+    "guardrails": "Does not disable shield lockout or grant extra revives. Do not trigger repeatedly on the same low-health threshold.",
+    "parameters": {
+      "hull_threshold_fraction": 0.3,
+      "duration_seconds": 7,
+      "cooldown_seconds": 35,
+      "fire_rate_bonus_rank1": 0.8,
+      "fire_rate_bonus_plus_per_rank": 0.15,
+      "lifesteal_fraction_rank1": 0.04,
+      "lifesteal_plus_per_rank": 0.01,
+      "healing_cap_hp_per_second_rank1": 12,
+      "healing_cap_plus_per_rank": 3
+    }
+  },
+  {
+    "id": "emperorOfTheRift",
+    "name": "Emperor of the Rift",
+    "rarity": "MYTHIC",
+    "category": "ANOMALY",
+    "card_text": "Unleash a domination wave that deletes lesser enemies and exposes boss cores.",
+    "trigger": "First valid combat entry after pick; then every 35 combat seconds while fighting.",
+    "extra_rank_scaling": "+4 radius and +180 elite damage per rank; boss vulnerability duration remains 2s.",
+    "guardrails": "Never bypass boss invulnerability, skip scripted phases, delete elites/bosses, or expose nonexistent cores; fallback to stagger pulse if boss core is protected.",
+    "parameters": {
+      "radius_rank1": 22,
+      "radius_plus_per_rank": 4,
+      "elite_damage_rank1": 500,
+      "elite_damage_plus_per_rank": 180,
+      "boss_exposure_seconds_if_valid": 2,
+      "cooldown_seconds": 35
+    }
+  },
+  {
+    "id": "godspeedMarauder",
+    "name": "Godspeed Marauder",
+    "rarity": "MYTHIC",
+    "category": "MOBILITY",
+    "card_text": "Movement becomes hyper-fast dashes with electric clones that attack on their own.",
+    "trigger": "While boosting, move faster; on every valid dodge, leave combat clones for 2s.",
+    "extra_rank_scaling": "+10 percentage points movement bonus and +1 clone per rank, cap 5 active clones.",
+    "guardrails": "Do not pass through blockers or trivialize final escape countdown. Clones cannot spawn their own clones or credit duplicate kills.",
+    "parameters": {
+      "speed_bonus_rank1": 0.6,
+      "speed_bonus_plus_per_rank": 0.1,
+      "clones_rank1": 3,
+      "clones_plus_per_rank": 1,
+      "clones_active_cap": 5,
+      "clone_seconds": 2,
+      "clone_damage_ratio": 0.5
+    }
+  },
+  {
+    "id": "singularityPalace",
+    "name": "Singularity Palace",
+    "rarity": "MYTHIC",
+    "category": "ANOMALY",
+    "card_text": "A rotating black-hole fortress devours bullets and crushes nearby enemies.",
+    "trigger": "On every 16th unique combat kill; spawn one rotating field for up to 12s.",
+    "extra_rank_scaling": "+1 radius and +35 DPS per rank; one instance maximum, 16s cooldown after termination.",
+    "guardrails": "Do not absorb mission-critical scripted objects or pull bosses out of arenas. Bullet suppression uses capped budget and nonrecursive effects.",
+    "parameters": {
+      "kills_needed": 16,
+      "field_radius_rank1": 8,
+      "radius_plus_per_rank": 1,
+      "field_seconds": 12,
+      "bullet_absorb_per_second": 2,
+      "damage_per_second_rank1": 90,
+      "damage_plus_per_rank": 35,
+      "cooldown_seconds": 16,
+      "instances_cap": 1
+    }
+  },
+  {
+    "id": "celestialExecution",
+    "name": "Celestial Execution",
+    "rarity": "MYTHIC",
+    "category": "ARSENAL",
+    "card_text": "Every 12th hit summons a colossal descending energy blade.",
+    "trigger": "Every 12th registered direct player primary hit on a valid target.",
+    "extra_rank_scaling": "+200 blade damage and +1 blast radius per rank; maximum one active blade visual.",
+    "guardrails": "Do not count the blade’s own damage as a primary hit, or penetrate protected boss phases. Debounce target hits per swordfall.",
+    "parameters": {
+      "direct_hits_needed": 12,
+      "blade_damage_rank1": 500,
+      "blade_damage_plus_per_rank": 200,
+      "radius_rank1": 5,
+      "radius_plus_per_rank": 1,
+      "active_visual_cap": 1
+    }
+  },
+  {
+    "id": "kingsCataclysm",
+    "name": "King’s Cataclysm",
+    "rarity": "MYTHIC",
+    "category": "ANOMALY",
+    "card_text": "Trigger a devastating blast of black lightning, rift fire, and diamond shards.",
+    "trigger": "On first transition to Infernal-or-hotter Rift Heat, with 20s internal combat cooldown.",
+    "extra_rank_scaling": "+180 radial damage and +4 bolt count per rank; cap 24 bolts.",
+    "guardrails": "Do not repeatedly trigger when Heat stays high. Do not permit shard or blast damage to restart explosion cascades.",
+    "parameters": {
+      "heat_threshold": "INFERNAL",
+      "cooldown_seconds": 20,
+      "blast_radius": 16,
+      "radial_damage_rank1": 600,
+      "radial_damage_plus_per_rank": 180,
+      "diamond_bolts_rank1": 12,
+      "diamond_bolts_plus_per_rank": 4,
+      "diamond_bolts_cap": 24,
+      "bolt_damage": 60
+    }
+  },
+  {
+    "id": "infiniteArmada",
+    "name": "Infinite Armada",
+    "rarity": "MYTHIC",
+    "category": "ARSENAL",
+    "card_text": "Summon ghost pirate frigates that broadside the battlefield.",
+    "trigger": "At boss encounter entry or 10 unique kills in a normal encounter; no more than once per 24s.",
+    "extra_rank_scaling": "+1 frigate per rank (cap 5), +25 damage per broadside per rank.",
+    "guardrails": "Summon is event- and cooldown-controlled; do not duplicate on boss phase transitions or turn ghost ships into persistent save entities.",
+    "parameters": {
+      "frigates_rank1": 2,
+      "frigates_plus_per_rank": 1,
+      "frigates_cap": 5,
+      "summon_seconds": 10,
+      "broadside_interval_seconds": 1,
+      "broadside_damage_rank1": 50,
+      "damage_plus_per_rank": 25,
+      "cooldown_seconds": 24,
+      "normal_kills_needed": 10
+    }
+  },
+  {
+    "id": "endOfFear",
+    "name": "End of Fear",
+    "rarity": "MYTHIC",
+    "category": "SURVIVAL",
+    "card_text": "Near death becomes invulnerability followed by a terrifying aura burst.",
+    "trigger": "First eligible lethal hit per encounter (after existing Death Warrant rescue priority), or crossing below 15% hull.",
+    "extra_rank_scaling": "+0.25s phase and +180 wave damage per rank; invulnerability cap 4s.",
+    "guardrails": "One activation per encounter. Preserve existing one-time lethal rescues, score finalization, and final escape timeout; never grants a free victory.",
+    "parameters": {
+      "hull_threshold_fraction": 0.15,
+      "activation_limit_per_encounter": 1,
+      "invulnerable_seconds_rank1": 2.5,
+      "invulnerable_plus_per_rank": 0.25,
+      "invulnerable_cap_seconds": 4,
+      "wave_radius": 14,
+      "wave_damage_rank1": 550,
+      "wave_damage_plus_per_rank": 180
+    }
+  },
+  {
+    "id": "stormTyrantHalo",
+    "name": "Storm Tyrant Halo",
+    "rarity": "MYTHIC",
+    "category": "ARSENAL",
+    "card_text": "A permanent halo emits arcs, mini-beams, and orbiting storm spears.",
+    "trigger": "Passive during combat while rank is installed.",
+    "extra_rank_scaling": "+1 spear per rank (cap 8), +25 spear damage and +70 beam damage per rank.",
+    "guardrails": "Limit to eight physical spears, per-target contact cooldown and fixed-time beam strikes. Do not count halo damage as primary shots.",
+    "parameters": {
+      "spears_rank1": 3,
+      "spears_plus_per_rank": 1,
+      "spears_cap": 8,
+      "spear_interval_seconds": 0.8,
+      "spear_damage_rank1": 65,
+      "spear_damage_plus_per_rank": 25,
+      "minibeam_interval_seconds": 4,
+      "minibeam_damage_rank1": 180,
+      "minibeam_damage_plus_per_rank": 70
+    }
+  },
+  {
+    "id": "crownOfTheLastPirate",
+    "name": "Crown of the Last Pirate",
+    "rarity": "MYTHIC",
+    "category": "ANOMALY",
+    "card_text": "All augments are amplified and gain extra empowered effects.",
+    "trigger": "Global post-aggregation enhancement when other installed augment effects resolve.",
+    "extra_rank_scaling": "+10 percentage points amplification per rank, cap +150% combined. Bonus pulses throttle to one per second globally.",
+    "guardrails": "No amplification of base stats, the crown’s own amplifier, saved progress, event counts, cooldown reduction, or infinite self-recursion. Only tagged augment magnitude fields.",
+    "parameters": {
+      "amplification_rank1": 0.3,
+      "amplification_plus_per_rank": 0.1,
+      "amplification_cap": 1.5,
+      "bonus_pulse_global_interval_seconds": 1
+    }
+  },
+  {
+    "id": "absoluteOvercharge",
+    "name": "Absolute Overcharge",
+    "rarity": "MYTHIC",
+    "category": "ARSENAL",
+    "card_text": "Heat overflows into god-mode: wider beams, no weapon cooldowns, multiplied damage.",
+    "trigger": "Entering Infernal-or-hotter Heat with 22s combat cooldown; empower for 6s.",
+    "extra_rank_scaling": "+0.4x damage multiplier and +0.6s duration per rank; duration caps at 10s.",
+    "guardrails": "Never remove dodge, recovery, boss, music, escape, or global scheduler cooldowns. Hard limit emission per frame and keep all damage finite.",
+    "parameters": {
+      "heat_threshold": "INFERNAL",
+      "duration_seconds_rank1": 6,
+      "duration_plus_per_rank": 0.6,
+      "duration_cap_seconds": 10,
+      "cooldown_seconds": 22,
+      "weapon_damage_multiplier_rank1": 2.5,
+      "damage_multiplier_plus_per_rank": 0.4,
+      "spawn_budget": "bounded-by-current-project-combat-pools"
+    }
+  }
+]

@@ -5,7 +5,7 @@ import { AUDIO_DEFAULTS } from '../src/core/SaveSystem.js';
 
 const legacy = { scrapBanked: 321, bestScore: 1234567, bestTime: 900, bestGrade: 'S',
   runs: 11, clears: 4, music: 0, sfx: 1, seenIntro: 1, selectedShip: 'void-corsair' };
-const migratedLegacy = { ...legacy, ...AUDIO_DEFAULTS };
+const migratedLegacy = { ...legacy, ...AUDIO_DEFAULTS, lastBankedRunId: '' };
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true, protocolTimeout: 180000,
@@ -227,7 +227,7 @@ try {
     const report = await page.evaluate(({ name, build }) => {
       const g = window.RIFT, lab = g.testing, input = window.__escapeInput;
       lab.enter(); lab.applyPreset('empty'); lab.setXPLevel(8);
-      for (const id of build) { g.upgrades.pendingOffers = new Set([id]); if (!g.upgrades.pick(id)) throw Error(`Bad pick ${id}`); }
+      for (const id of build) lab.setAugmentRank(id, g.upgrades.rank(id) + 1);
       for (const key of ['godMode','infiniteBoost','unlimitedRolls','autoFire','freezeEnemies']) lab.setSetting(key, false);
       lab.setSetting('timeScale', 1); lab.loadScene('escape'); lab.setPanelOpen(false);
       const oldRead = input.read.bind(input);

@@ -18,6 +18,9 @@ try {
   await page.setViewport({ width: 1440, height: 900, hasTouch: true });
   page.on('pageerror', error => errors.push(error.message));
   await page.evaluateOnNewDocument(() => {
+    // Capture one consistent source snapshot while other agents edit modules.
+    // The game has no network gameplay; this only suspends Vite's HMR socket.
+    window.WebSocket = class extends EventTarget { readyState = 0; send() {} close() {} };
     window.__pads = [];
     Object.defineProperty(navigator, 'getGamepads', { value: () => window.__pads });
   });
@@ -33,19 +36,24 @@ try {
     window.__feedback = await import(loaded('/src/ui/AugmentFeedback.js'));
     RIFT.update = () => {};
     RIFT.renderFrame = () => {};
+    RIFT.scrap.wallet.credit(100000);
     window.__done = 0;
-    window.__show = tiers => {
+    window.__checkpoint = 0;
+    window.__show = (tiers, source) => {
+      const checkpoint = __checkpoint++;
+      source ||= { sector: Math.floor(checkpoint / 3), checkpoint: checkpoint % 3 };
+      window.__lastSource = source;
       const offer = RIFT.upgrades.offer;
       if (tiers) RIFT.upgrades.offer = function(source) {
         return offer.call(this, source).map((up, i) => ({ ...up, rarity: tiers[i] }));
       };
-      try { RIFT.upgradeScreen.show({ sector: 0, checkpoint: 0 }, '#24ffe0', () => { __done++; }); }
+      try { RIFT.upgradeScreen.show(source, '#24ffe0', () => { __done++; }); }
       finally { RIFT.upgrades.offer = offer; }
     };
     window.__preview = (ids, tiers) => {
       __show();
       const cards = ids.map((id, index) => {
-        const up = { ...__registry[id], id, rank: 1, currentRank: 0, rarity: tiers?.[index] };
+        const up = { ...__registry[id], id, rank: 1, currentRank: 0, rarity: tiers?.[index], price: [250, 650, 1600][index], walletBalance: 3200 };
         return __cardModule.createHolographicAugmentCard(up, {
           index, delta: __feedback.augmentDelta(up, RIFT.upgrades.stats, 1), onSelect: () => {},
         });
@@ -58,7 +66,7 @@ try {
       const box = card.getBoundingClientRect();
       const label = card.dataset.augmentId;
       if (box.left < -1 || box.right > innerWidth + 1) faults.push(`${label}: horizontal overflow`);
-      const fields = ['h3', '.holoDescription', '.upStackEffect', '.upActualDelta', '.upTake'];
+      const fields = ['h3', '.holoDescription', '.upStackEffect', '.upActualDelta', '.holoEconomy', '.upTake'];
       let previous;
       for (const selector of fields) {
         const el = card.querySelector(selector);
@@ -97,6 +105,7 @@ try {
   };
 
   await show();
+  await page.evaluate(async () => { __preview(Object.keys(__registry).slice(0, 3)); await __settle(); });
   const defaults = await page.$$eval('#upgradeCards .holoCard', cards => cards.map(card => ({
     tag: card.tagName, rarity: card.dataset.rarity, label: card.querySelector('.holoRarity')?.textContent,
     nestedControls: card.querySelectorAll('button,input,a,select').length,
@@ -118,6 +127,52 @@ try {
   assert.ok(budget.every(card => card.nodes < 100 && card.canvas === 0), 'Cards add no WebGL contexts or unbounded particle nodes');
   await page.screenshot({ path: `${artifacts}/tiers-1440.png` });
 
+  const actualTierNames = await page.evaluate(async () => {
+    const tiers = ['RARE', 'ULTRA-RARE', 'MYTHIC'];
+    const ids = tiers.map(tier => Object.keys(__registry).find(id => __registry[id].rarity === tier));
+    __preview(ids, tiers);
+    document.getElementById('upgradeTitle').textContent = 'COSMIC ARTIFACTS';
+    document.getElementById('upgradeSub').textContent = 'PRESENTATION PREVIEW · THREE NEW AUGMENT DESIGNS';
+    document.querySelector('#augmentWallet b').textContent = '3,200';
+    await __settle();
+    return ids.map(id => __registry[id].name);
+  });
+  assert.equal(actualTierNames.length, 3, 'All three new gameplay rarities have real card designs');
+  await page.screenshot({ path: `${artifacts}/actual-new-tiers-1440.png` });
+  for (let attempt = 0; attempt < 15; attempt++) {
+    await show();
+    if (await page.$$eval('.holoCard', cards => new Set(cards.map(card => card.dataset.rarity)).size > 1)) break;
+  }
+  await page.screenshot({ path: `${artifacts}/actual-mixed-offer-1440.png` });
+
+  await show();
+  const money = await page.$$eval('.holoCard', cards => cards.map(card => ({
+    price: Number(card.dataset.price), wallet: Number(card.dataset.wallet),
+    priceText: card.querySelector('.holoPrice').textContent.replaceAll(',', ''),
+    remaining: card.querySelector('.holoBalance').textContent.replaceAll(',', ''),
+    action: card.querySelector('.holoAction').textContent,
+  })));
+  assert.ok(money.every(card => card.price > 0 && Number(card.priceText) === card.price && Number(card.remaining) === card.wallet - card.price && card.action === 'PURCHASE & INSTALL'), 'Prices, wallet and remaining balance use live text');
+
+  // Closing and reopening a pending checkpoint must never reroll its stock.
+  const stable = await page.evaluate(() => {
+    const source = { sector: 700, checkpoint: 2 };
+    __show(null, source);
+    const before = RIFT.upgradeScreen._offers.map(up => [up.id, up.rank, up.price, up.offerToken]);
+    RIFT.upgradeScreen.hide();
+    __show(null, source);
+    return { before, after: RIFT.upgradeScreen._offers.map(up => [up.id, up.rank, up.price, up.offerToken]) };
+  });
+  assert.deepEqual(stable.after, stable.before, 'Pending checkpoint keeps the same cards, ranks, prices and token');
+  const staleButton = await page.evaluate(() => {
+    const oldCard = document.querySelector('.holoCard');
+    __show();
+    const before = { balance: RIFT.scrap.wallet.balance, taken: RIFT.upgrades.taken.length };
+    oldCard.click();
+    return { before, after: { balance: RIFT.scrap.wallet.balance, taken: RIFT.upgrades.taken.length } };
+  });
+  assert.deepEqual(staleButton.after, staleButton.before, 'A detached card callback cannot buy from the replacement checkpoint');
+
   const ids = await page.evaluate(() => Object.keys(__registry));
   for (const [width, height] of [[1440, 900], [1280, 800], [390, 844]]) {
     await page.setViewport({ width, height, hasTouch: true });
@@ -129,6 +184,7 @@ try {
         assert.equal(await page.$$eval('.holoCard', cards => cards.every(card => {
           const rect = card.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight + 1;
         })), true, `Desktop cards remain fully visible at ${width}×${height}`);
+        assert.equal(await page.$eval('.upSkip', el => { const rect = el.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight + 1; }), true, `Skip stays visible at ${width}×${height}`);
       }
     }
     await show(['RARE', 'ULTRA-RARE', 'MYTHIC']);
@@ -139,6 +195,8 @@ try {
         const visible = await card.evaluate(el => { const rect = el.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight + 1; });
         assert.equal(visible, true, 'Each narrow-screen card can be fully scrolled into view');
       }
+      await page.$eval('.upSkip', el => el.scrollIntoView({ block: 'center' }));
+      assert.equal(await page.$eval('.upSkip', el => { const rect = el.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight + 1; }), true, 'Skip can be scrolled into view on touch screens');
     }
   }
 
@@ -156,8 +214,9 @@ try {
   for (const input of ['mouse', 'keyboard', 'keyboard-focus', 'touch', 'gamepad']) {
     await show();
     const index = input === 'mouse' ? 0 : input === 'touch' ? 2 : 1;
-    const { before, done, expectedId } = await page.evaluate(index => ({
+    const { before, done, expectedId, balance, price, spent } = await page.evaluate(index => ({
       before: RIFT.upgrades.taken.length, done: __done, expectedId: RIFT.upgradeScreen._offers[index].id,
+      balance: RIFT.scrap.wallet.balance, spent: RIFT.scrap.wallet.spent, price: RIFT.upgradeScreen._offers[index].price,
     }), index);
     if (input === 'mouse') await page.click('.holoCard:nth-child(1)');
     if (input === 'keyboard') await page.keyboard.press('Digit2');
@@ -183,7 +242,60 @@ try {
     });
     await finish(before, done);
     assert.equal(await page.evaluate(() => RIFT.upgrades.taken.at(-1)), expectedId, `${input} installs the selected card`);
+    assert.equal(await page.evaluate(() => RIFT.scrap.wallet.balance), balance - price, `${input} charges exactly once`);
+    assert.equal(await page.evaluate(() => RIFT.scrap.wallet.spent), spent + price, `${input} records one spend`);
   }
+
+  for (const input of ['mouse', 'keyboard', 'keyboard-focus', 'touch', 'gamepad']) {
+    await page.evaluate(() => RIFT.scrap.wallet.reset());
+    await show();
+    assert.equal(await page.$$eval('.holoCard', cards => cards.every(card => card.getAttribute('aria-disabled') === 'true' && !card.disabled && card.querySelector('.holoMoneyLabel').textContent === 'MISSING / SCRAP')), true, 'Unaffordable cards remain inspectable');
+    const before = await page.evaluate(() => ({ taken: RIFT.upgrades.taken.length, done: __done }));
+    await page.click('.holoCard');
+    await page.keyboard.press('Digit2');
+    assert.equal(await page.evaluate(() => RIFT.upgradeScreen.open), true, 'Invalid purchase keeps the shop open');
+    assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), before.taken, 'Insufficient funds cannot install');
+    assert.equal(await page.evaluate(() => RIFT.scrap.wallet.balance), 0, 'Insufficient funds cannot debit');
+    if (input === 'mouse') await page.click('.upSkip');
+    if (input === 'keyboard') await page.keyboard.press('KeyS');
+    if (input === 'keyboard-focus') { await page.focus('.upSkip'); await page.keyboard.press('Enter'); }
+    if (input === 'touch') {
+      const skip = await page.$('.upSkip');
+      const box = await skip.boundingBox();
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    }
+    if (input === 'gamepad') {
+      await page.evaluate(() => {
+        __pads = [__pad]; __tick();
+        RIFT.controllerMenus.focus(document.querySelector('.holoCard'));
+        __press(15); __press(15); __press(15);
+      });
+      assert.equal(await page.evaluate(() => document.activeElement.matches('.upSkip')), true, 'D-pad reaches Skip & Save');
+      await page.evaluate(() => __press(0));
+    }
+    await page.evaluate(() => { document.querySelector('.upSkip').click(); RIFT.scheduler.update(.3); });
+    assert.equal(await page.evaluate(() => __done), before.done + 1, `${input} skip continues once`);
+    assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), before.taken, `${input} skip grants no augment`);
+    assert.equal(await page.evaluate(() => RIFT.scrap.wallet.balance), 0, `${input} skip spends nothing`);
+  }
+
+  await show();
+  const exact = await page.evaluate(() => {
+    const up = RIFT.upgradeScreen._offers[0];
+    RIFT.scrap.wallet.credit(up.price);
+    RIFT.upgradeScreen.update();
+    return { before: RIFT.upgrades.taken.length, done: __done, price: up.price };
+  });
+  assert.equal(await page.$eval('.holoCard', card => card.getAttribute('aria-disabled')), 'false', 'Exact-price balance enables purchase');
+  await page.click('.holoCard');
+  await finish(exact.before, exact.done);
+  assert.equal(await page.evaluate(() => RIFT.scrap.wallet.balance), 0, 'Exact-price purchase leaves zero');
+  const completedShop = await page.evaluate(() => {
+    const opened = RIFT.upgradeScreen.show(__lastSource, '#24ffe0', () => { __done++; });
+    return { opened, hidden: RIFT.upgradeScreen.el.classList.contains('hidden'), open: RIFT.upgradeScreen.open };
+  });
+  assert.deepEqual(completedShop, { opened: false, hidden: true, open: false }, 'A completed checkpoint cannot open an empty shop');
+  await page.evaluate(() => RIFT.scrap.wallet.credit(100000));
 
   // An old installation cannot close a replacement offer or run its callback.
   await show();
@@ -212,7 +324,7 @@ try {
   await page.evaluate(() => { RIFT.togglePause(); RIFT.upgradeScreen.hide(); });
   assert.equal(await page.$eval('#upgradeCards', el => el.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running').length), 0, 'Hidden cards do no animation work');
   assert.deepEqual(errors, []);
-  console.log(`PASS: 45 augment texts at desktop/narrow sizes, rarity art and bounded effects, reduced motion, mouse/keyboard/touch/virtual MCON, single installs and stale callback safety. Screenshots: ${artifacts}`);
+  console.log(`PASS: ${ids.length} augment texts at desktop/narrow sizes, rarity art and bounded effects, reduced motion, paid mouse/keyboard/touch/virtual MCON, zero-wallet skips, exact-price and single-charge transactions, stable offers and stale callback safety. Screenshots: ${artifacts}`);
 } finally {
   await browser.close();
 }

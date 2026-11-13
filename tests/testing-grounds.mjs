@@ -247,7 +247,7 @@ try {
   await page.screenshot({ path: `${out}/testing-grounds.png` });
   const saveIsolation = await page.evaluate(() => {
     const g = window.RIFT;
-    g.scrap.collected = 123456; g.score.total = 987654;
+    g.scrap.wallet.credit(123456); g.score.total = 987654;
     g.showResults({ victory: true });
     const afterResults = JSON.stringify(g.save.data);
     g.testing.exit();
@@ -263,7 +263,7 @@ try {
   assert.equal(saveIsolation.active, false); assert.equal(saveIsolation.hit, true); assert.equal(saveIsolation.normalDamage, true);
   assert.equal(saveIsolation.ranks, 0, 'Normal runs start with a fresh build');
   assert.deepEqual(errors, [], 'No browser, WebGL, or audio errors');
-  console.log('PASS: god mode, six ships, 45 ranks, XP rebuild, autofire/dummy damage, spawning, time controls, panel freeze, nine scenes, all boss phases, death/restore, cleanup and save isolation.');
+  console.log('PASS: god mode, six ships, 75 ranks, XP rebuild, autofire/dummy damage, spawning, time controls, panel freeze, nine scenes, all boss phases, death/restore, cleanup and save isolation.');
   console.log('Destinations:', visited.map(s => `${s.id}: ${s.encounter || 'approach'}`).join('; '));
 } finally {
   const child = browser.process();

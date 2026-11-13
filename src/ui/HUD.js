@@ -121,13 +121,13 @@ export class HUD {
     if (!d?.cfg || $('approachPanel').classList.contains('hidden')) return;
     const t = this.game.director.stateT;
     $('approachFill').style.width = `${clamp(t / d.cfg.duration, 0, 1) * 100}%`;
-    writeText($('approachCount'), `${d.picks} / 3 AUGMENTS`);
+    writeText($('approachCount'), `${d.picks} / 3 CACHES`);
     [...$('approachStops').children].forEach((marker, i) => marker.classList.toggle('installed', i < d.picks));
     const beat = d.cfg.authored?.beats[d.beatIndex];
     writeText($('approachBeat'), d.awaitingAugment ? 'AUGMENT CACHE SECURED' : beat?.title || 'PUSH THROUGH THE DEFENSES');
     writeText($('approachHint'), d.awaitingAugment ? 'Choose a power — combat is paused' : beat?.detail || (d.picks < 3
-      ? `Next augment in ${Math.max(0, Math.ceil(d.cfg.augmentAt[d.picks] - t))}s · survive and collect scrap`
-      : 'All three augments installed · objective ahead'));
+      ? `Next cache in ${Math.max(0, Math.ceil(d.cfg.augmentAt[d.picks] - t))}s · collect scrap to purchase`
+      : 'All three caches cleared · objective ahead'));
     const bounty = $('approachBounty');
     bounty.classList.toggle('hidden', !d.bounty);
     if (d.bounty) writeText(bounty, d.bountyResolved ? '★ BLOCKADE BOUNTY CLAIMED' : `BOUNTY: BLOCKADE ACE · ${Math.ceil(d.bounty.healthPct * 100)}% HULL`);
@@ -294,7 +294,7 @@ export class HUD {
     this.el.heatGlow.style.opacity = String(Math.max(0, (t - 0.45) * 1.1));
 
     // score + scrap
-    writeText(this.el.scrap, g.scrap.total.toLocaleString());
+    writeText(this.el.scrap, g.scrap.wallet.balance.toLocaleString());
     writeText(this.el.score, g.score.total.toLocaleString());
 
     // objective health + weak-point pips

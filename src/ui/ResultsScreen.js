@@ -20,7 +20,8 @@ export class ResultsScreen {
     const g = this.game;
 
     // ---- end-of-run bonuses ----
-    if (victory) {
+    const firstPresentation = !this._shownRun || this._shownRun !== g.runId;
+    if (victory && firstPresentation) {
       const spare = Math.max(0, PAR_TIME - g.runTime);
       if (spare > 0) {
         g.score.addFlat(spare * SCORE.TIME_BONUS_PER_SEC, 'TIME BONUS');
@@ -29,15 +30,19 @@ export class ResultsScreen {
 
     const score = g.score.total;
     const grade = g.score.grade();
-    const scrap = g.scrap.total;
+    const scrap = g.scrap.wallet.earned;
+    const spent = g.scrap.wallet.spent;
+    const remainder = g.scrap.wallet.balance;
 
-    if (!g.testRun) Save.bankRun({
-      scrap,
+    if (!g.testRun && firstPresentation) Save.bankRun({
+      scrap: remainder,
+      runId: g.runId,
       score,
       time: g.runTime,
       grade,
       cleared: victory,
     });
+    this._shownRun = g.runId;
 
     // ---- header ----
     $('resultsEyebrow').textContent = g.testRun ? 'TEST SESSION / RESULTS NOT SAVED' : victory ? 'NEXUS BROKEN' : 'RUN TERMINATED';
@@ -72,7 +77,9 @@ export class ResultsScreen {
       ['BOSS PHASES CLEARED', `${st.bossPhases} / 4`],
       ['DAMAGE TAKEN', Math.round(st.damageTaken)],
       ['SCRAP PLUNDERED', scrap.toLocaleString()],
-      ['SCRAP BANKED', Save.data.scrapBanked.toLocaleString()],
+      ['SCRAP SPENT', spent.toLocaleString()],
+      [g.testRun ? 'TEST WALLET / NOT BANKED' : 'REMAINDER BANKED', remainder.toLocaleString()],
+      ['LIFETIME SCRAP BANK', Save.data.scrapBanked.toLocaleString()],
       ['SHIP LEVEL', g.xp.level],
     ];
     this.grid.innerHTML = rows

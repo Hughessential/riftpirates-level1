@@ -42,6 +42,7 @@ export class PlayerWeapon {
 
   /** A new gun announces itself immediately, then joins the existing arsenal. */
   onAugmentInstalled(id, level = 1) {
+    this.player.cosmicEffects?.onAugmentInstalled(id, level);
     this.signature = weaponPowerSignature(this.player.stats, { shield: this.player.shield });
     const kind = Object.entries(WEAPON_AUGMENTS).find(([, augment]) => augment === id)?.[0];
     const status = this.signature.modifiers.find(modifier => modifier.id === id);
@@ -85,6 +86,7 @@ export class PlayerWeapon {
     const target = aiming ? this.targeting.update(dt, p.pos, ctx.targets) : null;
     if (!aiming) this.targeting.reset();
     p.reticleLock = !!target;
+    p.cosmicEffects?.onAim(target, dt);
     // Retain the fractional interval between shots. Replacing the cooldown at
     // each shot quantizes high fire rates into identical 30Hz plateaus.
     this.cooldown = Math.max(this.cooldown - dt, -dt);
@@ -99,18 +101,23 @@ export class PlayerWeapon {
       this.proj.firePlayer({ ...echo.bolt, x: p.x + echo.side, y: p.y + .05 });
       this.echoes.splice(i, 1); this._sound('echo');
     }
+    const absolute = p.cosmicEffects?.timers.overcharge > 0;
     if (this.cooldown > 0) return;
     // Cadences beyond the visual budget become extra damage, never a dead stack.
-    const output = primaryWeaponOutput(s, { fireRate: p.fireRate, critBuffT: p.critBuffT,
+    const output = primaryWeaponOutput(s, { fireRate: absolute ? Math.max(45,p.fireRate) : p.fireRate, critBuffT: p.critBuffT,
       heatMultiplier: ctx.heat.multiplier, shield: p.shield, treasureCharge: p.treasureCharge,
       weakPoint: !!target && target.kind !== 'enemy' });
     this.cooldown += 1 / output.fireRate;
-    let damage = output.damage;
+    // Overcharge removes the ordinary weapon cadence, retaining a 45Hz spawn
+    // ceiling. A slow frame carries the missing emissions as damage instead.
+    let damage = output.damage * (p.cosmicEffects?.directDamageMultiplier() || 1)
+      * (absolute ? Math.max(1,45*dt) : 1);
     this.signature = weaponPowerSignature(s, { heatMultiplier: ctx.heat.multiplier,
       shield: p.shield, treasureCharge: p.treasureCharge, shot: this.shots });
     p.treasureCharge = 0;
-    const crit = chance(s.criticalChance);
-    if (crit) damage *= s.criticalMultiplier;
+    const mark = p.cosmicEffects?.critBonus(target) || { chance: 0, multiplier: 0 };
+    const crit = chance(Math.min(1,s.criticalChance + mark.chance));
+    if (crit) damage *= s.criticalMultiplier + mark.multiplier;
     const t = target?.pos && target.pos.z < -2 ? target.pos : { x: p.x, y: p.y + .05, z: -90 };
     this.muzzle *= -1; this.shots++;
     const showcase = this.pendingShowcase;
@@ -123,11 +130,14 @@ export class PlayerWeapon {
     });
     const emit = (weapon, options = {}) => {
       const visual = appearance(weapon);
+      if (absolute) { visual.width *= 1.7; visual.trail *= 1.4; }
       return this.proj.firePlayer({ ...base, x: p.x, weapon, color: visual.color, visual, ...options });
     };
     const charged = kinetic && this.charge >= 1;
-    emit(charged ? 'capacitor' : 'pulse', { x: p.x + this.muzzle * 1.15,
+    const primary = emit(charged ? 'capacitor' : 'pulse', { x: p.x + this.muzzle * 1.15,
       damage: damage * (charged ? 1 + kinetic * 2.5 : 1), pierce: charged ? 1 + kinetic : 0 });
+    p.cosmicEffects?.onPrimaryShot(primary);
+    p.cosmicEffects?.onVolley(base, t);
     if (charged) { this.charge = 0; this._sound('capacitor', kinetic); }
     else {
       const hasGuns = Object.entries(this.signature.weaponRanks).some(([kind, count]) =>

@@ -1,4 +1,6 @@
 import { BASE_STATS } from '../player/Player.js';
+import { COSMIC_AUGMENTS, amplifyAugmentStats } from './CosmicAugments.js';
+import { augmentPrice, augmentRarity, weightedAugment } from './AugmentEconomy.js';
 
 /** Every augment is repeatable. Numeric ranks compose; weapons never replace one another. */
 export const AUGMENT_CATEGORIES = { ARSENAL: '#34ffe4', SURVIVAL: '#73ff87', MOBILITY: '#82b8ff', SALVAGE: '#ffd34b', ANOMALY: '#d779ff' };
@@ -8,6 +10,7 @@ const augment = (name, icon, category, desc, stack, apply = () => {}, onPick) =>
 const linear = (s, key, rank, amount) => { s[key] *= (1 + amount * rank) / (1 + amount * (rank - 1)); };
 
 export const UPGRADES = {
+  ...COSMIC_AUGMENTS,
   rapidFire: augment('HYPERTRIGGER', '>>', 'ARSENAL', 'Turn your entire arsenal into a neon bullet storm.',
     '+35% base firing rate per stack. No damage penalty.', (s, r) => linear(s, 'fireRate', r, .35)),
   hullBoost: augment('DREADNOUGHT HULL', 'HP', 'SURVIVAL', 'Become a flying pirate fortress.',
@@ -115,51 +118,125 @@ const shuffle = (array, random) => {
   return result;
 };
 
+/** Rebuild from authoritative ranks so Crown bonuses never compound on themselves.
+ * XP remains a separate earned progression, applied after augment magnitude. */
+export function buildAugmentStats(ranks, xpLevel = 1) {
+  const base = BASE_STATS();
+  const raw = { ...base };
+  for (const id of IDS) {
+    const rank = Math.max(0, Math.floor(Number(ranks[id]) || 0));
+    if (rank > 10000) throw new RangeError('Augment rank exceeds the safe simulation range');
+    raw[id] = rank;
+    for (let r = 1; r <= rank; r++) UPGRADES[id].apply(raw, r);
+  }
+  const stats = amplifyAugmentStats(raw, base);
+  const level = Math.max(1, Math.min(18, Math.floor(xpLevel) || 1));
+  stats.maxHealth += (level - 1) * 8;
+  stats.damage *= 1.04 ** (level - 1);
+  if (Object.values(stats).some(value => typeof value === 'number' && !Number.isFinite(value)))
+    throw new RangeError('Augment stats must stay finite');
+  return stats;
+}
+
 export class UpgradeSystem {
-  constructor(game, random = Math.random) { this.game = game; this.random = random; this.reset(); }
+  constructor(game, random = Math.random) { this.game = game; this.random = random; this.runSerial = 0; this.reset(); }
   reset() {
+    this.runSerial++;
     this.taken = [];
     this.ranks = {};
     this.pendingOffers = new Set();
-    this.stats = BASE_STATS();
-    for (const id of IDS) this.stats[id] = 0;
+    this.offerCache = new Map();
+    this.activeOffer = null;
+    this.offerSerial = 0;
+    this.transactions = { purchases: 0, spent: 0, skips: 0, unaffordable: 0, byRarity: {} };
+    this.stats = buildAugmentStats({});
   }
   rank(id) { return this.ranks[id] || 0; }
   canPick(id) { return Object.hasOwn(UPGRADES, id); }
-  offer(source) {
-    const ids = [];
-    const add = (id) => { if (ids.length < 3 && !ids.includes(id) && this.canPick(id)) ids.push(id); };
-    if (typeof source === 'object' && source !== null) {
-      // Weapon, survival/movement answer, then wild card. Owned augments are
-      // deliberately offered again so players can deepen a chosen build.
-      add(shuffle(IDS.filter((id) => UPGRADES[id].category === 'ARSENAL'), this.random)[0]);
-      add(shuffle(IDS.filter((id) => ['SURVIVAL', 'MOBILITY'].includes(UPGRADES[id].category)), this.random)[0]);
-      const owned = IDS.filter((id) => this.rank(id) > 0 && !ids.includes(id));
-      const pool = owned.length && this.random() < .4 ? owned : IDS.filter((id) => !ids.includes(id));
-      add(shuffle(pool, this.random)[0]);
-    } else {
-      for (const id of CACHES[source] || CACHES.at(-1)) add(id);
-    }
-    for (const id of shuffle(IDS, this.random)) add(id);
-    this.pendingOffers = new Set(ids);
-    return ids.map((id) => ({ id, ...UPGRADES[id], rank: this.rank(id) + 1, currentRank: this.rank(id) }));
+  price(id) { return augmentPrice(UPGRADES[id], this.rank(id)); }
+  _key(source) {
+    return typeof source === 'object' && source !== null
+      ? `approach:${source.sector}:${source.checkpoint}` : `cache:${source}`;
   }
-  cancelOffer() { this.pendingOffers.clear(); }
-  pick(id) {
-    if (!this.pendingOffers.has(id) || !this.canPick(id)) return false;
-    this.pendingOffers.clear();
-    this.taken.push(id);
-    const rank = this.rank(id) + 1;
-    this.ranks[id] = rank;
-    const before = this.stats.maxHealth;
-    this.stats[id] = rank;
-    const up = UPGRADES[id];
-    up.apply(this.stats, rank);
+  offer(source) {
+    const key = this._key(source);
+    let record = this.offerCache.get(key);
+    if (record?.complete) return [];
+    if (!record) {
+      const ids = [];
+      const available = category => IDS.filter(id => !ids.includes(id) && (!category || category.includes(UPGRADES[id].category)));
+      const add = id => { if (id && ids.length < 3 && !ids.includes(id) && this.canPick(id)) ids.push(id); };
+      if (typeof source === 'object' && source !== null) {
+        add(weightedAugment(available(['ARSENAL']), UPGRADES, this.random));
+        add(weightedAugment(available(['SURVIVAL', 'MOBILITY']), UPGRADES, this.random));
+        const owned = available().filter(id => this.rank(id) > 0);
+        add(weightedAugment(owned.length && this.random() < .4 ? owned : available(), UPGRADES, this.random));
+      } else for (const id of CACHES[source] || CACHES.at(-1)) add(id);
+      for (const id of shuffle(IDS, this.random)) add(id);
+      const balance = this.game.scrap?.wallet?.balance || 0;
+      // Keep fixed-cache identities unless all three ranks are unaffordable;
+      // every shop retains an affordable answer when an eligible one exists.
+      if (!ids.some(id => this.price(id) <= balance)) {
+        const affordable = available().filter(id => this.price(id) <= balance);
+        if (affordable.length) {
+          const sameCategory = affordable.filter(id => UPGRADES[id].category === UPGRADES[ids[2]].category);
+          ids[2] = weightedAugment(sameCategory.length ? sameCategory : affordable, UPGRADES, this.random);
+        }
+      }
+      record = { key, token: `${this.runSerial}:${++this.offerSerial}:${key}`, complete: false,
+        cards: ids.map(id => ({ id, rank: this.rank(id) + 1, price: this.price(id) })) };
+      this.offerCache.set(key, record);
+      if (!record.cards.some(card => card.price <= balance)) this.transactions.unaffordable++;
+    }
+    this.activeOffer = record;
+    this.pendingOffers = new Set(record.cards.map(card => card.id));
+    const walletBalance = this.game.scrap?.wallet?.balance || 0;
+    return record.cards.map(card => ({ ...UPGRADES[card.id], ...card,
+      currentRank: card.rank - 1, offerToken: record.token, walletBalance,
+      remainingBalance: Math.max(0, walletBalance - card.price), missingScrap: Math.max(0, card.price - walletBalance) }));
+  }
+  cancelOffer() { this.pendingOffers.clear(); this.activeOffer = null; }
+  _valid(token) { return Boolean(this.activeOffer && !this.activeOffer.complete && this.activeOffer.token === token); }
+  skip(token) {
+    if (!this._valid(token)) return false;
+    this.activeOffer.complete = true;
+    this.transactions.skips++;
+    this.cancelOffer();
+    return true;
+  }
+  pick(id, token) {
+    if (!this._valid(token) || !this.pendingOffers.has(id) || !this.canPick(id)) return false;
+    const record = this.activeOffer;
+    const card = record.cards.find(card => card.id === id);
+    const wallet = this.game.scrap?.wallet;
+    if (!card || card.rank !== this.rank(id) + 1 || card.price !== this.price(id) || !wallet?.canSpend(card.price)) return false;
+    const ranks = { ...this.ranks, [id]: card.rank };
+    let next;
+    try { next = buildAugmentStats(ranks, this.game.xp?.level || 1); } catch { return false; }
     const p = this.game.player;
-    p.applyStats(this.stats);
-    if (this.stats.maxHealth > before) p.heal(this.stats.maxHealth - before);
-    up.onPick?.(p, rank);
-    this.game.weapon?.onAugmentInstalled?.(id, rank);
+    const snapshot = Object.fromEntries(Object.entries(p).filter(([,v]) => v === null || !['object','function'].includes(typeof v)));
+    const previousStats = p.stats;
+    // Stage reversible player changes first. Only successful installation debits.
+    try {
+      p.applyStats(next);
+      if (next.maxHealth > this.stats.maxHealth) p.heal(next.maxHealth - this.stats.maxHealth);
+      UPGRADES[id].onPick?.(p, card.rank);
+      if (!wallet.spend(card.price)) throw new Error('Wallet changed during installation');
+    } catch {
+      Object.assign(p, snapshot); p.stats = previousStats;
+      return false;
+    }
+    this.stats = next;
+    this.ranks = ranks;
+    this.taken.push(id);
+    record.complete = true;
+    this.transactions.purchases++;
+    this.transactions.spent += card.price;
+    const rarity = augmentRarity(UPGRADES[id]);
+    this.transactions.byRarity[rarity] = (this.transactions.byRarity[rarity] || 0) + 1;
+    this.cancelOffer();
+    // Presentation notifications cannot invalidate a committed purchase.
+    try { this.game.weapon?.onAugmentInstalled?.(id, card.rank); } catch (error) { console.warn('Augment installation feedback failed', error); }
     return true;
   }
 }

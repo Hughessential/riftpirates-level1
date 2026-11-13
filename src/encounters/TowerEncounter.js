@@ -140,7 +140,7 @@ export class TowerEncounter {
     });
     Audio2.play('weakpoint_death', 0.85, 1, 0.06);
     g.camera3.shake(0.45);
-    g.scrap.burst(p.x, p.y, p.z, m.target.scrap, 2.2);
+    g.scrap.burst(p.x,p.y,p.z,m.target.scrap,1.2,{sourceId:`module:${this.identity.key}:${name}`,kind:'module',life:24});
     g.score.add(SCORE.WEAK_POINT, 'WEAK POINT');
     g.heat.onWeakPointDestroyed();
     g.xp.add(m.target.xp);
@@ -251,7 +251,7 @@ export class TowerEncounter {
       });
       Audio2.play('tower_death', 1, 0.6);
       g.camera3.shake(1.1);
-      g.scrap.burst(pos.x, pos.y + 4, pos.z + 10, this.config.scrapReward ?? 220, 5);
+      g.scrap.burst(pos.x,pos.y+4,pos.z+10,this.config.scrapReward??220,3,{sourceId:`objective:${this.identity.key}`,kind:'boss',life:26});
       this.group.visible = false;
       this.state = 'dead';
       this.onDestroyed();

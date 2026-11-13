@@ -8,6 +8,7 @@ export class ProjectilePool {
     this.scene = scene;
     this.cursor = { player: 0, enemy: 0 };
     this.saturationCount = 0;
+    this.readabilityGain = 1;
     this._dummy = new THREE.Object3D();
     this._part = new THREE.Object3D();
     this._color = new THREE.Color();
@@ -80,7 +81,7 @@ export class ProjectilePool {
       vx: dx / d * speed, vy: dy / d * speed, vz: dz / d * speed,
       speed, damage, crit, life, weapon, color: color || visual.color || style.color,
       radius: radius ?? visual.radius ?? style.radius, pierce, splash, homing, target,
-      searchT: 0, procDepth, ricochetsRemaining, augmentTimeScale: 1, age: 0, visual });
+      searchT: 0, procDepth, ricochetsRemaining, augmentTimeScale: 1, age: 0, visual, onEnd: null });
     o.hitTargets.clear();
     o.mesh.visible = true; o.mesh.material.color.set(o.color);
     this._write(o);
@@ -135,7 +136,7 @@ export class ProjectilePool {
       if (o.homing > 0) this._guide(o, dt, game?.targets);
       o.x += o.vx * dt; o.y += o.vy * dt; o.z += o.vz * dt; o.life -= dt;
       if (o.life <= 0 || o.z < -155 || o.z > 30 || Math.abs(o.x) > 95 || Math.abs(o.y) > 70) {
-        this.killPlayerBolt(o); continue;
+        this.killPlayerBolt(o, o.life <= 0 ? 'expired' : 'out-of-bounds'); continue;
       }
       this._write(o);
     }
@@ -169,7 +170,7 @@ export class ProjectilePool {
         o.mesh.position.copy(d.position); o.mesh.quaternion.copy(d.quaternion); o.mesh.scale.copy(d.scale);
         const color = o.color;
         const accent = v.accent || color;
-        const brightness = v.brightness;
+        const brightness = v.brightness * Math.sqrt(this.readabilityGain);
         // Parts share the bolt's flight transform; there are no extra scene
         // objects, colliders or damage events for the decorative silhouette.
         if (v.shape === 'orb') {
@@ -232,8 +233,23 @@ export class ProjectilePool {
   }
 
   /** Reconcile any proc redirect/color edits made after the movement step. */
-  flush() { for (const o of this.player) if (o.active) this._write(o); }
-  killPlayerBolt(o) { o.active = false; o.mesh.visible = false; o.target = null; this._write(o); }
+  flush() {
+    let live = 0;
+    for (const o of this.player) if (o.active) live++;
+    // Dense overlapping trails must not become a white wall. Reduce decorative
+    // radiance, never projectile counts, opaque silhouettes, collision or power.
+    this.readabilityGain = Math.max(.18, Math.min(1, 120 / Math.max(1,live)));
+    this.playerGlow.material.opacity = .075 * this.readabilityGain;
+    for (const o of this.player) if (o.active) this._write(o);
+  }
+  killPlayerBolt(o, reason = 'collision') {
+    if (!o.active) return;
+    const onEnd = o.onEnd; o.onEnd = null;
+    // Snapshot before returning this slot to the pool: a shard may reuse it.
+    const ended = onEnd ? { x: o.x, y: o.y, z: o.z, damage: o.damage } : null;
+    o.active = false; o.mesh.visible = false; o.target = null; this._write(o);
+    onEnd?.(ended, reason);
+  }
   killEnemyBolt(o) { o.active = false; o.mesh.visible = false; this._write(o); }
   clearEnemyNear(x, y, radius) {
     let count = 0;
@@ -243,8 +259,9 @@ export class ProjectilePool {
     return count;
   }
   reset() {
-    for (const o of this.player) { this.killPlayerBolt(o); o.hitTargets.clear(); }
+    for (const o of this.player) { this.killPlayerBolt(o, 'reset'); o.hitTargets.clear(); }
     for (const o of this.enemy) this.killEnemyBolt(o);
     this.cursor.player = 0; this.cursor.enemy = 0; this.saturationCount = 0;
+    this.readabilityGain = 1; this.playerGlow.material.opacity = .075;
   }
 }

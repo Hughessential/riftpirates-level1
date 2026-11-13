@@ -89,6 +89,8 @@ try {
   const takeCard = async () => {
     const before = await page.evaluate(() => window.RIFT.upgrades.taken.length);
     await page.evaluate(() => {
+      // This pacing test funds its fixtures; economy budgets are tested separately.
+      window.RIFT.scrap.wallet.credit(10000);
       const card = document.querySelector('#upgradeCards .upCard');
       card.click();
       card.click(); // double input must never buy two augments
@@ -150,7 +152,7 @@ try {
     await page.evaluate(() => {
       const g = window.RIFT;
       g.togglePause();
-      document.querySelector('#upgradeCards .upCard').click();
+      (window.RIFT.scrap.wallet.credit(10000), document.querySelector('#upgradeCards .upCard').click());
       dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1' }));
     });
     await step(5);
@@ -240,7 +242,7 @@ try {
   await until('state', 'TRAVERSAL_1', 4);
   await until('choice', null, 120);
   await page.evaluate(() => {
-    document.querySelector('#upgradeCards .upCard').click();
+    (window.RIFT.scrap.wallet.credit(10000), document.querySelector('#upgradeCards .upCard').click());
     window.RIFT.startRun();
   });
   await step(0.6);

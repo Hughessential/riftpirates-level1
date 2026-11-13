@@ -574,7 +574,7 @@ export class RiftAdmiralBoss extends TowerEncounter {
         g.addHazard(
           new Shockwave({ x: 0, y: 2, maxR: 80, speed: 60, thickness: 3, color: P.gold, damage: 0, label: 'NEXUS BREAK' })
         );
-        g.scrap.burst(wp.x, wp.y, wp.z + 20, this.config.scrapReward, 8);
+        g.scrap.burst(wp.x,wp.y,wp.z+20,this.config.scrapReward,4,{sourceId:'objective:admiral',kind:'boss',life:26});
         Audio2.play('boss_death', 1, 0.65);
         g.camera3.shake(1.2);
         this.group.visible = false;

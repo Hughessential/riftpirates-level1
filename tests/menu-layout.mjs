@@ -83,7 +83,7 @@ try {
   await page.evaluate(() => {
     const g = window.RIFT;
     g.scrap.burst(0, 0, -10, 12);
-    g.scrap.collected = 7;
+    g.scrap.wallet.credit(7);
     g.quitRun();
   });
   assert.equal(await page.$eval('#resultsTitle', (el) => el.textContent), await page.evaluate(() => `${window.RIFT.player.shipName} DESTROYED`), 'Results identify the selected ship');

@@ -44,7 +44,7 @@ try {
     const build = ['rapidFire', 'twinFangs', 'hotshot', 'prismLance', 'seekerSwarm',
       'armorPlating', 'hullBoost', 'shieldRecharge', 'vectorThrusters', 'afterburner',
       'reactorRecovery', 'repairSwarm', 'timeDilation'];
-    for (const id of build) { g.upgrades.pendingOffers = new Set([id]); g.upgrades.pick(id); }
+    for (const id of build) lab.setAugmentRank(id, g.upgrades.rank(id) + 1);
     lab.setSetting('infiniteBoost', false); lab.setSetting('godMode', true);
     lab.setSetting('autoFire', false); lab.setSetting('freezeEnemies', false);
     lab.loadScene('escape'); lab.setPanelOpen(false);

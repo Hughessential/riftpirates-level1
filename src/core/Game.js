@@ -180,6 +180,7 @@ export class Game {
       const before = this.player.health;
       const hit = takeDamage(amount, source);
       if (hit) {
+        this.augmentEffects.cosmic?.onPlayerDamaged();
         const dealt = before - this.player.health;
         // A hit landing inside the dodge window means it was never a dodge.
         if (this.player.dodgeT > 0) this.player.dodgeSpoiled = true;
@@ -411,6 +412,7 @@ export class Game {
     this.escape.dispose();
     if (!testing) this.testing.deactivate();
     this._resultsFinalized = false;
+    this.runId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
     this._escapeCleared = false;
     this.killedBy = '';
     this.testRun = testing;

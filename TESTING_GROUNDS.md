@@ -14,9 +14,11 @@ The console holds the simulation while you configure it. **Close + Fly**, **F2**
 
 ## Augments
 
-Search all **45 augments** by name or effect, filter by category, and set each rank from **0–50**. Rank zero removes an augment. Rebuilding recomputes stats from base values and your XP level, so removing a modifier does not leave invisible bonuses behind.
+Search all **75 augments** by name or effect, filter by category and rarity, and set each rank from **0–50**. Rank zero removes an augment. Rebuilding recomputes stats from base values and your XP level, so removing a modifier does not leave invisible bonuses behind.
 
-**All 45 / Rank 1**, **Full Arsenal**, and **Clear Build** provide instant presets. Rank edits clear existing projectiles, queued volleys and temporary augment effects; they also reset hit-block and rescue charges for a clean experiment. They do not refill hull or shield—use Restore when needed.
+**All 75 / Rank 1**, **Full Arsenal**, and **Clear Build** provide instant presets. Rank edits clear existing projectiles, queued volleys and temporary augment effects; they also reset hit-block and rescue charges for a clean experiment. They do not refill hull or shield—use Restore when needed.
+
+The **TEST WALLET +5,000** button adds isolated spendable scrap for shop tests. Scene replays reset the wallet and reopen their checkpoints while keeping the build. Test currency never enters your saved bank.
 
 ## Arena
 
@@ -40,4 +42,4 @@ Music and SFX levels can be adjusted separately from the title or pause menus an
 
 ## Validation
 
-`npm run test:lab` checks UI entry/search/ranks, god-mode toggling, all six hulls, all 45 augments, reversible XP/stat rebuilding, actual damage to targets, spawns, slow motion, input isolation, scene/phase jumps, cleanup, save isolation and return to normal play.
+`npm run test:lab` checks UI entry/search/ranks, god-mode toggling, all six hulls, all 75 augments, reversible XP/stat rebuilding, actual damage to targets, spawns, slow motion, input isolation, scene/phase jumps, cleanup, save isolation and return to normal play.

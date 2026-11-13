@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { STATE } from './GameState.js';
 import { Input } from './Input.js';
 import { Audio2, WEAPON_AUDIO } from './AudioManager.js';
-import { UPGRADES } from '../systems/UpgradeSystem.js';
+import { UPGRADES, buildAugmentStats } from '../systems/UpgradeSystem.js';
 import { PLAYER_SHIPS, isPlayerShipId } from '../render/PlayerFleet.js';
 import { ENEMY_TYPES } from '../enemies/EnemyTypes.js';
 import { Target } from '../combat/Target.js';
@@ -129,20 +129,14 @@ export class TestingGrounds {
     }
     g.upgradeScreen.hide();
     g.upgrades.reset();
-    const s = g.upgrades.stats;
-    for (const [id, up] of Object.entries(UPGRADES)) {
+    for (const id of Object.keys(UPGRADES)) {
       const rank = clamp(Math.floor(ranks[id] || 0), 0, 50);
       if (!rank) continue;
       g.upgrades.ranks[id] = rank;
-      s[id] = rank;
-      for (let r = 1; r <= rank; r++) {
-        up.apply(s, r);
-        g.upgrades.taken.push(id);
-      }
+      for (let r = 0; r < rank; r++) g.upgrades.taken.push(id);
     }
-    // XP modifiers commute with augment multipliers; no pickup side effects.
-    s.maxHealth += (g.xp.level - 1) * 8;
-    s.damage *= 1.04 ** (g.xp.level - 1);
+    const s = buildAugmentStats(g.upgrades.ranks, g.xp.level);
+    g.upgrades.stats = s;
     p.stats = s;
     p.blockCapacity = s.freeBlocks;
     p.blocksLeft = s.freeBlocks;
@@ -195,6 +189,10 @@ export class TestingGrounds {
     g.killedBy = '';
     this._disposeDummies(); this._disposeEncounter();
     g.scheduler.clear(); g.upgradeScreen.hide(); g.resultsScreen.hide();
+    // Scene replays are a new isolated experiment. Preserve the build, but
+    // re-open its checkpoints without reviving stale purchase tokens.
+    g.upgrades.offerCache.clear();
+    g.upgrades.cancelOffer();
     clearTimeout(g.director._tcT);
     g.enemies.clear(); g.clearHazards(); g.projectiles.reset();
     g.targets.length = 0; g.projectileBlockers.length = 0;
@@ -295,6 +293,13 @@ export class TestingGrounds {
         tx: x, ty: p.y, tz: 3, speed: 18, damage: 8, radius: .55, color: '#ff8844', label: 'TEST BARRAGE' });
     }
     this.changed();
+  }
+
+  creditTestScrap(amount = 5000) {
+    if (!this.active || !this.game.testRun) return false;
+    this.game.scrap.wallet.credit(amount);
+    this.changed();
+    return true;
   }
 
   spawnScrap() {
@@ -402,6 +407,7 @@ export class TestingGrounds {
       projectiles: g.projectiles.player.filter(b => b.active).length + g.projectiles.enemy.filter(b => b.active).length,
       enemies: g.enemies.countAlive(), targets: g.targets.filter(t => t.alive).length,
       fps: this.fps, dummyDamage: this.dummyDamage,
+      wallet: { ...g.scrap.wallet }, economy: { ...g.upgrades.transactions },
       escape: g.escape.snapshot(),
       dps: this.damageSamples.reduce((sum, sample) => sum + sample.damage, 0) / Math.min(2, Math.max(.1, this.elapsed)),
     };

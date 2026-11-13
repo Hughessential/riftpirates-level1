@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { STATE, COMBAT_STATES, UPGRADE_STATES } from './GameState.js';
 import { P, IDENTITY } from './Palette.js';
 import { TRAVERSAL } from '../config/encounters.js';
+import { buildTreasureRoute } from '../config/approaches.js';
 import { OuterDefenseTower } from '../encounters/OuterDefenseTower.js';
 import { MidriftPressureTower } from '../encounters/MidriftPressureTower.js';
 import { InnerCitadelTower } from '../encounters/InnerCitadelTower.js';
@@ -210,6 +211,8 @@ export class LevelDirector {
     this.data.beatIndex = -1;
     this.data.bounty = null;
     this.data.bountyResolved = false;
+    this.data.treasure = buildTreasureRoute(cfg);
+    this.data.treasureIndex = 0;
 
     g.env.clearApproach();
     g.camera3.setMode('traversal');
@@ -310,7 +313,7 @@ export class LevelDirector {
       }
       Input.reset();
       Input.enabled = true;
-      g.hud.toast(`AUGMENT ${d.picks}/3 INSTALLED`, d.picks === 3 ? 'BUILD READY — BREACH THE TOWER' : 'Next cache marked on your route', d.identity.main);
+      g.hud.toast(`CACHE ${d.picks}/3 COMPLETE`, d.picks === 3 ? 'BUILD READY — BREACH THE TOWER' : 'Next cache marked on your route', d.identity.main);
     });
   }
 
@@ -344,8 +347,8 @@ export class LevelDirector {
         });
       });
     } else if (event.type === 'salvage') {
-      g.env.spawnCrate({ x: event.x, y: event.y });
-      g.scrap.burst(event.x, event.y, -65, 18, 0.2);
+      g.env.spawnCrate({ x: event.x, y: event.y, value:75, sourceId:`wreckline:${d.sector}:${event.at}` });
+      g.scrap.burst(event.x,event.y,-65,25,.2,{ sourceId:`wreckline-trail:${d.sector}:${event.at}`,bundle:true,kind:'trail' });
       g.hud.toast('SALVAGE LANE', event.x < 0 ? 'Gold cache on your left' : event.x > 0 ? 'Gold cache on your right' : 'Gold cache ahead', P.gold);
     } else if (event.type === 'gate') {
       g.env.spawnGate({ x: event.x, y: event.y, rotation: event.rotation, spin: 0, drift: 0 });
@@ -600,6 +603,18 @@ export class LevelDirector {
     const g = this.game;
     const cfg = this.data.cfg;
     const d = this.data;
+
+    // Finite authored income is independent of random patrol kills and visual
+    // quality. Stable IDs prevent replaying/resetting an approach to mint money.
+    while (d.treasureIndex < d.treasure.length && this.stateT >= d.treasure[d.treasureIndex].at) {
+      const event = d.treasure[d.treasureIndex++];
+      if (event.type === 'trail') {
+        g.scrap.burst(event.x,event.y,-54,event.value,.1,{ sourceId:event.sourceId,bundle:true,kind:'route',life:20 });
+      } else {
+        g.env.spawnCrate({ x:event.x,y:event.y,z:-64,value:event.value,sourceId:event.sourceId });
+        g.hud.toast('TREASURE POCKET', `${event.x<0?'LEFT':'RIGHT'} FLANK · BREAK THE GLOWING CACHE`, P.gold);
+      }
+    }
 
     if (cfg.authored) {
       this._updateApproachBeat();

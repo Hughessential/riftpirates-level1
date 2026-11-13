@@ -56,7 +56,8 @@ try {
     'scatterNova', 'seekerSwarm', 'voidMortar', 'echoBarrage', 'teslaFork', 'solarBurn', 'gravityWell', 'rapidFire'];
   const capture = await page.evaluate((ids) => {
     const g = window.RIFT;
-    for (const id of ids) { g.upgrades.pendingOffers.add(id); if (!g.upgrades.pick(id)) throw new Error(`Cannot pick ${id}`); }
+    g.testRun = true; g.testing.active = true; // Explicit isolated developer fixture.
+    for (const id of ids) g.testing.setAugmentRank(id, g.upgrades.rank(id) + 1);
     g.enemies.clear(); g.targets.length = 0;
     for (let i = 0; i < 5; i++) {
       const enemy = g.enemies.spawn(i % 2 ? 'gunship' : 'heavy', (i - 2) * 7, 2 + i % 2 * 3, -45,
@@ -115,7 +116,7 @@ try {
 
   const stress = await page.evaluate((ids) => {
     const g = window.RIFT;
-    for (const id of ids) { g.upgrades.pendingOffers.add(id); g.upgrades.pick(id); }
+    for (const id of ids) g.testing.setAugmentRank(id, g.upgrades.rank(id) + 1);
     for (let i = 0; i < 480; i++) window.__mayhemStep(1 / 60);
     window.__mayhemRender(1 / 60);
     return { finite: g.projectiles.player.concat(g.projectiles.enemy).filter((b) => b.active)

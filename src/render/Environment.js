@@ -199,6 +199,27 @@ export class Environment {
     o.active = true;
     o.spin = { x: 1.2, y: 0.9 };
     o.zf = 0.85;
+    this.lootSerial = (this.lootSerial || 0) + 1;
+    o.lootSourceId = opts.sourceId || `crate:${this.game.director?.state}:${this.lootSerial}`;
+    o.lootValue = opts.value ?? 75;
+    if (!o.lootHalo) { o.lootHalo = glowSprite(P.gold,5,.32); o.g.add(o.lootHalo); }
+    o.lootHalo.visible = true;
+    o.target = new Target({ object3D:o.g,hp:35,radius:o.radius,priority:PRIORITY.ENEMY+5,
+      kind:'treasure',label:`TREASURE CACHE / ${o.lootValue} SCRAP`,scrap:0,score:0,xp:0,
+      onDeath:()=>this._openCrate(o), });
+    this.game.targets.push(o.target);
+    return o;
+  }
+
+  _openCrate(o) {
+    if (!o.active) return;
+    const g = this.game, pos = o.g.position;
+    g.scrap.burst(pos.x,pos.y,pos.z,o.lootValue,.9,{ sourceId:o.lootSourceId,kind:'treasure',
+      budgetGroup:`crates:${g.director?.state}`,budgetLimit:12 });
+    g.fx.explode(pos.x,pos.y,pos.z,{ count:18,colors:[P.gold,P.white,P.magenta],power:14,arcColor:P.gold,flashScale:1.5 });
+    Audio2.play('scrap_burst',.5,1);
+    g.hud.toast('TREASURE CACHE OPEN',`${o.lootValue} SCRAP · COLLECT THE GEMS`,P.gold);
+    this._release(o);
   }
 
   spawnGate(opts = {}) {
@@ -231,7 +252,9 @@ export class Environment {
           count: 14, colors, power: 12, arcs: false,
         });
         Audio2.play('enemy_death', 0.35, 1.2, 0.1);
-        this.game.scrap.burst(p.x, p.y, p.z, 3);
+        this.lootSerial = (this.lootSerial || 0) + 1;
+        this.game.scrap.burst(p.x,p.y,p.z,4,.5,{sourceId:`debris:${this.lootSerial}`,
+          kind:'debris',budgetGroup:`debris:${this.game.director?.state}`,budgetLimit:32});
         this.game.score.add(40, 'DEBRIS');
         this.game.heat.onKill();
         this._release(o);
@@ -316,14 +339,7 @@ export class Environment {
       if (!p.alive) continue;
       const d = Math.hypot(o.g.position.x - p.x, o.g.position.y - p.y, o.g.position.z);
       if (d < o.radius + p.radius + p.stats.scrapRadius * 0.35) {
-        const bounty = 45;
-        g.scrap.burst(o.g.position.x, o.g.position.y, o.g.position.z, bounty, 2);
-        g.fx.explode(o.g.position.x, o.g.position.y, o.g.position.z, {
-          count: 18, colors: [P.gold, P.white, P.magenta], power: 14, arcColor: P.gold, flashScale: 1.5,
-        });
-        Audio2.play('scrap_burst', 0.7, 1);
-        g.hud.toast('SCRAP CACHE', `+${bounty}`, P.gold);
-        this._release(o);
+        this._openCrate(o);
       }
     }
 

@@ -39,6 +39,7 @@ const DEFAULTS = {
   ...AUDIO_DEFAULTS,
   seenIntro: 0, // lets us offer a skip on the Nexus cinematic after the first view
   selectedShip: 'rift-talon', // cosmetic hull only; never changes run stats
+  lastBankedRunId: '', // additive: prevents a repeated results callback banking twice
 };
 
 export const Save = {
@@ -66,9 +67,12 @@ export const Save = {
     store.set(KEY, JSON.stringify(this.data));
   },
 
-  bankRun({ scrap, score, time, grade, cleared }) {
+  bankRun({ scrap, score, time, grade, cleared, runId }) {
     const d = this.data;
-    d.scrapBanked += scrap;
+    if (runId && d.lastBankedRunId === runId) return false;
+    const remainder = Number.isFinite(scrap) ? Math.max(0, Math.floor(scrap)) : 0;
+    d.scrapBanked = Math.max(0, Number(d.scrapBanked) || 0) + remainder;
+    if (runId) d.lastBankedRunId = runId;
     d.runs += 1;
     if (score > d.bestScore) {
       d.bestScore = score;
@@ -79,5 +83,6 @@ export const Save = {
       if (!d.bestTime || time < d.bestTime) d.bestTime = time;
     }
     this.save();
+    return true;
   },
 };

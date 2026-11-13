@@ -4,7 +4,7 @@ A complete, playable Three.js vertical slice built from the *Level 1 Progression
 the *Player-System Notes*, and the concept-art board in `riftpirates_content/`.
 
 Choose one of six cosmetic ships and fly down a collapsing rift corridor, break five objectives, and take the
-**Rift Admiral** apart at the Nexus. Each approach grants three augments before
+**Rift Admiral** apart at the Nexus. Each approach offers three separate paid augment caches before
 its objective, letting you build up your ship while you fight forward.
 
 ---
@@ -21,7 +21,7 @@ npm start          # Vite dev server on port 8000
 
 Then open **http://localhost:8000/index.html** and press **LAUNCH RUN**.
 For the developer sandbox, open **http://localhost:8000/?lab=1**, click **TESTING GROUNDS**, or press **F2**.
-It includes god mode, all ships, editable ranks for all 45 augments, enemy/target spawning,
+It includes god mode, all ships, editable ranks for all 75 augments, enemy/target spawning,
 every encounter and boss phase, slow motion, and lighting/sound previews. Test progress is never banked.
 See [the Testing Grounds guide](TESTING_GROUNDS.md); run its checks with `npm run test:lab`.
 
@@ -130,15 +130,22 @@ Choosing cards freezes flight, danger, Heat and the route timer.
 `OVERDRIVE`), while getting hit or camping bleeds it away. **Perfect Dodge** — boost within 0.22s of
 an incoming threat — refunds boost, buffs your guns, and pays a score bonus.
 
-Three caches precede each tower and the Inhibitor, for twelve augment selections.
-Each cache offers three usable choices from **45 repeatable augments** across
-weapons, survival, speed, loot and anomalies. Every augment stacks, weapons
-coexist, and the cards show what the next stack adds. Piercing lances, seeking
-swarms, orbiting guns, chain lightning, gravity wells, loot-charged volleys and
-dodge retaliation can combine from the first approach. A final Nexus cache
-brings the build to thirteen selections before the Admiral. Objective clears
-repair hull and boost; shield recovery continues. See [the complete augment
-guide](MAYHEM_ARSENAL.md) for all 45 effects and example builds.
+Three caches precede each tower and the Inhibitor, with one final cache before the
+Admiral. Each shows exactly three distinct choices from **75 repeatable augments**
+across weapons, survival, speed, loot and anomalies. Purchase one or **SKIP & SAVE**;
+mouse/touch, keys `1`–`3`, `S`, Tab/Enter and gamepad navigation all work.
+
+Plunder physical treasure to fund the current-run wallet. Base prices are **100 /
+250 / 650 / 1,600 SCRAP** for Standard / Rare / Ultra-Rare / Mythic. Further ranks
+cost 25% more per owned rank, rounded up to the next 10 scrap. Historical banked
+scrap stays separate; only the unspent remainder banks on death or victory.
+The new tiers contain ten powers each, including spectral broadsides, blink
+slashes, defensive crystal halos, ghost armadas and black-hole fortresses.
+
+See [the original 45 arsenal guide](MAYHEM_ARSENAL.md) and the
+[cosmic augment and economy guide](COSMIC_AUGMENTS_AND_ECONOMY.md) for mechanics,
+starting balance, known adaptations and verification commands. Objective clears
+still repair hull and boost while normal shield recovery continues.
 
 The weapon system uses seventeen distinct neon projectile styles and eighteen
 original sound cues selected from the supplied retro SFX collection. Four
