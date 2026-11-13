@@ -79,6 +79,7 @@ export const MUSIC_FILES = {
 };
 export const GAMEPLAY_MUSIC = ['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking'];
 const THEME_TAIL = 1.4; // Deliberate end fade, not a claimed seamless musical loop.
+const ASSET_BASE = import.meta.env?.BASE_URL || './';
 
 export class AudioManagerImpl {
   constructor() {
@@ -153,7 +154,7 @@ export class AudioManagerImpl {
   async _loadSfx() {
     const jobs = Object.entries(SFX_FILES).map(async ([key, file]) => {
       try {
-        const res = await fetch(`sfx/${file}`);
+        const res = await fetch(`${ASSET_BASE}sfx/${file}`);
         const arr = await res.arrayBuffer();
         this.buffers[key] = await this.ctx.decodeAudioData(arr);
         if (key.startsWith('weapon_')) {
@@ -267,7 +268,7 @@ export class AudioManagerImpl {
     if (this.music[name]) return this.music[name];
     const file = MUSIC_FILES[name];
     if (!file) return null;
-    const el = new Audio(`music/${encodeURIComponent(file)}`);
+    const el = new Audio(`${ASSET_BASE}music/${encodeURIComponent(file)}`);
     el.loop = false;
     el.preload = 'auto';
     el.volume = 0;

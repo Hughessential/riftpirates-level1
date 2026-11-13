@@ -23,7 +23,8 @@
     "test:display": "node tests/display-loot.mjs",
     "test:intros": "node tests/boss-intros.mjs",
     "test:audio": "node tests/audio-volume-browser.mjs",
-    "test:carnage": "node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/escape-carnage.mjs"
+    "test:carnage": "node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/escape-carnage.mjs",
+    "test:pages": "node tests/pages-smoke.mjs"
   },
   "private": true,
   "devDependencies": {

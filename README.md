@@ -38,6 +38,21 @@ use Vite for development or serve the generated `dist/` folder after building.
 For a production bundle, run `npm run build`; Vite writes the deployable site to `dist/`.
 Three.js and its post-processing addons are installed through npm.
 
+### GitHub Pages
+
+The public game is **https://hughessential.github.io/riftpirates-level1/**. A push to
+`main` runs `.github/workflows/deploy-pages.yml`: it installs locked npm dependencies,
+builds with the `/riftpirates-level1/` base path, and publishes `dist/` through
+GitHub Pages Actions. The source files in the repository root are not a deployable
+site by themselves. The former Pages version is preserved at the
+`archive/pre-portfolio-pages-2026-11-13` tag; the full current source remains in
+Git history and on `codex/combat-spectacle-display`.
+
+To check a finished deployment in a browser, run
+`RIFT_URL=https://hughessential.github.io/riftpirates-level1/ npm run test:pages`.
+The smoke check loads the published JavaScript, CSS, font, voxel ships, soundtrack
+and sound effects, then launches, pauses and resumes a run.
+
 ### Controls
 
 The gamepad layout follows the classic Star Fox-style space-shooter map:
