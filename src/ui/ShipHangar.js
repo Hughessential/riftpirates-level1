@@ -49,6 +49,7 @@ export class ShipHangar {
     this.dialog.querySelector('#hangarConfirm').addEventListener('click', () => this.close());
     this.dialog.addEventListener('click', (event) => { if (event.target === this.dialog) this.close(); });
     this.dialog.addEventListener('keydown', (event) => {
+      if (event.target.closest('.hangarPilotIdentity')) return;
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); this.advance(1); }
       else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); this.advance(-1); }
       else if (/^[1-6]$/.test(event.key)) { event.preventDefault(); this.select(PLAYER_SHIPS[Number(event.key) - 1].id); }
@@ -135,6 +136,21 @@ export class ShipHangar {
     const index = PLAYER_SHIPS.findIndex((ship) => ship.id === this.selectedId);
     this.select(PLAYER_SHIPS[(index + direction + PLAYER_SHIPS.length) % PLAYER_SHIPS.length].id);
     this.buttons.find((button) => button.dataset.shipId === this.selectedId).focus();
+  }
+
+  setPilotIdentity({ name, onEdit }) {
+    if (!this.pilotEntry) {
+      this.pilotEntry = document.createElement('button');
+      this.pilotEntry.type = 'button';
+      this.pilotEntry.id = 'hangarPilotName';
+      this.pilotEntry.className = 'hangarPilotIdentity';
+      this.pilotEntry.setAttribute('aria-label', 'Edit pilot name');
+      this.pilotEntry.innerHTML = '<span aria-hidden="true">◆</span><strong class="pilotNameText"></strong><span>EDIT ↗</span>';
+      this.dialog.querySelector('.hangarPreview').append(this.pilotEntry);
+      this.pilotEntry.addEventListener('click', () => this.onEditPilot?.());
+    }
+    if (onEdit) this.onEditPilot = onEdit;
+    this.pilotEntry.querySelector('strong').textContent = name;
   }
 
   open() {

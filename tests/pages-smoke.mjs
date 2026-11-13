@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import { readdirSync } from 'node:fs';
@@ -54,7 +55,7 @@ try {
   }, { base, assets });
   assert.deepEqual(missing, [], 'Runtime font, audio and fleet files are available');
 
-  await page.click('#launchBtn');
+  await launchRun(page);
   assert.equal(await page.evaluate(() => window.RIFT.running), true, 'Launch starts the game');
   await page.click('#pauseBtn');
   assert.equal(await page.evaluate(() => window.RIFT.paused), true, 'Pause works');

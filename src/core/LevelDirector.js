@@ -44,6 +44,8 @@ export class LevelDirector {
   }
 
   go(state) {
+    // A settled run cannot be revived by an obsolete encounter callback.
+    if (this.game._terminalOutcome && !(state === STATE.VICTORY && this.game._terminalOutcome === 'victory')) return;
     this.exit(this.state);
     this.state = state;
     this.stateT = 0;
@@ -106,16 +108,16 @@ export class LevelDirector {
 
       // ---- objective intros ----
       case STATE.TOWER_1_INTRO:
-        this._enterObjectiveIntro(new OuterDefenseTower(g), IDENTITY.tower1, 1, 'level1_a');
+        this._enterObjectiveIntro(new OuterDefenseTower(g), IDENTITY.tower1, 1);
         break;
       case STATE.TOWER_2_INTRO:
-        this._enterObjectiveIntro(new MidriftPressureTower(g), IDENTITY.tower2, 2, 'level1_b');
+        this._enterObjectiveIntro(new MidriftPressureTower(g), IDENTITY.tower2, 2);
         break;
       case STATE.TOWER_3_INTRO:
-        this._enterObjectiveIntro(new InnerCitadelTower(g), IDENTITY.tower3, 3, 'level1_c');
+        this._enterObjectiveIntro(new InnerCitadelTower(g), IDENTITY.tower3, 3);
         break;
       case STATE.INHIBITOR_INTRO:
-        this._enterObjectiveIntro(new InhibitorEncounter(g), IDENTITY.inhibitor, 4, 'level1_c');
+        this._enterObjectiveIntro(new InhibitorEncounter(g), IDENTITY.inhibitor, 4);
         break;
 
       // ---- objective combat ----
@@ -181,10 +183,10 @@ export class LevelDirector {
         break;
 
       case STATE.VICTORY:
-        g.setWorldMood(0xffc53d, 1.2, 0.92);
+        g.setWorldMood(0x36ffe6, 1.2, 0.84);
         g.env.setSpeed(6);
         g.camera3.setMode('tower');
-        g.hud.banner(g._escapeCleared ? 'RIFT REACHED. YOU MADE IT.' : 'NEXUS BROKEN', P.gold);
+        g.hud.banner('RIFT REACHED. YOU MADE IT.', P.cyan);
         break;
 
       default:
@@ -229,7 +231,7 @@ export class LevelDirector {
     Audio2.playGameplay(2);
   }
 
-  _enterObjectiveIntro(encounter, identity, index, music) {
+  _enterObjectiveIntro(encounter, identity, index) {
     const g = this.game;
     g.encounter = encounter;
     g.player.blocksLeft = g.player.stats.freeBlocks;

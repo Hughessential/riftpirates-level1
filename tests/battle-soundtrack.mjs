@@ -12,6 +12,9 @@ const errors = [];
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
+  await page.evaluateOnNewDocument(() => localStorage.setItem('riftpirates-level1-v1', JSON.stringify({
+    pilotName: 'AUDIO TEST', pilotNameConfirmed: true,
+  })));
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled);
@@ -100,15 +103,21 @@ try {
   await page.waitForFunction(() => window.RIFT.audio.music.escape?.el.readyState >= 2);
   const escape = await page.evaluate(() => {
     const a = window.RIFT.audio;
+    const before = a.music.escape.el.currentTime;
     a.syncEscapeTime(50);
+    const uninterrupted = Math.abs(a.music.escape.el.currentTime - before) < .1;
+    a.setMusicPaused('escape-study', true);
+    a.syncEscapeTime(50);
+    a.setMusicPaused('escape-study', false);
     return { name: a.currentMusic, src: decodeURIComponent(a.music.escape.el.currentSrc),
       duration: a.music.escape.el.duration, rate: a.music.escape.el.playbackRate,
-      time: a.music.escape.el.currentTime };
+      time: a.music.escape.el.currentTime, uninterrupted };
   });
   assert.equal(escape.name, 'escape');
   assert.ok(escape.src.endsWith('/music/The Very Very End.mp3'));
   assert.ok(escape.duration > 139 && escape.duration < 141);
   assert.equal(escape.rate, 1);
+  assert.equal(escape.uninterrupted, true, 'Live recording is not scrubbed to a slow simulation clock');
   assert.ok(Math.abs(escape.time - 50) < 1);
   await page.evaluate(() => document.getElementById('toTitleBtn').click());
   assert.equal(await page.evaluate(() => window.RIFT.audio.currentMusic), 'title', 'Return selects official title theme');

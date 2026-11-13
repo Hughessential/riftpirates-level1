@@ -11,6 +11,19 @@ import { initMenuCursor } from './ui/MenuCursor.js';
 import { TestingGroundsPanel } from './ui/TestingGroundsPanel.js';
 import { initAudioSettings } from './ui/AudioSettings.js';
 import { ControllerMenus } from './ui/ControllerMenus.js';
+import { PilotIdentity } from './ui/PilotIdentity.js';
+
+// Start the official title recording before voxel loading. Saved mute/volume
+// still apply, and browsers which block autoplay unlock on the first gesture.
+Save.load();
+Audio2.setMusicPaused('background', document.hidden);
+Audio2.playTitle(0);
+Audio2.init({ loadSfx: false });
+Audio2.resume();
+const unlockAudio = () => { Audio2.init(); Audio2.resume(); };
+window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
+window.addEventListener('keydown', unlockAudio, { capture: true });
+document.addEventListener('visibilitychange', () => Audio2.setMusicPaused('background', document.hidden));
 
 initVoxelTitle();
 initMenuCursor();
@@ -20,7 +33,6 @@ await Promise.all([
   preloadImportedAssets((loaded) => { worldProgress = loaded; paintProgress(); }),
   preloadPlayerFleet((loaded) => { fleetProgress = loaded; paintProgress(); }),
 ]);
-Save.load();
 if (!isPlayerShipId(Save.data.selectedShip)) Save.data.selectedShip = PLAYER_SHIPS[0].id;
 const game = new Game();
 const hangar = new ShipHangar({
@@ -32,6 +44,7 @@ const hangar = new ShipHangar({
   },
 });
 game.hangar = hangar;
+game.pilotIdentity = new PilotIdentity(game, hangar);
 $('bootProgress').value = 1;
 $('bootStatus').classList.add('hidden');
 $('launchBtn').disabled = false;
@@ -55,7 +68,7 @@ function showTitle() {
   game.prepareTitle();
   Input.enabled = false;
   $('titleScreen').classList.remove('hidden');
-  $('resultsScreen').classList.add('hidden');
+  game.resultsScreen.hide();
   $('pauseScreen').classList.add('hidden');
   game.hud.hide();
   $('boostBtn').classList.add('hidden');
@@ -75,14 +88,8 @@ function launch() {
   game.startRun();
 }
 
-// Unlock the requested title theme on the first real interaction. Launch still
-// starts immediately, even when an audio device or a recording is unavailable.
-const unlockAudio = () => { Audio2.init(); Audio2.resume(); };
-window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
-window.addEventListener('keydown', unlockAudio, { capture: true });
-
 // --- wiring ---
-$('launchBtn').addEventListener('click', launch);
+$('launchBtn').addEventListener('click', () => game.pilotIdentity.requestLaunch(launch));
 $('againBtn').addEventListener('click', () => {
   Audio2.resume();
   if (game.testRun) game.testing.enter();

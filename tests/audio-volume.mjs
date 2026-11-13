@@ -9,7 +9,7 @@ class FakeAudio {
   play() { this.paused = false; return Promise.resolve(); }
   pause() { this.paused = true; }
 }
-const node = () => ({ connect() {}, gain: { value: 0 } });
+const node = () => ({ connections: [], connect(destination) { this.connections.push(destination); }, gain: { value: 0 } });
 class FakeContext {
   constructor() { this.currentTime = 0; this.state = 'running'; this.destination = {}; }
   createGain() { return node(); }
@@ -45,6 +45,44 @@ webAudio._loadSfx = async () => {};
 await webAudio.init();
 assert.equal(webAudio.musicGain.gain.value, .31);
 assert.equal(webAudio.sfxGain.gain.value, .22);
+assert.deepEqual(webAudio.musicGain.connections, [webAudio.mixBus], 'Music bypasses death filtering before the final protected mix');
+assert.deepEqual(webAudio.master.connections, [webAudio.warpFilter], 'Death filtering remains available to SFX');
+assert.deepEqual(webAudio.warpFilter.connections, [webAudio.mixBus]);
+assert.deepEqual(webAudio.mixBus.connections, [webAudio.mixLimiter]);
+assert.deepEqual(webAudio.mixLimiter.connections, [webAudio.outputGain]);
+assert.deepEqual(webAudio.outputGain.connections, [webAudio.ctx.destination]);
+assert.equal(webAudio.mixLimiter.threshold.value, -3);
+assert.equal(webAudio.mixLimiter.ratio.value, 20);
+assert.equal(webAudio.outputGain.gain.value, .95);
+
+// The boot title can start before the renderer exists, without waiting on the
+// SFX download bank or requiring a render-loop tick to lift a zero-duration fade.
+const bootAudio = new AudioManagerImpl();
+let sfxLoads = 0;
+bootAudio._loadSfx = async () => { sfxLoads++; };
+bootAudio.playTitle(0);
+await bootAudio.init({ loadSfx: false });
+assert.equal(bootAudio.music.title.level, 1);
+assert.equal(bootAudio.music.title.gain.gain.value, 1);
+assert.equal(bootAudio.music.title.el.paused, false);
+assert.equal(bootAudio._fades.length, 0);
+assert.equal(sfxLoads, 0);
+await Promise.all([bootAudio.init(), bootAudio.init(), bootAudio.init()]);
+assert.equal(sfxLoads, 1, 'The first gesture loads SFX once, even when unlock handlers overlap');
+
+const automation = [];
+const smooth = { level: .8, tail: 1, gain: { gain: {
+  value: .2,
+  cancelScheduledValues(time) { automation.push(['cancel', time]); },
+  setTargetAtTime(value, time, constant) { automation.push(['target', value, time, constant]); },
+} } };
+webAudio.ctx.currentTime = 10;
+webAudio._applyLevel(smooth);
+assert.equal(smooth.gain.gain.value, .2, 'Crossfade updates schedule a smooth audio-clock transition instead of jumping gain');
+assert.deepEqual(automation.at(-1), ['target', .8, 10, .012]);
+const scheduled = automation.length;
+webAudio._applyLevel(smooth);
+assert.equal(automation.length, scheduled, 'Steady music gain does not grow an automation queue every frame');
 webAudio.playBattle(0, { restart: true }); webAudio.update(1);
 webAudio.music.battle.el.currentTime = 42;
 webAudio.pauseMusic();

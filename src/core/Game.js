@@ -170,12 +170,14 @@ export class Game {
     this.paused = false;
     this.running = false;
     this.titleMode = true;
+    this._terminalOutcome = null;
     this.difficulty = { fireScale: 1, damageScale: 1 };
     this.stats = this._blankStats();
 
     // Player damage has to fan out to several systems; do it in one place.
     const takeDamage = this.player.takeDamage.bind(this.player);
     this.player.takeDamage = (amount, source) => {
+      if (this._terminalOutcome) return false;
       if (this.testing.active && this.testing.settings.godMode && !this.testing.bypassGod) return false;
       const before = this.player.health;
       const hit = takeDamage(amount, source);
@@ -245,6 +247,7 @@ export class Game {
     if (this._watchedDensity !== (devicePixelRatio || 1)) this._resize();
     this._updateLighting(dt);
     this.presentation.render(dt);
+    this.pilotIdentity?.updateTag(this.camera, this.renderer.domElement);
   }
 
   /** Cross-fades the whole arena into each objective's identity color. */
@@ -332,23 +335,31 @@ export class Game {
   }
 
   onBossDefeated() {
-    if (!this.running || this._resultsFinalized || this.director.state !== STATE.BOSS_COMBAT) return;
+    if (!this.running || this._terminalOutcome || this._resultsFinalized || this.director.state !== STATE.BOSS_COMBAT) return;
     if (this.testing.active) this.testing.sceneId = 'escape';
     this.director.go(STATE.ESCAPE);
   }
 
   completeEscape() {
-    if (!this.running || !this.player.alive || this._resultsFinalized || this.director.state !== STATE.ESCAPE) return;
+    if (!this.running || !this.player.alive || this._terminalOutcome || this._resultsFinalized || this.director.state !== STATE.ESCAPE) return;
     if (this.escape.outcome !== 'escaped') return;
+    this._terminalOutcome = 'victory';
     this._escapeCleared = true;
+    this.escapeMargin = this.escape.remaining;
+    this.scheduler.clear();
     this.enemies.clear();
     this.clearHazards();
     this.projectiles.reset();
+    this.player.frozen = true;
+    this.pilotIdentity?.hideTag();
+    Audio2.playVictory();
     this.director.go(STATE.VICTORY);
+    // Settle immediately; decorative staging must never hold up saving.
+    this.showResults({ victory: true });
   }
 
   failEscape(source = 'GALACTIC COLLAPSE') {
-    if (!this.running || this._resultsFinalized || this.director.state !== STATE.ESCAPE) return;
+    if (!this.running || this._terminalOutcome || this._resultsFinalized || this.director.state !== STATE.ESCAPE) return;
     // Missing the deadline is a failed route, not a damage hit that armor,
     // a revive charge or lab god mode could turn into extra countdown time.
     this.player.health = 0;
@@ -360,8 +371,8 @@ export class Game {
     Audio2.setMusicPaused('game', this.paused);
     Audio2.setMusicPaused('lab', this.testing.active && this.testing.panelOpen);
     Audio2.setMusicPaused('background', document.hidden);
-    // Study speed changes simulation only. Hold the original recording during
-    // frame study; return at the matching timeline position without repitching.
+    // Explicit frame study can seek the paused recording. Live flight always
+    // lets the original track run continuously, even when rendering falls behind.
     Audio2.setMusicPaused('escape-study', this.director.state === STATE.ESCAPE &&
       this.testing.active && this.testing.settings.timeScale !== 1);
     if (this.director.state === STATE.ESCAPE) Audio2.syncEscapeTime(this.escape.elapsed);
@@ -374,6 +385,11 @@ export class Game {
     this.director.clearPresentation();
     this.escape.dispose();
     this.testing.deactivate();
+    this.resultsScreen.hide();
+    this.death.end();
+    this.pilotIdentity?.resetSession();
+    this.pilotIdentity?.hideTag();
+    this._terminalOutcome = null;
     this.testRun = false;
     this.running = false;
     this.titleMode = true;
@@ -412,10 +428,13 @@ export class Game {
     this.escape.dispose();
     if (!testing) this.testing.deactivate();
     this._resultsFinalized = false;
+    this._terminalOutcome = null;
+    this.escapeMargin = null;
     this.runId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
     this._escapeCleared = false;
     this.killedBy = '';
     this.testRun = testing;
+    this.runPilotName = this.pilotIdentity?.snapshotRun({ testing }) || Save.data.pilotName || 'PIRATE';
     this.time = 0;
     this.runTime = 0;
     this.paused = false;
@@ -475,7 +494,10 @@ export class Game {
   }
 
   _onPlayerDeath(source) {
-    if (!this.running || this._resultsFinalized || this.death.active) return;
+    if (!this.running || this.player.alive || this._terminalOutcome || this._resultsFinalized || this.death.active) return;
+    this._terminalOutcome = 'defeat';
+    this.pilotIdentity?.hideTag();
+    Audio2.playDeath();
     this.director.clearPresentation();
     this.escape.dispose();
     this.killedBy = source;
@@ -483,17 +505,31 @@ export class Game {
     Input.enabled = false;
     this.enemies.clear();
     this.clearHazards();
+    this.projectiles.reset();
     this.scheduler.clear();
     this.death.start_(this.player.x, this.player.y);
   }
 
   showResults({ victory }) {
     if (this._resultsFinalized) return;
+    if (victory && (this._terminalOutcome !== 'victory' || !this._escapeCleared)) return;
+    if (!victory && this._terminalOutcome === 'victory') return;
+    this._terminalOutcome = victory ? 'victory' : 'defeat';
+    if (victory) Audio2.playVictory();
+    else Audio2.playDeath();
     this.director.clearPresentation();
+    this.scheduler.clear();
+    this.death.end();
+    this.enemies.clear();
+    this.clearHazards();
+    this.projectiles.reset();
+    this.pilotIdentity?.hideTag();
     this._resultsFinalized = true;
     this.escape.dispose();
     this.player.exhaust.reset();
     this.running = false;
+    this.paused = false;
+    $('pauseScreen').classList.add('hidden');
     Input.enabled = false;
     this.upgradeScreen.hide();
     this.hud.hide();
@@ -544,6 +580,7 @@ export class Game {
     // gamepad is polled every frame — even while paused, so Start can resume
     Input.pollGamepad();
     this.controllerMenus?.update();
+    this.resultsScreen.update?.(rawDt);
     const qualityEligible = this.running && !this.paused && !this.testing.active &&
       !this.director.intro.active && !this.director.inUpgrade && !this.upgradeScreen.open &&
       !this.upgradeScreen.closing && !this.death.active;
@@ -618,7 +655,7 @@ export class Game {
 
     this.director.update(dt);
     if (this.director.state === STATE.ESCAPE) Audio2.syncEscapeTime(this.escape.elapsed);
-    if (!this.director.inUpgrade) this._updateWorld(dt);
+    if (this.running && !this._terminalOutcome && !this.director.inUpgrade) this._updateWorld(dt);
 
     this.hud.update(dt);
     this.renderFrame(dt);
@@ -627,7 +664,7 @@ export class Game {
   _updateWorld(dt) {
     this.testing.beforeWorld(dt);
     const dying = this.director.state === STATE.DYING;
-    const active = !this.director.inUpgrade;
+    const active = !dying && !this._terminalOutcome && !this.director.inUpgrade;
 
     // --- purge dead targets before anything reads the list ---
     for (let i = this.targets.length - 1; i >= 0; i--) {
@@ -649,9 +686,9 @@ export class Game {
     const heroSequence = this.director.state === STATE.ESCAPE || this.director.intro.active;
     this.worldShowcase.worldRoot.visible = !heroSequence;
     this.env.livingDebris.group.visible = !heroSequence;
-    if (active) {
+    if (active && !this._terminalOutcome) {
       if (!this.testing.active || !this.testing.settings.freezeEnemies) this.enemies.update(dt);
-      if (this.encounter) this.encounter.update(dt);
+      if (this.encounter && !this._terminalOutcome) this.encounter.update(dt);
     }
 
     // --- hazards ---
@@ -678,7 +715,7 @@ export class Game {
     this.damageNumbers.update(dt);
     this.camera3.update(dt, this.player, this.player.boosting);
     if (!this.testing.active || this.testing.settings.trail) {
-      this.player.exhaust.update(dt, this.player, this.camera, { emit: !dying });
+      this.player.exhaust.update(dt, this.player, this.camera, { emit: !dying && !this._terminalOutcome });
     }
 
     // the Nexus rift spins while it's open

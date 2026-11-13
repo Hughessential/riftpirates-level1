@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 /**
  * Visual verification. Every other test stubs out rendering; this one actually
  * draws frames and saves them, so the outlined-voxel look, the HUD, the
@@ -36,7 +37,7 @@ const shot = async (name) => {
 // Title screen first, before anything is running.
 await shot('00-title');
 
-await page.click('#launchBtn');
+await launchRun(page);
 await new Promise((r) => setTimeout(r, 500));
 
 // Sim without rendering (swiftshader is far too slow to draw 60fps), then draw

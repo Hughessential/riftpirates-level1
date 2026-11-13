@@ -1,5 +1,6 @@
 import { Input, DEFAULT_BUTTONS } from '../core/Input.js';
 import { Audio2 } from '../core/AudioManager.js';
+import { pilotNameCharacters } from '../core/PilotName.js';
 import './controller-menus.css';
 
 const controls = 'button,input:not([type="hidden"]),select,textarea';
@@ -102,20 +103,30 @@ export class ControllerMenus {
     this.keyboard = document.createElement('dialog');
     this.keyboard.id = 'controllerKeyboard';
     this.keyboard.className = 'controllerDialog controllerKeyboard';
-    this.keyboard.innerHTML = `<h2>AUGMENT SEARCH</h2><output></output><div>${'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('').map(key => `<button data-key="${key}">${key}</button>`).join('')}<button data-key=" ">SPACE</button><button data-key="erase">⌫</button><button data-key="clear">CLEAR</button><button data-key="done">DONE</button></div>`;
+    this.keyboard.innerHTML = `<h2>AUGMENT SEARCH</h2><output class="pilotNameText"></output><div>${'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_'.split('').map(key => `<button data-key="${key}">${key}</button>`).join('')}<button data-key=" ">SPACE</button><button data-key="erase">⌫</button><button data-key="clear">CLEAR</button><button data-key="done">DONE</button></div>`;
     document.body.append(this.keyboard);
     this.keyboard.addEventListener('click', event => {
       const key = event.target.closest('[data-key]')?.dataset.key;
       if (key == null || !this.searchField) return;
-      if (key === 'done') return this.keyboard.close();
+      if (key === 'done') return this.closeKeyboard();
       if (key === 'clear') this.searchField.value = '';
-      else if (key === 'erase') this.searchField.value = this.searchField.value.slice(0, -1);
+      else if (key === 'erase') this.searchField.value = pilotNameCharacters(this.searchField.value).slice(0, -1).join('');
       else this.searchField.value += key;
       this.searchField.dispatchEvent(new Event('input', { bubbles: true }));
-      this.keyboard.querySelector('output').value = this.searchField.value || 'TYPE TO FILTER';
+      this.keyboard.querySelector('output').value = this.searchField.value || this.searchField.dataset.keyboardPlaceholder || 'TYPE TO FILTER';
     });
-    this.keyboard.addEventListener('cancel', event => { event.preventDefault(); this.keyboard.close(); });
+    this.keyboard.addEventListener('cancel', event => { event.preventDefault(); this.closeKeyboard(); });
     this.keyboard.addEventListener('keydown', event => event.stopPropagation());
+  }
+
+  closeKeyboard() {
+    if (!this.keyboard.open) return;
+    this.keyboard.close();
+    // Restore both owners synchronously. A queued native close listener could
+    // steal focus after the player has already moved to the next control.
+    this.root = this.currentRoot();
+    if (this.searchField?.isConnected) this.focus(this.searchField);
+    Input.blockMenuCarryover();
   }
 
   setActive(active) {
@@ -129,6 +140,7 @@ export class ControllerMenus {
   currentRoot() {
     if (this.keyboard.open) return this.keyboard;
     if (this.settings.open) return this.settings;
+    if (this.game.pilotIdentity?.dialog.open) return this.game.pilotIdentity.dialog;
     if (this.game.testingPanel?.dialog.open) return this.game.testingPanel.dialog;
     if (this.game.hangar?.dialog.open) return this.game.hangar.dialog;
     for (const id of ['pauseScreen', 'resultsScreen', 'upgradeScreen', 'titleScreen']) {
@@ -197,7 +209,7 @@ export class ControllerMenus {
       this.focused?.classList.remove('controllerFocus');
       this.focused = null;
       if (this.active && root) {
-        const preferred = root.querySelector('#launchBtn,#resumeBtn,#againBtn,.shipOption[aria-pressed="true"],.upCard,[role="tab"][aria-selected="true"]');
+        const preferred = root.querySelector('#victorySkip:not([hidden])') || root.querySelector('#launchBtn,#resumeBtn,#againBtn,#pilotNameInput,.shipOption[aria-pressed="true"],.upCard,[role="tab"][aria-selected="true"]');
         const items = [...root.querySelectorAll(controls)].filter(visible);
         this.focus(preferred && visible(preferred) ? preferred : items[0]);
       }
@@ -211,8 +223,9 @@ export class ControllerMenus {
       return;
     }
     if (nav.cancel || nav.pause) {
-      if (root === this.keyboard) this.keyboard.close();
+      if (root === this.keyboard) this.closeKeyboard();
       else if (root === this.settings) this.closeSettings();
+      else if (root === this.game.pilotIdentity?.dialog) this.game.pilotIdentity.close();
       else if (root === this.game.testingPanel?.dialog) this.game.testingPanel.close();
       else if (root === this.game.hangar?.dialog) this.game.hangar.close();
       else if (root.id === 'pauseScreen' || root.id === 'upgradeScreen') this.game.togglePause();
@@ -239,7 +252,8 @@ export class ControllerMenus {
       Input.blockMenuCarryover();
       if (el.matches('input[type="search"],input[type="text"],textarea')) {
         this.searchField = el;
-        this.keyboard.querySelector('output').value = el.value || 'TYPE TO FILTER';
+        this.keyboard.querySelector('h2').textContent = el.dataset.keyboardTitle || 'AUGMENT SEARCH';
+        this.keyboard.querySelector('output').value = el.value || el.dataset.keyboardPlaceholder || 'TYPE TO FILTER';
         this.keyboard.showModal();
       } else if (el.tagName === 'SELECT') this.adjust(el, 1);
       else if (!el.matches('input[type="range"],input[type="number"]')) el.click();

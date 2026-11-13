@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 
@@ -14,7 +15,7 @@ try {
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
-  await page.click('#launchBtn');
+  await launchRun(page);
 
   const setup = await page.evaluate(async () => {
     const { Input } = await import('/src/core/Input.js');

@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 /**
  * Full-level verification. Steps the simulation with a fixed dt so we can play
  * an entire 12-minute run in seconds and assert every state transition.
@@ -25,7 +26,7 @@ page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('favi
 
 await page.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Boolean(window.RIFT));
-await page.click('#launchBtn');
+await launchRun(page);
 
 // Simulation-only: software GL makes rendering the bottleneck, and we're
 // verifying game logic here. Visuals get checked separately with screenshots.
@@ -246,7 +247,7 @@ const results = await page.evaluate(() => {
   const el = document.getElementById('resultsScreen');
   return {
     visible: !el.classList.contains('hidden'),
-    title: document.getElementById('resultsTitle').textContent,
+    title: document.getElementById('resultsTitle').getAttribute('aria-label'),
     grade: document.getElementById('gradeVal').textContent,
     score: document.getElementById('scoreBig').textContent,
     rows: document.querySelectorAll('#resultsGrid .rrow').length,
@@ -255,7 +256,7 @@ const results = await page.evaluate(() => {
 });
 console.log('\nRESULTS:', JSON.stringify(results, null, 1));
 assert.equal(results.visible, true);
-assert.equal(results.title, 'THE RIFT ADMIRAL DEFEATED');
+assert.equal(results.title, 'GALAXY ESCAPED');
 assert.equal((await snap()).dir, 'VICTORY');
 
 // ---- restart without reload ----

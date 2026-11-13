@@ -89,7 +89,6 @@ export class DeathSequence {
     this.scene.add(this.coreGlow);
 
     Audio2.play('player_death', 1, 0.85);
-    Audio2.stopMusic(0.5);
     this.overlay.classList.add('on');
     this.game.camera3.shake(0.6);
 
@@ -315,6 +314,7 @@ export class DeathSequence {
     this.rim.visible = false;
     if (this.coreGlow) {
       this.scene.remove(this.coreGlow);
+      this.coreGlow.material.dispose();
       this.coreGlow = null;
     }
     this.overlay.classList.remove('on');

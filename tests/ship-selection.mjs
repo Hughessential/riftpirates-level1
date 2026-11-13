@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -63,7 +64,7 @@ try {
     if (index === 2) await page.screenshot({ path: `${OUT}/ship-hangar.png` });
     await page.click('#hangarConfirm');
     assert.equal(await page.$eval('#shipHangarDialog', (el) => el.open), false);
-    await page.click('#launchBtn');
+    await launchRun(page);
     const actual = await page.evaluate(() => {
       const g = window.RIFT;
       return { running: g.running, id: g.player.shipId, renderedId: g.player.hull.userData.shipId,

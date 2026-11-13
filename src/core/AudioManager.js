@@ -66,7 +66,7 @@ export const WEAPON_AUDIO = {
 for (const [kind, profile] of Object.entries(WEAPON_AUDIO)) SFX_FILES[`weapon_${kind}`] = `mayhem/${profile.file || kind}.wav`;
 
 // Source filenames are authoritative; the embedded MP3 titles differ.
-export const MUSIC_FILES = {
+export const MUSIC_FILES = Object.freeze({
   title: 'Rift Pirates OFFICIAL Main Title Theme.mp3',
   battle: 'Boss Battle OFFICAL soundtrack.mp3',
   escape: 'The Very Very End.mp3',
@@ -75,11 +75,12 @@ export const MUSIC_FILES = {
   neondrift: 'neondrift.mp3',
   pixelatedvoid: 'pixelatedvoid.mp3',
   thepirateking: 'thepirateking.mp3',
-  defeat: 'defeat.m4a',
-  victory: 'victory.mp3',
-};
-export const GAMEPLAY_MUSIC = ['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking'];
+  defeat: 'sorryyoudied.mp3',
+  victory: 'Afterthefinalescape.mp3',
+});
+export const GAMEPLAY_MUSIC = Object.freeze(['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking']);
 const THEME_TAIL = 1.4; // Deliberate end fade, not a claimed seamless musical loop.
+export const AUDIO_OUTPUT = Object.freeze({ threshold: -3, ratio: 20, headroom: .95, musicSmoothing: .012 });
 const ASSET_BASE = import.meta.env?.BASE_URL || './';
 
 export class AudioManagerImpl {
@@ -109,8 +110,11 @@ export class AudioManagerImpl {
     this._weaponTrim = {};
   }
 
-  async init() {
-    if (this.ctx) return;
+  async init({ loadSfx = true } = {}) {
+    if (this.ctx) {
+      if (loadSfx) await this._ensureSfx();
+      return;
+    }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     try { this.ctx = new AC(); } catch { return; }
@@ -122,12 +126,29 @@ export class AudioManagerImpl {
     this.master = this.ctx.createGain();
     this.master.gain.value = 1;
 
-    // Death sequence sweeps this filter down to smear the mix (Player notes).
+    // Both buses need headroom at their final sum. Compressing SFX alone cannot
+    // protect a loud explosion + soundtrack from clipping the device output.
+    this.mixBus = this.ctx.createGain();
+    this.mixBus.gain.value = 1;
+    this.mixLimiter = this.ctx.createDynamicsCompressor();
+    this.mixLimiter.threshold.value = AUDIO_OUTPUT.threshold;
+    this.mixLimiter.knee.value = 0;
+    this.mixLimiter.ratio.value = AUDIO_OUTPUT.ratio;
+    this.mixLimiter.attack.value = .003;
+    this.mixLimiter.release.value = .08;
+    this.outputGain = this.ctx.createGain();
+    this.outputGain.gain.value = AUDIO_OUTPUT.headroom;
+    this.mixBus.connect(this.mixLimiter);
+    this.mixLimiter.connect(this.outputGain);
+    this.outputGain.connect(this.ctx.destination);
+
+    // Death sequence sweeps the SFX mix; official music retains its original
+    // frequency range as well as its original tempo throughout the ending.
     this.warpFilter = this.ctx.createBiquadFilter();
     this.warpFilter.type = 'lowpass';
     this.warpFilter.frequency.value = 22050;
     this.master.connect(this.warpFilter);
-    this.warpFilter.connect(this.ctx.destination);
+    this.warpFilter.connect(this.mixBus);
 
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.value = Save.data.sfx ? this.sfxVol : 0;
@@ -145,12 +166,14 @@ export class AudioManagerImpl {
 
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = Save.data.music ? this.musicVol : 0;
-    this.musicGain.connect(this.master);
+    this.musicGain.connect(this.mixBus);
 
     this.ready = true;
     if (this._desired) this._startCurrent();
-    await this._loadSfx();
+    if (loadSfx) await this._ensureSfx();
   }
+
+  _ensureSfx() { return this._sfxLoad ||= this._loadSfx(); }
 
   async _loadSfx() {
     // First interaction should make the primary gun, impact and menu audible
@@ -294,9 +317,22 @@ export class AudioManagerImpl {
     return entry;
   }
 
-  _applyLevel(entry) {
+  _applyLevel(entry, { immediate = false } = {}) {
     const volume = Math.max(0, Math.min(1, entry.level * entry.tail));
-    if (entry.gain) entry.gain.gain.value = volume;
+    if (entry.gain) {
+      if (entry._levelTarget === volume && !immediate) return;
+      entry._levelTarget = volume;
+      const param = entry.gain.gain;
+      if (!immediate && typeof param.setTargetAtTime === 'function') {
+        // Frame-stepped gain assignments can click when the renderer stalls.
+        // Let the audio clock interpolate each small crossfade/tail adjustment.
+        param.cancelScheduledValues(this.ctx.currentTime);
+        param.setTargetAtTime(volume, this.ctx.currentTime, AUDIO_OUTPUT.musicSmoothing);
+      } else {
+        param.cancelScheduledValues?.(this.ctx?.currentTime || 0);
+        param.value = volume;
+      }
+    }
     else entry.el.volume = Save.data.music ? volume * this.musicVol : 0;
   }
 
@@ -334,6 +370,9 @@ export class AudioManagerImpl {
     };
     entry.el.onerror = () => {
       if (token !== this._generation || entry.name !== this.currentMusic) return;
+      if (!this._unavailable.has(entry.name)) {
+        console.warn(`Music unavailable: ${MUSIC_FILES[entry.name]}`);
+      }
       this._unavailable.add(entry.name);
       if (this.musicOwner === 'gameplay') this._advanceGameplay();
       // Dedicated themes remain owned by their scene even if the file is unavailable.
@@ -343,6 +382,8 @@ export class AudioManagerImpl {
   }
 
   _select(name, owner, fade, repeat, { restart = false, resume = false } = {}) {
+    // Unknown or obsolete cues cannot replace the currently owned soundtrack.
+    if (name && !Object.hasOwn(MUSIC_FILES, name)) return;
     if (this.currentMusic === name && this.musicOwner === owner && !restart) return;
     const prev = this.currentMusic && this.music[this.currentMusic];
     this._generation++;
@@ -356,7 +397,7 @@ export class AudioManagerImpl {
         this._fades = this._fades.filter(f => f.entry !== entry);
         entry.el.pause();
         entry.level = 0;
-        this._applyLevel(entry);
+        this._applyLevel(entry, { immediate: true });
       }
     }
     if (prev && prev.name !== name) this._fadeTo(prev, 0, fade, true);
@@ -391,7 +432,7 @@ export class AudioManagerImpl {
     if (this.musicOwner === 'gameplay') this._advanceGameplay();
     else if (this._desired?.repeat) {
       // Play the complete source again, with a softened restart; never route a
-      // long boss/escape session into the ordinary gameplay shuffle.
+      // long boss/escape/results session into the ordinary gameplay shuffle.
       this._select(entry.name, this.musicOwner, THEME_TAIL, true, { restart: true });
     }
   }
@@ -407,6 +448,8 @@ export class AudioManagerImpl {
   playTitle(fade = 1.5) { this._select('title', 'title', fade, true); }
   playBattle(fade = 1.5, { restart = false } = {}) { this._select('battle', 'battle', fade, true, { restart }); }
   playEscape(fade = .7, { restart = true } = {}) { this._select('escape', 'escape', fade, true, { restart }); }
+  playDeath(fade = .35) { this._select('defeat', 'death', fade, true); }
+  playVictory(fade = .45) { this._select('victory', 'victory', fade, true); }
 
   /** The escape simulation owns its deadline, even without working audio. */
   syncEscapeTime(elapsed) {
@@ -414,36 +457,49 @@ export class AudioManagerImpl {
     if (this.musicOwner !== 'escape' || !current) return;
     const duration = current.el.duration;
     if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(elapsed)) return;
+    // Rendering and simulation may slow down while the audio device keeps
+    // playing. Seeking a live recording to every >1s discrepancy caused
+    // repeated audible rewinds during heavy escape combat. Only silent lab
+    // frame-study follows a manually advanced simulation timeline.
+    if (!this._pauseReasons.has('escape-study') || !current.el.paused) return;
     const target = Math.max(0, elapsed) % duration;
-    // Only correct a meaningful stall, resume, or lab time-scale discrepancy.
-    // Ordinary frames play the original recording continuously at its own tempo.
-    if (Math.abs(current.el.currentTime - target) > 1) {
+    if (Math.abs(current.el.currentTime - target) > .25) {
       try { current.el.currentTime = target; } catch { /* Media may still be seeking. */ }
     }
   }
 
-  /** Compatibility for existing results/lab hooks; all old traversal cues shuffle. */
-  playMusic(name, fade = 1.2, loop = true) {
+  /** Compatibility only; each scene still owns its explicit approved recording. */
+  playMusic(name, fade = 1.2) {
     if (['level1_a', 'level1_b', 'level1_c'].includes(name)) return this.playGameplay(fade);
+    if (GAMEPLAY_MUSIC.includes(name)) return this.playGameplay(fade);
     if (name === 'title') return this.playTitle(fade);
     if (name === 'battle' || name === 'boss') return this.playBattle(fade);
     if (name === 'escape') return this.playEscape(fade, { restart: false });
-    this._select(name, name ? 'results' : null, fade, loop);
+    if (name === 'defeat' || name === 'death') return this.playDeath(fade);
+    if (name === 'victory') return this.playVictory(fade);
+    if (name === null) this.stopMusic(fade);
   }
 
   stopMusic(fade = .8) { this._select(null, null, fade, false); }
 
   _fadeTo(entry, target, dur, stopAtEnd) {
     this._fades = this._fades.filter(f => f.entry !== entry);
-    this._fades.push({ entry, from: entry.level, to: target, t: 0, dur: Math.max(.01, dur), stopAtEnd });
+    if (dur <= 0) {
+      entry.level = target;
+      this._applyLevel(entry, { immediate: true });
+      if (stopAtEnd) entry.el.pause();
+      return;
+    }
+    this._fades.push({ entry, from: entry.level, to: target, t: 0, dur: Math.max(.01, dur), stopAtEnd,
+      clock: this.ctx?.state === 'running' ? this.ctx.currentTime : null });
   }
 
-  /** Death-sequence audio smear: 0 = clean, 1 = fully muffled + pitched down. */
+  /** Death-sequence SFX smear: 0 = clean, 1 = fully muffled. */
   warp(amount) {
     if (!this.ready) return;
     const f = 22050 * Math.pow(1 - 0.985 * amount, 2.2);
     this.warpFilter.frequency.setTargetAtTime(Math.max(180, f), this.ctx.currentTime, 0.05);
-    // Preserve the official soundtrack tempo; only the existing mix filter warps.
+    // Preserve the official soundtrack; only the SFX filter warps.
   }
 
   resetWarp() {
@@ -454,9 +510,15 @@ export class AudioManagerImpl {
 
   update(dt) {
     if (this._pauseReasons.size) return;
+    const clock = this.ctx?.state === 'running' ? this.ctx.currentTime : null;
     for (let i = this._fades.length - 1; i >= 0; i--) {
       const f = this._fades[i];
-      f.t += dt;
+      // Simulation dt is capped for safe movement. Music runs in real time, so
+      // a slow frame must not stretch a short crossfade into several seconds of
+      // competing songs. Explicit pause/resume resets this clock below.
+      const audioElapsed = clock !== null && f.clock !== null ? Math.max(0, clock - f.clock) : 0;
+      f.clock = clock;
+      f.t += Math.max(Math.max(0, dt), audioElapsed);
       const k = Math.min(1, f.t / f.dur);
       f.entry.level = f.from + (f.to - f.from) * k;
       this._applyLevel(f.entry);
@@ -512,6 +574,7 @@ export class AudioManagerImpl {
     if (this._pauseReasons.size) {
       for (const entry of Object.values(this.music)) entry.el.pause();
     } else {
+      for (const fade of this._fades) fade.clock = this.ctx?.state === 'running' ? this.ctx.currentTime : null;
       const current = this.currentMusic && this.music[this.currentMusic];
       if (current?.el.ended) this._finishTrack(current);
       else if (current) this._playEntry(current);

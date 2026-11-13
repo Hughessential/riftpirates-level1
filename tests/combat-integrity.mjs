@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 /**
  * Combat integrity. The full-level test ran in god mode, which hides the things
  * that actually matter: do attacks fire, do they hurt, is the Perfect Dodge
@@ -18,7 +19,7 @@ page.on('pageerror', (e) => errors.push(`${e.message} :: ${(e.stack || '').split
 await page.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled);
 await new Promise((r) => setTimeout(r, 700));
-await page.click('#launchBtn');
+await launchRun(page);
 await new Promise((r) => setTimeout(r, 400));
 await page.evaluate(() => {
   window.RIFT.renderFrame = () => {};

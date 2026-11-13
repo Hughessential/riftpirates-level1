@@ -1,11 +1,13 @@
+import { launchRun } from './helpers/start-run.mjs';
 /** Ending integration + honest escape difficulty. Uses a fresh Chrome profile. */
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
+import { PILOT_IDENTITY_DEFAULTS } from '../src/core/PilotName.js';
 import { AUDIO_DEFAULTS } from '../src/core/SaveSystem.js';
 
 const legacy = { scrapBanked: 321, bestScore: 1234567, bestTime: 900, bestGrade: 'S',
   runs: 11, clears: 4, music: 0, sfx: 1, seenIntro: 1, selectedShip: 'void-corsair' };
-const migratedLegacy = { ...legacy, ...AUDIO_DEFAULTS, lastBankedRunId: '' };
+const migratedLegacy = { ...legacy, ...AUDIO_DEFAULTS, ...PILOT_IDENTITY_DEFAULTS, lastBankedRunId: '' };
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true, protocolTimeout: 180000,
@@ -21,7 +23,8 @@ try {
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   assert.deepEqual(await page.evaluate(() => window.RIFT.save.data), migratedLegacy, 'Existing progress and mute settings survive; new volume controls receive defaults');
-  await page.click('#launchBtn');
+  await launchRun(page);
+  migratedLegacy.pilotNameConfirmed = true;
   await page.evaluate(async () => {
     const g = window.RIFT;
     window.__escapeStep = g.update.bind(g); window.__escapeRender = g.renderFrame.bind(g);

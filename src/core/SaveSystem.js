@@ -3,6 +3,8 @@
  * run upgrades never persist. localStorage with an in-memory fallback so the
  * game still runs when storage is blocked (private windows, file://).
  */
+import { PILOT_IDENTITY_DEFAULTS, validatePilotName } from './PilotName.js';
+
 const KEY = 'riftpirates-level1-v1';
 
 export const AUDIO_DEFAULTS = { musicVolume: .65, sfxVolume: .85 };
@@ -37,6 +39,7 @@ const DEFAULTS = {
   music: 1,
   sfx: 1,
   ...AUDIO_DEFAULTS,
+  ...PILOT_IDENTITY_DEFAULTS,
   seenIntro: 0, // lets us offer a skip on the Nexus cinematic after the first view
   selectedShip: 'rift-talon', // cosmetic hull only; never changes run stats
   lastBankedRunId: '', // additive: prevents a repeated results callback banking twice
@@ -60,6 +63,10 @@ export const Save = {
     for (const [key, fallback] of Object.entries(AUDIO_DEFAULTS)) {
       this.data[key] = clampAudioVolume(this.data[key], fallback);
     }
+    const pilot = validatePilotName(this.data.pilotName);
+    this.data.pilotName = pilot.valid ? pilot.name : PILOT_IDENTITY_DEFAULTS.pilotName;
+    this.data.pilotNameConfirmed = pilot.valid && this.data.pilotNameConfirmed === true;
+    this.data.nameTagVisible = this.data.nameTagVisible !== false;
     return this.data;
   },
 

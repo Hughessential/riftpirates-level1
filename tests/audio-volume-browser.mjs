@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 
@@ -60,7 +61,7 @@ try {
   });
   assert.ok(bounds.bottom < bounds.footer && bounds.right <= 1280, 'Title mixer fits above the route footer');
 
-  await page.click('#launchBtn'); await page.click('#pauseBtn');
+  await launchRun(page); await page.click('#pauseBtn');
   const paused = await page.evaluate(() => ({ time: window.RIFT.runTime, owner: window.RIFT.audio.musicOwner }));
   await page.focus('#musicVolume2'); await page.keyboard.press('ArrowLeft');
   await page.focus('#sfxTgl2'); await page.keyboard.press('Space');

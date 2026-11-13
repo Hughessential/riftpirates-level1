@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'node:fs';
@@ -71,7 +72,7 @@ try {
   const animations = await page.evaluate(() => [...document.querySelectorAll('.menuSpectrum,.riftHalo,.riftOrbit,.riftShard')]
     .map((el) => getComputedStyle(el).animationName));
   assert.ok(animations.every((name) => name === 'none'), 'Menu motion honors reduced motion');
-  await page.click('#launchBtn');
+  await launchRun(page);
   assert.equal(await page.evaluate(() => window.RIFT.running), true, 'Launch starts gameplay');
   assert.equal(await page.evaluate(() => document.getElementById('titleScreen').classList.contains('hidden')), true);
   await page.click('#pauseBtn');
@@ -86,7 +87,7 @@ try {
     g.scrap.wallet.credit(7);
     g.quitRun();
   });
-  assert.equal(await page.$eval('#resultsTitle', (el) => el.textContent), await page.evaluate(() => `${window.RIFT.player.shipName} DESTROYED`), 'Results identify the selected ship');
+  assert.equal(await page.$eval('#resultsTitle', (el) => el.textContent), 'SHIP DESTROYED', 'Failure results stay distinct from victory');
   await page.click('#toTitleBtn');
   const returned = await page.evaluate(() => {
     const g = window.RIFT;
@@ -103,7 +104,7 @@ try {
     titleVisible: true, running: false, activeScrap: false,
     menuHero: true, world: false, debris: false,
   }, 'Returning from results restores the clean title vignette');
-  await page.click('#launchBtn');
+  await launchRun(page);
   assert.equal(await page.evaluate(() => window.RIFT.env.livingDebris.group.visible), true, 'Relaunch restores populated scenery');
   assert.deepEqual(errors, [], 'No menu startup errors');
   console.log('PASS: desktop layout, voxel lettering, reduced motion, launch and return to title.');

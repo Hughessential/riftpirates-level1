@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 /**
  * Real-browser regression coverage for pre-objective augments. The ordinary
  * animation loop is silenced after launch so all gameplay time is advanced
@@ -26,7 +27,7 @@ try {
   });
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.RIFT));
-  await page.click('#launchBtn');
+  await launchRun(page);
   await page.evaluate(() => {
     const g = window.RIFT;
     window.__step = g.update.bind(g);

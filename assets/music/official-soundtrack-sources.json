@@ -32,6 +32,16 @@
     "thepirateking.mp3": {
       "bytes": 4238599,
       "sha256": "49e7e15c793a39c412fd068c631a7fe4b71729b279e5bf33056d5209cf7e9222"
+    },
+    "Afterthefinalescape.mp3": {
+      "source": "User-provided endgame recording, 2026-11-13",
+      "bytes": 4865067,
+      "sha256": "57e4b1e5502d11e3adfd24ee74536968facd94976e5a5e9aae862b36afe54362"
+    },
+    "sorryyoudied.mp3": {
+      "source": "User-provided endgame recording, 2026-11-13",
+      "bytes": 4843469,
+      "sha256": "3e032576c6dfe5a3273bb0cf7f3913d724ca84b47dc8c5d4b58a41f91d32555c"
     }
   }
 }

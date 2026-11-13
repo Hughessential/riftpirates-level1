@@ -8,7 +8,7 @@
     "dev": "vite --host 0.0.0.0 --port 8000",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 8000",
-    "test": "node tests/adaptive-resolution.mjs && node tests/asset-loading.mjs && node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/imported-assets.mjs && node tests/player-fleet.mjs && node tests/augments.mjs && node tests/arsenal.mjs && node tests/weapon-feedback.mjs && node tests/enemy-abilities.mjs && node tests/augment-effects.mjs && node tests/shield-pressure.mjs && node tests/approach-progression.mjs && node tests/level-walkthrough.mjs && node tests/combat-integrity.mjs && node tests/perfect-dodge.mjs && node tests/battle-soundtrack.mjs && node tests/final-escape.mjs",
+    "test": "node tests/adaptive-resolution.mjs && node tests/asset-loading.mjs && node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/imported-assets.mjs && node tests/player-fleet.mjs && node tests/augments.mjs && node tests/arsenal.mjs && node tests/weapon-feedback.mjs && node tests/enemy-abilities.mjs && node tests/augment-effects.mjs && node tests/shield-pressure.mjs && node tests/keyboard-roll.mjs && node tests/approach-progression.mjs && node tests/level-walkthrough.mjs && node tests/combat-integrity.mjs && node tests/perfect-dodge.mjs && node tests/battle-soundtrack.mjs && node tests/final-escape.mjs",
     "test:mayhem": "node tests/mayhem-browser.mjs",
     "test:lab": "node tests/testing-grounds.mjs",
     "test:menu": "node tests/menu-layout.mjs",
@@ -30,7 +30,12 @@
     "test:controllers": "node tests/controller-menus.mjs",
     "test:cards": "node tests/holographic-cards.mjs",
     "test:economy": "node tests/augment-economy.mjs && node tests/loot-economy.mjs && node tests/economy-save.mjs",
-    "test:cosmic": "node tests/cosmic-augments.mjs && node tests/cosmic-effects.mjs"
+    "test:cosmic": "node tests/cosmic-augments.mjs && node tests/cosmic-effects.mjs",
+    "test:endgame": "node tests/run-results.mjs && node tests/pilot-identity.mjs && node tests/endgame-music.mjs && node tests/pilot-identity-browser.mjs && node tests/victory-presentation.mjs",
+    "test:keyboard": "node tests/keyboard-roll.mjs",
+    "test:cursor": "node tests/menu-cursor-trail.mjs",
+    "test:autoplay": "node tests/title-autoplay.mjs",
+    "test:audio-integrity": "node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/audio-mix.mjs && node tests/title-autoplay.mjs && node tests/audio-volume-browser.mjs && node tests/battle-soundtrack.mjs && node tests/endgame-music.mjs"
   },
   "private": true,
   "devDependencies": {

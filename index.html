@@ -208,28 +208,55 @@
 
 <!-- ======================= results ======================= -->
 <div id="resultsScreen" class="screen hidden">
-  <div class="eyebrow" id="resultsEyebrow">RUN TERMINATED</div>
-  <h2 id="resultsTitle">STAR HOPPER DESTROYED</h2>
-  <div id="deathLine" class="hidden"></div>
-
-  <div id="scoreRow">
-    <div id="gradeVal" class="grade gD">D</div>
-    <div id="scoreCol">
-      <b id="scoreBig">0</b>
-      <span>FINAL SCORE</span>
-      <small>BEST <b id="bestScoreVal">0</b></small>
-      <div id="newBest" class="hidden">NEW BEST</div>
-    </div>
-  </div>
-
-  <div id="resultsGrid"></div>
-
-  <div class="buildLbl">RUN BUILD</div>
-  <div id="resultsBuild"></div>
-
-  <div class="row">
-    <button class="btnBig" id="againBtn">RUN AGAIN</button>
-    <button class="btnGhost" id="toTitleBtn">TITLE</button>
+  <canvas id="victoryParticles" aria-hidden="true"></canvas>
+  <div class="resultsShell">
+    <header class="resultsHeader">
+      <div class="eyebrow" id="resultsEyebrow">RUN TERMINATED</div>
+      <span class="resultsTransmission" aria-hidden="true">RIFT / 01 // END TRANSMISSION</span>
+    </header>
+    <section class="resultsHero" aria-label="Run outcome and pilot">
+      <div class="resultsHeroCopy">
+        <h2 id="resultsTitle">SHIP DESTROYED</h2>
+        <p id="resultsSubtitle"></p>
+        <div id="deathLine" class="hidden"></div>
+      </div>
+      <div class="resultsShipStage">
+        <div class="resultsOrbit" aria-hidden="true"></div>
+        <div class="resultsOrbit orbitTwo" aria-hidden="true"></div>
+        <img id="resultsShipImage" alt="" hidden>
+        <span id="resultsShipFallback" aria-hidden="true">◆</span>
+        <div class="resultsIdentity"><span>CAPTAIN /</span><strong id="resultsPilotName" class="pilotNameText">PIRATE</strong><small id="resultsShipName">STAR HOPPER</small></div>
+      </div>
+    </section>
+    <section class="resultsReport" aria-label="Final results">
+      <div id="scoreRow">
+        <div class="resultsRank"><span>EARNED RANK</span><div id="gradeVal" class="grade gD">D</div></div>
+        <div id="scoreCol">
+          <span>FINAL SCORE</span><b id="scoreBig">0</b>
+          <small>PERSONAL BEST <b id="bestScoreVal">0</b></small>
+          <div id="newBest" class="hidden">NEW PERSONAL BEST</div>
+        </div>
+      </div>
+      <div class="resultsRecap"><div class="resultsSectionLabel">FLIGHT RECORDER <span>// ACTUAL RUN DATA</span></div><div id="resultsGrid"></div></div>
+    </section>
+    <section class="resultsBuildPanel" aria-label="Final augment build">
+      <div class="resultsBuildHeader">
+        <div class="buildLbl">FINAL BUILD <span>// INSTALLED AUGMENTS</span></div>
+        <button id="resultsBuildToggle" class="btnGhost" aria-expanded="false" aria-controls="resultsBuild" hidden>SHOW FULL BUILD</button>
+        <div class="resultsBuildPaging" hidden>
+          <button id="resultsBuildPrevious" class="btnGhost" aria-label="Show previous augments">BUILD UP ↑</button>
+          <button id="resultsBuildNext" class="btnGhost" aria-label="Show next augments">BUILD DOWN ↓</button>
+        </div>
+      </div>
+      <div id="resultsBuild" tabindex="0" aria-label="Installed augments and ranks"></div>
+    </section>
+    <footer class="resultsActions">
+      <button class="btnBig" id="againBtn">RUN AGAIN <span aria-hidden="true">›</span></button>
+      <button class="btnGhost" id="toTitleBtn">MAIN TITLE</button>
+      <button class="btnGhost" id="victorySkip" hidden>SHOW FINAL SCORE <span aria-hidden="true">»</span></button>
+      <span class="resultsReviewHint">YOUR RUN. YOUR SHIP. YOUR LEGEND.</span>
+    </footer>
+    <div id="resultsAnnouncement" class="resultsScreenReader" role="status" aria-live="polite"></div>
   </div>
 </div>
 

@@ -248,7 +248,7 @@ try {
   const saveIsolation = await page.evaluate(() => {
     const g = window.RIFT;
     g.scrap.wallet.credit(123456); g.score.total = 987654;
-    g.showResults({ victory: true });
+    g.testing.previewEnding(true);
     const afterResults = JSON.stringify(g.save.data);
     g.testing.exit();
     const afterExit = JSON.stringify(g.save.data);

@@ -197,6 +197,7 @@ class InputImpl {
     });
     addEventListener('blur', () => {
       this._keys = {};
+      this._rollQueue = 0;
       this.boost = false;
       fOff();
       stickEnd();
@@ -233,7 +234,9 @@ class InputImpl {
       this._navRepeat = {};
       this._padX = this._padY = this._camX = this._camY = 0;
       this._padBoost = this._padBrake = this._padFire = this._padAim = false;
-      this._rollQueue = 0;
+      // Keyboard Q/E uses the same queue. Preserve fresh key presses through
+      // ordinary no-controller polling; only a real disconnect cancels input.
+      if (this.padLost) this._rollQueue = 0;
       this.capture = null;
       return;
     }

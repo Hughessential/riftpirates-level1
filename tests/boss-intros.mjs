@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'node:fs';
@@ -32,7 +33,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled);
-  await page.click('#launchBtn');
+  await launchRun(page);
   await page.evaluate(() => {
     const g = window.RIFT;
     window.__introStep = g.update.bind(g);

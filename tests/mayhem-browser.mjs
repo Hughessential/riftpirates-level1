@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +21,7 @@ try {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT?.augmentEffects && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
-  await page.click('#launchBtn');
+  await launchRun(page);
   await page.waitForFunction((kinds) => kinds.every((kind) => window.RIFT.audio.buffers[`weapon_${kind}`]?.duration > 0),
     { timeout: 120000 }, Object.keys(WEAPON_AUDIO));
   const audio = await page.evaluate(async (kinds) => {

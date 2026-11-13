@@ -1,0 +1,85 @@
+/* Endings share the real recorder, but the escaped ship owns the victory stage. */
+#resultsScreen{padding:clamp(16px,3.2vmin,34px);gap:0;justify-content:flex-start;background:#02030a;backdrop-filter:none;isolation:isolate;color:#cce8e7}
+#resultsScreen::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 80% 18%,#36115b66,transparent 44%),radial-gradient(ellipse at 8% 78%,#005a5129,transparent 46%),linear-gradient(140deg,#030609,#060313 65%,#020306)}
+#victoryParticles{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;filter:none!important;transform:none!important}
+.resultsShell{position:relative;z-index:1;flex:none;width:min(1260px,100%);margin:auto;text-align:left}
+.resultsHeader{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:14px;border-bottom:1px solid #29ffe478;background:linear-gradient(90deg,#03050bf2,#050713d9)}
+#resultsEyebrow{color:#aaff32;text-shadow:0 0 12px #6dff2444;font-size:10px;letter-spacing:.22em;line-height:1.6}
+.resultsTransmission{color:#84769e;font-size:8px;letter-spacing:.14em}
+.resultsHero{display:grid;grid-template-columns:1.15fr 1fr;align-items:center;min-height:268px;gap:26px;padding:20px 12px 18px}
+#resultsTitle{margin:0;color:#f08aab;font-size:clamp(22px,3vw,42px);font-style:normal;line-height:1.15;letter-spacing:.08em}
+.victoryResults #resultsTitle{display:grid;gap:5px;max-width:620px;filter:drop-shadow(0 0 8px #24ffe040)}
+#resultsTitle>span{display:block;line-height:0}
+#resultsTitle svg{display:block;width:100%;height:88px;overflow:visible}
+#resultsSubtitle{margin:16px 0 0;color:#b0ff41;font-size:9px;letter-spacing:.1em;line-height:1.7}
+#resultsScreen #deathLine{margin-top:17px;color:#eb84a8;font-size:10px;letter-spacing:.1em;line-height:1.7}
+.resultsShipStage{height:245px;position:relative;display:flex;align-items:center;justify-content:center;min-width:0;isolation:isolate}
+.resultsShipStage::before{content:"";position:absolute;width:75%;height:68%;border-radius:50%;background:radial-gradient(ellipse,#641bb44a,transparent 67%);z-index:-1}
+#resultsShipImage{width:min(400px,100%);height:245px;object-fit:contain;transform:translateY(-18px) scale(1.24);filter:drop-shadow(0 4px 4px #000) drop-shadow(0 0 14px #1fffe047);animation:escapedShipFloat 6s ease-in-out infinite}
+#resultsShipFallback{color:#25f5d8;font-size:74px;text-shadow:0 0 22px #6929dd;transform:translateY(-20px)}
+.resultsOrbit{position:absolute;left:7%;top:19%;width:86%;height:51%;border:1px solid #2cffe155;border-radius:50%;transform:rotate(-19deg);box-shadow:0 0 20px #29ffe009;z-index:-1}
+.resultsOrbit::before,.resultsOrbit::after{content:"";position:absolute;width:5px;height:5px;background:#31fff0;box-shadow:0 0 12px #31fff0;transform:rotate(45deg);top:40%;left:-2px}
+.resultsOrbit::after{left:auto;right:-2px;background:#cb49ff;box-shadow:0 0 10px #cb49ff}
+.resultsOrbit.orbitTwo{transform:rotate(18deg);border-color:#ad4de448;top:17%;height:54%;left:13%;width:74%}
+.resultsIdentity{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:9px;text-align:center;background:linear-gradient(90deg,transparent,#02060be8 15%,#02060be8 85%,transparent);padding:10px}
+.resultsIdentity>span{font-size:8px;color:#768e99;letter-spacing:.12em}
+#resultsPilotName{color:#8dfff4;font-size:18px;letter-spacing:.1em;text-shadow:0 0 9px #16ffdf66;font-family:'Rift Pixel',system-ui,sans-serif;overflow-wrap:anywhere;max-width:100%}
+#resultsShipName{display:block;width:100%;color:#bc8ae6;font-size:9px;letter-spacing:.16em}
+.resultsReport{display:grid;grid-template-columns:.86fr 1.4fr;gap:28px;background:#040710ed;border:1px solid #304754;border-left:2px solid #25eed2;padding:20px 24px;box-shadow:0 8px 40px #0008;position:relative}
+.resultsReport::before{content:"";position:absolute;top:-1px;right:-1px;width:80px;height:2px;background:#bd3dff;box-shadow:0 0 12px #a528ff88}
+#resultsScreen #scoreRow{margin:0;align-self:center;gap:22px;min-width:0}
+.resultsRank{display:flex;flex-direction:column;gap:10px;align-items:center;flex:none}
+.resultsRank>span{font-size:7px;color:#8c9dac;letter-spacing:.14em}
+#resultsScreen .grade{width:76px;height:80px;border-radius:0;border:1px solid currentColor;font-size:43px;font-style:normal;background:linear-gradient(135deg,#0a1225,#05050c);clip-path:polygon(15% 0,100% 0,100% 85%,85% 100%,0 100%,0 15%);animation:none}
+#resultsScreen .grade.gS{color:#b0ff42;box-shadow:inset 0 0 30px #8aff2715}
+#resultsScreen .grade.gSplus{color:#df7bff;box-shadow:inset 0 0 30px #c939ff25}
+#resultsScreen #scoreCol{min-width:0;line-height:1.25}
+#resultsScreen #scoreCol>span{font-size:8px;color:#80a0ab;letter-spacing:.2em}
+#resultsScreen #scoreBig{font-size:clamp(28px,3.3vw,45px);color:#52ffee;text-shadow:0 0 19px #21f9d83d;letter-spacing:-.03em;margin:8px 0;white-space:nowrap}
+#resultsScreen #scoreCol small{font-size:8px;letter-spacing:.04em;color:#8a99b5;line-height:1.9}
+#resultsScreen #scoreCol small b{color:#c3c8d6}
+#resultsScreen #newBest{font-size:7px;padding:4px 6px;color:#beff54;background:#192808;border:1px solid #91df3c55;border-radius:0;letter-spacing:.1em;animation:none;margin-top:9px;line-height:1.4}
+.resultsSectionLabel,.buildLbl{font-size:9px;letter-spacing:.14em;color:#58e8da;line-height:1.5}
+.resultsSectionLabel span,.buildLbl span{color:#807395;font-size:7px}
+#resultsScreen #resultsGrid{width:100%;margin-top:12px;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 22px}
+#resultsScreen .rrow{padding:5px 0;font-size:8px;letter-spacing:.035em;gap:9px;border-color:#192232;color:#8c9da8;line-height:1.5}
+#resultsScreen .rrow b{font-size:10px;color:#d1e7e6;white-space:nowrap;text-align:right;flex:none}
+#resultsScreen .rrow:nth-child(n+11) b{color:#b6f4ed}
+.resultsBuildPanel{margin-top:18px;padding:0 0 16px;border-bottom:1px solid #714b916b}
+#resultsScreen .buildLbl{margin:0 0 10px}
+#resultsScreen #resultsBuild{width:100%;max-width:none;justify-content:flex-start;max-height:76px;overflow-y:auto;scrollbar-color:#7c3ba6 #0c091a;padding:2px 2px 6px;gap:6px}
+#resultsScreen #resultsBuild:focus-visible{outline:1px solid #3fffe4;outline-offset:3px}
+#resultsScreen .chip{font-size:8px;font-weight:400;line-height:1.5;padding:5px 8px;letter-spacing:.04em;border-radius:0;border-color:#34434c;background:#060b12;max-width:100%;overflow-wrap:anywhere}
+.resultsActions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding-top:18px}
+#resultsScreen .btnBig{font-size:13px;letter-spacing:.12em;padding:15px 24px;border:1px solid #35ffe4;background:linear-gradient(135deg,#0b282d,#070c18);color:#88fff1;border-radius:0;box-shadow:0 4px 0 #6c1e9b,0 0 20px #25ffe118;min-width:180px}
+#resultsScreen .btnBig span{margin-left:16px;color:#dca0ff}
+#resultsScreen .btnGhost{font-size:10px;letter-spacing:.06em;padding:15px 18px;background:#060912;border-color:#425065;color:#a1bfca;border-radius:0;white-space:nowrap}
+#resultsScreen button:hover,#resultsScreen button:focus-visible{color:#e3fffa;border-color:#87fff0;box-shadow:0 0 16px #24ffe13a;outline:2px solid #49ffdf;outline-offset:3px}
+#resultsScreen #victorySkip{border-style:dashed;color:#c5a0e9;font-size:9px}
+.resultsReviewHint{margin-left:auto;font-size:7px;color:#8b789d;letter-spacing:.08em}
+.resultsScreenReader{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.deathResults::before{background:radial-gradient(ellipse at 75% 18%,#44162d55,transparent 50%),linear-gradient(130deg,#060509,#09040c)!important}
+.deathResults #resultsEyebrow{color:#ee8aa8;text-shadow:none}
+.deathResults .resultsHeader{border-color:#854259}
+.deathResults .resultsOrbit{display:none}
+.deathResults #resultsShipImage{filter:grayscale(.7) brightness(.5);animation:none}
+.deathResults #resultsSubtitle{color:#a98b9a}
+.deathResults .resultsReport{border-left-color:#db6e96}
+.deathResults #scoreBig{color:#e5b7ca!important;text-shadow:none!important}
+.deathResults .resultsHero{min-height:230px}
+.calmVictory #resultsShipImage{animation:none}
+@keyframes escapedShipFloat{0%,100%{transform:translateY(-18px) scale(1.24)}50%{transform:translateY(-24px) scale(1.24)}}
+@media(min-width:1600px) and (min-height:950px){.resultsShell{width:min(1440px,92%)}.resultsHero{min-height:340px}.resultsShipStage{height:300px}#resultsShipImage{height:300px;width:460px}#resultsTitle svg{height:110px}.resultsReport{padding:26px 30px}.resultsActions{padding-top:24px}}
+@media(max-width:1050px){.resultsReport{grid-template-columns:.75fr 1.25fr;padding:18px;gap:18px}#resultsScreen #scoreRow{gap:12px;flex-direction:column}#resultsScreen #scoreCol{text-align:center}.resultsRank{gap:5px}#resultsScreen .grade{height:58px;width:60px;font-size:32px}#resultsScreen .rrow{font-size:7px}#resultsScreen #scoreBig{font-size:34px}.resultsReviewHint{display:none}}
+@media(max-width:720px){#resultsScreen{padding:18px 14px}.resultsHeader{gap:10px}.resultsTransmission{display:none}#resultsEyebrow{font-size:8px}.resultsHero{grid-template-columns:1fr;gap:0;padding:23px 4px 14px}.resultsHeroCopy{text-align:center}#resultsTitle svg{height:65px}.resultsShipStage{height:200px}#resultsShipImage{height:210px;width:310px}.resultsIdentity{bottom:2px}#resultsSubtitle{font-size:8px;margin-top:12px}.resultsReport{grid-template-columns:1fr;gap:20px;padding:18px 13px}#resultsScreen #scoreRow{flex-direction:row;justify-content:center;gap:22px}#resultsScreen #scoreCol{text-align:left}#resultsScreen #scoreBig{font-size:35px}#resultsScreen #resultsGrid{gap:3px 14px}#resultsScreen .rrow{font-size:7px}#resultsScreen .rrow b{font-size:9px}.resultsSectionLabel span{display:none}#resultsScreen #resultsBuild{max-height:100px}.resultsActions{position:sticky;bottom:-18px;background:#02040bf5;padding:14px 0 12px;gap:10px;z-index:2}#resultsScreen .btnBig{min-width:0;flex:1;padding:14px;font-size:11px}#resultsScreen .btnGhost{padding:14px 12px;font-size:9px}#resultsScreen #victorySkip{width:100%;padding:10px}.resultsBuildPanel{margin-top:16px}.deathResults .resultsHero{min-height:0}}
+@media(max-width:390px){#resultsScreen #resultsGrid{grid-template-columns:1fr}#resultsTitle svg{height:56px}.buildLbl span{display:none}}
+@media(prefers-reduced-motion:reduce){#resultsScreen *,#resultsScreen *::before,#resultsScreen *::after{animation:none!important;transition:none!important}}
+/* Long builds can be inspected with native controls on any gamepad. Expanded
+   lists still have a bounded viewport and explicit page controls for lab builds. */
+.resultsBuildHeader{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+#resultsScreen .resultsBuildHeader .buildLbl{margin:0 auto 0 0}
+#resultsScreen .resultsBuildHeader .btnGhost{font-size:7px;padding:7px 9px;min-height:28px}
+.resultsBuildPaging{display:flex;gap:7px}
+.resultsBuildPaging[hidden]{display:none}
+#resultsScreen .resultsBuildPaging button:disabled{opacity:.35;cursor:default}
+#resultsScreen.expandedBuild #resultsBuild{max-height:min(36vh,300px)}

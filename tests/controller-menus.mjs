@@ -45,6 +45,9 @@ try {
   await page.evaluate(() => { __go('#hangarConfirm'); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.hangar.dialog.open), false);
   await page.evaluate(() => { __go('#launchBtn'); __press(0); });
+  assert.equal(await page.evaluate(() => RIFT.pilotIdentity.dialog.open), true, 'First flight offers pilot creation');
+  await page.evaluate(() => { __go('#pilotNameInput'); __press(0); __go('[data-key="clear"]'); __press(0); __go('[data-key="A"]'); __press(0); __go('[data-key="-"]'); __press(0); __go('[data-key="1"]'); __press(0); __press(1); __go('#pilotNameConfirm'); __press(0); });
+  assert.equal(await page.evaluate(() => RIFT.runPilotName), 'A-1', 'Controller keyboard creates and snapshots a pilot name');
   assert.equal(await page.evaluate(() => RIFT.running), true);
   await page.evaluate(() => { RIFT.scrap.wallet.credit(5000); RIFT.upgradeScreen.show(1, '#22ffee', () => {}); __input.enabled=false; __tick(); __press(15); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), 1, 'Augment selection installs exactly one upgrade');
@@ -94,6 +97,14 @@ try {
   assert.equal(await page.evaluate(() => RIFT.testingPanel.activeTab), 'effects');
   await page.evaluate(() => { __go('#labBloom'); __press(15); __go('[data-sound]'); __press(0); __go('#labExit'); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.testing.active), false);
+
+  // South skips the celebratory reveal before becoming the retry action.
+  await page.evaluate(() => { __go('#testingGroundsBtn'); __press(0); __go('#labTab-arena'); __press(0); __go('[data-action="victory"]'); __press(0); });
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'victorySkip', 'Controller starts on the reveal skip action');
+  await page.evaluate(() => __press(0));
+  assert.equal(await page.evaluate(() => RIFT.resultsScreen.presentation.revealing), false);
+  assert.equal(await page.evaluate(() => RIFT.running), false, 'Skipping reveal does not start a new run');
+  await page.evaluate(() => __press(1));
 
   // Existing assignments swap, so remapping confirm onto Back cannot strand the menu.
   await page.evaluate(() => { __go('#controllerSettingsBtn'); __press(0); __go('[data-bind="fire"]'); __press(0); __press(1); });

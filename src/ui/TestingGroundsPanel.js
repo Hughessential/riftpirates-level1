@@ -63,6 +63,7 @@ export class TestingGroundsPanel {
             <div class="labControlRow"><label>SIMULATION SPEED<select id="labTimeScale">${[[.25, '0.25× / FRAME STUDY'], [.5, '0.5× / SLOW MOTION'], [1, '1× / REAL TIME'], [2, '2× / FAST FORWARD']].map(option).join('')}</select></label><label>PLAYER LEVEL<select id="labXPLevel">${Array.from({ length: 18 }, (_, i) => option([i + 1, `LEVEL ${i + 1}`])).join('')}</select></label><button type="button" data-action="xp">SET LEVEL</button></div>
             <div class="labActionGrid"><button type="button" data-action="restore">RESTORE HULL + SHIELD</button><button type="button" data-action="damage">TAKE 40 DAMAGE</button><button type="button" data-action="shield">BREAK SHIELD</button><button type="button" data-action="dodge">TRIGGER PERFECT DODGE</button></div>
             <p class="labHint">Damage controls deliberately bypass god mode so you can test shield-break and low-health effects.</p>
+            <div class="labActionGrid"><button type="button" data-action="identity">EDIT TEST PILOT / NAME TAG</button></div>
           </section>
           <section class="labPage" id="labPage-augments" role="tabpanel" aria-labelledby="labTab-augments" hidden>
             <div class="labSectionHead"><div><span class="labEyebrow">${Object.keys(UPGRADES).length} AUGMENTS / EVERY COMBINATION</span><h3>BUILD A MONSTER</h3></div><span class="labPill" id="labBuildCount">0 STACKS</span></div>
@@ -76,6 +77,7 @@ export class TestingGroundsPanel {
             <div class="labControlRow labSceneControls"><label>DESTINATION<select id="labScene">${SCENES.map(option).join('')}</select></label><button type="button" data-action="scene" class="labPrimary">LOAD SCENE →</button></div>
             <div class="labControlRow"><label>ADMIRAL PHASE<select id="labBossPhase">${[[1, '01 / RIFT ADMIRAL'], [2, '02 / RIFT UNLEASHED'], [3, '03 / NEXUS OVERDRIVE'], [4, '04 / TOTAL DOMINION']].map(option).join('')}</select></label><button type="button" data-action="phase">LOAD BOSS PHASE</button></div>
             <button type="button" data-action="intro">PLAY SELECTED BOSS INTRO</button>
+            <div class="labActionGrid"><button type="button" data-action="victory">PREVIEW VICTORY</button><button type="button" data-action="defeat">PREVIEW DEATH</button></div>
             <p class="labHint">Choose a tower, Inhibitor or Admiral, then PLAY INTRO to watch its arrival. Scene changes keep your ship, augments and overrides. Load FINAL ESCAPE to retry the collapse; turn god mode and infinite boost off to test difficulty.</p>
             <div class="labSectionHead labSubhead"><h3>POPULATE THE RANGE</h3><span>SHIPS / TARGETS / DODGE PATTERNS</span></div>
             <div class="labControlRow"><label>ENEMY SHIP<select id="labEnemyType">${[['scout', 'SCOUT / MICRO RECON'], ['gunship', 'GUNSHIP'], ['heavy', 'HEAVY GUNNER'], ['elite', 'ELITE CAPTAIN'], ['shielder', 'SHIELD DRONE']].map(option).join('')}</select></label><label>COUNT<select id="labEnemyCount">${[1, 3, 5, 10].map(n => option([n, `${n} SHIP${n > 1 ? 'S' : ''}`])).join('')}</select></label><button type="button" data-action="enemy">SPAWN</button></div>
@@ -184,7 +186,7 @@ export class TestingGroundsPanel {
     // Capture before gameplay's global keys: typing a name must never fly,
     // fire, roll, pause, or pick a card underneath the native dialog.
     this._keyDown = event => {
-      if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open]')) return;
+      if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open],#pilotIdentityDialog[open]')) return;
       const editing = /^(INPUT|SELECT|TEXTAREA)$/.test(event.target?.tagName);
       const shortcut = event.code === 'F2' || (event.code === 'Backquote' && !editing);
       if (shortcut || (this.dialog.open && event.code === 'Escape')) {
@@ -207,7 +209,7 @@ export class TestingGroundsPanel {
         event.stopImmediatePropagation();
       }
     };
-    this._keyUp = event => { if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open]')) return; if (this.dialog.open || event.code === 'F2' || event.code === 'Backquote') event.stopImmediatePropagation(); };
+    this._keyUp = event => { if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open],#pilotIdentityDialog[open]')) return; if (this.dialog.open || event.code === 'F2' || event.code === 'Backquote') event.stopImmediatePropagation(); };
     window.addEventListener('keydown', this._keyDown, true);
     window.addEventListener('keyup', this._keyUp, true);
   }
@@ -216,6 +218,9 @@ export class TestingGroundsPanel {
     const value = id => this.dialog.querySelector(`#${id}`).value;
     const t = this.testing;
     const actions = {
+      identity: [() => t.game.pilotIdentity?.open(), 'TEST IDENTITY / NEVER SAVED.'],
+      victory: [() => t.previewEnding(true), 'VICTORY PREVIEW / NO PROGRESS SAVED.'],
+      defeat: [() => t.previewEnding(false), 'DEATH PREVIEW / NO PROGRESS SAVED.'],
       restore: [() => t.restorePlayer(), 'HULL, SHIELD AND BOOST RESTORED.'],
       damage: [() => t.damagePlayer(40), 'APPLIED 40 TEST DAMAGE.'],
       shield: [() => t.breakShield(), 'SHIELD BROKEN. CLOSE THE CONSOLE TO TEST RECOVERY.'],

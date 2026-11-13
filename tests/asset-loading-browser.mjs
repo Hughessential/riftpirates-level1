@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 
@@ -35,7 +36,7 @@ try {
       return ids.size;
     });
     assert.equal(loaded, mode === 'missing' ? 0 : 7, 'Fallback or full authored models match the network outcome');
-    await page.click('#launchBtn');
+    await launchRun(page);
     assert.equal(await page.evaluate(() => window.RIFT.running), true, 'Asset failure cannot leave Launch locked');
     assert.deepEqual(errors, [], 'No startup/gameplay exceptions after asset failure');
     console.log(`PASS: ${mode} voxel requests still reach a playable game`);

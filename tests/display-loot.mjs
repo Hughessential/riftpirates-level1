@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import puppeteer from 'puppeteer-core';
@@ -96,7 +97,7 @@ try {
     console.log(`${width}×${height} @${dpr}x: camera, canvas, postprocessing and menu aligned`);
   }
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
-  await page.click('#launchBtn');
+  await launchRun(page);
   await page.evaluate(() => {
     const g = window.RIFT; g.director.go('TRAVERSAL_1'); g.director.clearPresentation();
     g.enemies.clear(); g.clearHazards(); g.scrap.reset();

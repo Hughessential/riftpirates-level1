@@ -185,6 +185,9 @@ export class TestingGrounds {
     g.director.clearPresentation();
     g.escape.dispose();
     g._resultsFinalized = false;
+    g._terminalOutcome = null;
+    g.escapeMargin = null;
+    g.runId = globalThis.crypto?.randomUUID?.() || `lab-${Date.now()}-${Math.random()}`;
     g._escapeCleared = false;
     g.killedBy = '';
     this._disposeDummies(); this._disposeEncounter();
@@ -216,7 +219,7 @@ export class TestingGrounds {
       g.setWorldMood(0x6d44ff, 1, .78);
       g.camera3.setMode('tower');
       g.hud.clearObjective(); g.hud.el.objective.textContent = 'TESTING GROUNDS / FREE FLIGHT';
-      Audio2.playMusic('level1_a', .5);
+      Audio2.playGameplay(.5);
     }
     if (id === 'boss' && !introOnly) for (const eye of g.encounter.parts.eyes) eye.material.opacity = 1;
     clearTimeout(g.director._tcT);
@@ -242,6 +245,30 @@ export class TestingGrounds {
   }
 
   clearArena() { this.loadScene('sandbox'); }
+
+  /** Explicit lab-only ending preview: never a real clear or paid reward. */
+  previewEnding(victory = true) {
+    if (!this.active || !this.game.testRun) return false;
+    const g = this.game;
+    if (g._terminalOutcome) this.loadScene('sandbox');
+    this.setPanelOpen(false);
+    g.death.end();
+    g.director.clearPresentation();
+    if (victory) {
+      g._terminalOutcome = 'victory';
+      g._escapeCleared = true;
+      g.escapeMargin = null; // A preview has no measured escape margin.
+      g.player.frozen = true;
+      g.director.go(STATE.VICTORY);
+      g.showResults({ victory: true });
+    } else {
+      g.player.health = 0;
+      g.player.alive = false;
+      g._onPlayerDeath('TEST PREVIEW');
+    }
+    this.changed();
+    return true;
+  }
 
   spawnEnemy(type, count = 1) {
     if (!this.active || !Object.hasOwn(ENEMY_TYPES, type)) return [];

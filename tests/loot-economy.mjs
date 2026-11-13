@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { RunWallet } from '../src/systems/RunWallet.js';
@@ -155,7 +156,7 @@ if (process.env.RIFT_LOOT_BROWSER === '1') {
     page.on('pageerror',error=>errors.push(error.message));
     await page.goto('http://localhost:8000/',{waitUntil:'domcontentloaded',timeout:120000});
     await page.waitForFunction(()=>window.RIFT&&!document.getElementById('launchBtn').disabled,{timeout:120000});
-    await page.click('#launchBtn');
+    await launchRun(page);
     await page.evaluate(()=>{
       const g=RIFT; window.__stepLoot=g.update.bind(g); g.update=()=>{}; g.renderFrame=()=>{};
       g.enemies.update=()=>{}; g.collisions.update=()=>{}; g.player.takeDamage=()=>false;

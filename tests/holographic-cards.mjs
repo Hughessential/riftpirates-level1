@@ -1,3 +1,4 @@
+import { launchRun } from './helpers/start-run.mjs';
 /** Browser coverage for the reusable card presentation and the existing cache input path. */
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -26,7 +27,7 @@ try {
   });
   await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
-  await page.click('#launchBtn');
+  await launchRun(page);
   await page.evaluate(async () => {
     // Reuse the exact Vite module URLs, including HMR query strings, to avoid duplicate singletons.
     const loaded = path => performance.getEntriesByType('resource').find(entry => new URL(entry.name).pathname.endsWith(path))?.name;
