@@ -161,9 +161,9 @@ export class ShipHangar {
   update(dt) {
     if (!this.dialog.open) return;
     const nav = Input.menuNav;
-    if (nav.left || nav.up) this.advance(-1);
-    else if (nav.right || nav.down) this.advance(1);
-    if (nav.confirm) this.close();
+    if (!Input.menuRouting && (nav.left || nav.up)) this.advance(-1);
+    else if (!Input.menuRouting && (nav.right || nav.down)) this.advance(1);
+    if (!Input.menuRouting && nav.confirm) this.close();
     if (!this.reducedMotion.matches) this.time += dt;
     const model = this.models.get(this.selectedId);
     if (model) model.rotation.y = Math.sin(this.time * 0.32) * 0.48;

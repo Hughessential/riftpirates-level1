@@ -8,7 +8,7 @@
     "dev": "vite --host 0.0.0.0 --port 8000",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 8000",
-    "test": "node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/imported-assets.mjs && node tests/player-fleet.mjs && node tests/augments.mjs && node tests/arsenal.mjs && node tests/weapon-feedback.mjs && node tests/enemy-abilities.mjs && node tests/augment-effects.mjs && node tests/shield-pressure.mjs && node tests/approach-progression.mjs && node tests/level-walkthrough.mjs && node tests/combat-integrity.mjs && node tests/perfect-dodge.mjs && node tests/battle-soundtrack.mjs && node tests/final-escape.mjs",
+    "test": "node tests/adaptive-resolution.mjs && node tests/asset-loading.mjs && node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/imported-assets.mjs && node tests/player-fleet.mjs && node tests/augments.mjs && node tests/arsenal.mjs && node tests/weapon-feedback.mjs && node tests/enemy-abilities.mjs && node tests/augment-effects.mjs && node tests/shield-pressure.mjs && node tests/approach-progression.mjs && node tests/level-walkthrough.mjs && node tests/combat-integrity.mjs && node tests/perfect-dodge.mjs && node tests/battle-soundtrack.mjs && node tests/final-escape.mjs",
     "test:mayhem": "node tests/mayhem-browser.mjs",
     "test:lab": "node tests/testing-grounds.mjs",
     "test:menu": "node tests/menu-layout.mjs",
@@ -24,7 +24,10 @@
     "test:intros": "node tests/boss-intros.mjs",
     "test:audio": "node tests/audio-volume-browser.mjs",
     "test:carnage": "node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/escape-carnage.mjs",
-    "test:pages": "node tests/pages-smoke.mjs"
+    "test:pages": "node tests/pages-smoke.mjs",
+    "test:assets": "node tests/asset-loading.mjs && node tests/imported-assets.mjs && node tests/player-fleet.mjs && node tests/asset-loading-browser.mjs",
+    "test:render": "node tests/adaptive-resolution.mjs && node tests/render-performance.mjs",
+    "test:controllers": "node tests/controller-menus.mjs"
   },
   "private": true,
   "devDependencies": {

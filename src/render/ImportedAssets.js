@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { VOXLoader, buildMesh } from 'three/addons/loaders/VOXLoader.js';
+import { fetchAssetBuffer } from '../core/AssetLoader.js';
 
 /** Curated original models from the user's asset archive, stored locally. */
 export const IMPORTED_ASSETS = {
@@ -101,11 +102,8 @@ export function preloadImportedAssets(onProgress = () => {}) {
   let completed = 0;
   loading = Promise.all(entries.map(async ([id, asset]) => {
     try {
-      const response = await fetch(`${import.meta.env?.BASE_URL || './'}voxels/${asset.file}`, {
-        signal: AbortSignal.timeout(12000),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      registerImportedAsset(id, await response.arrayBuffer());
+      const buffer = await fetchAssetBuffer(`${import.meta.env?.BASE_URL || './'}voxels/${asset.file}`);
+      registerImportedAsset(id, buffer);
     } catch (error) {
       console.warn(`Using procedural fallback for ${asset.name}: ${error.message}`);
     } finally {

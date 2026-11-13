@@ -10,5 +10,14 @@ export default defineConfig({
   publicDir: 'assets',
   build: {
     target: 'es2022',
+    // Keep the renderer cached across gameplay/UI releases instead of making
+    // returning players download the whole engine with every game change.
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'three', test: /node_modules[\\/]three[\\/]/ }],
+        },
+      },
+    },
   },
 });

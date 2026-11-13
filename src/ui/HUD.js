@@ -2,6 +2,13 @@ import { P } from '../core/Palette.js';
 import { $, clamp } from '../core/Utils.js';
 import { weaponPowerSignature, primaryWeaponOutput } from '../config/weapons.js';
 
+// Reassigning textContent recreates text nodes even when the displayed value
+// has not changed. Most HUD values are stable across many 20 Hz updates.
+function writeText(element, value) {
+  const text = String(value);
+  if (element.textContent !== text) element.textContent = text;
+}
+
 /**
  * Persistent HUD (spec §42). The level badge is welded to the left end of the
  * health bar, League-style (Player notes) — it must stay legible at all times.
@@ -46,6 +53,12 @@ export class HUD {
     this.arsenal.id = 'arsenalReadout';
     this.arsenal.innerHTML = '<small>REACTOR / TIER 0</small><strong>PULSE</strong><span class="arsenalStats"></span><span class="arsenalMods"></span>';
     this.el.hud.append(this.arsenal);
+    this.arsenalFields = {
+      tier: this.arsenal.querySelector('small'),
+      label: this.arsenal.querySelector('strong'),
+      stats: this.arsenal.querySelector('.arsenalStats'),
+      mods: this.arsenal.querySelector('.arsenalMods'),
+    };
     this.augmentFlash = 0;
   }
 
@@ -108,16 +121,16 @@ export class HUD {
     if (!d?.cfg || $('approachPanel').classList.contains('hidden')) return;
     const t = this.game.director.stateT;
     $('approachFill').style.width = `${clamp(t / d.cfg.duration, 0, 1) * 100}%`;
-    $('approachCount').textContent = `${d.picks} / 3 AUGMENTS`;
+    writeText($('approachCount'), `${d.picks} / 3 AUGMENTS`);
     [...$('approachStops').children].forEach((marker, i) => marker.classList.toggle('installed', i < d.picks));
     const beat = d.cfg.authored?.beats[d.beatIndex];
-    $('approachBeat').textContent = d.awaitingAugment ? 'AUGMENT CACHE SECURED' : beat?.title || 'PUSH THROUGH THE DEFENSES';
-    $('approachHint').textContent = d.awaitingAugment ? 'Choose a power — combat is paused' : beat?.detail || (d.picks < 3
+    writeText($('approachBeat'), d.awaitingAugment ? 'AUGMENT CACHE SECURED' : beat?.title || 'PUSH THROUGH THE DEFENSES');
+    writeText($('approachHint'), d.awaitingAugment ? 'Choose a power — combat is paused' : beat?.detail || (d.picks < 3
       ? `Next augment in ${Math.max(0, Math.ceil(d.cfg.augmentAt[d.picks] - t))}s · survive and collect scrap`
-      : 'All three augments installed · objective ahead');
+      : 'All three augments installed · objective ahead'));
     const bounty = $('approachBounty');
     bounty.classList.toggle('hidden', !d.bounty);
-    if (d.bounty) bounty.textContent = d.bountyResolved ? '★ BLOCKADE BOUNTY CLAIMED' : `BOUNTY: BLOCKADE ACE · ${Math.ceil(d.bounty.healthPct * 100)}% HULL`;
+    if (d.bounty) writeText(bounty, d.bountyResolved ? '★ BLOCKADE BOUNTY CLAIMED' : `BOUNTY: BLOCKADE ACE · ${Math.ceil(d.bounty.healthPct * 100)}% HULL`);
   }
 
   /** One pip per weak point, so the player can see what's left to break. */
@@ -242,7 +255,7 @@ export class HUD {
     // health + shield + level badge
     const hpPct = clamp(p.health / s.maxHealth, 0, 1) * 100;
     this.el.hp.style.width = `${hpPct}%`;
-    this.el.hpText.textContent = `${Math.ceil(p.health)}/${Math.round(s.maxHealth)}`;
+    writeText(this.el.hpText, `${Math.ceil(p.health)}/${Math.round(s.maxHealth)}`);
     this.el.hp.classList.toggle('low', hpPct < 30);
 
     if (s.shieldMax > 0) {
@@ -250,17 +263,17 @@ export class HUD {
       this.el.shield.parentElement.classList.remove('hidden');
       const recovering = p.shield < s.shieldMax;
       const delay = p.shieldRecoveryRemaining || 0;
-      this.el.shieldStatus.textContent = p.shieldBroken
+      writeText(this.el.shieldStatus, p.shieldBroken
         ? `SHIELD BROKEN / ${delay.toFixed(1)}S`
         : recovering && delay > 0 ? `SHIELD RECOVERY / ${delay.toFixed(1)}S`
         : recovering ? 'SHIELD RECHARGING'
-        : `SHIELD ${Math.ceil(p.shield)} / ${Math.round(s.shieldMax)}`;
+        : `SHIELD ${Math.ceil(p.shield)} / ${Math.round(s.shieldMax)}`);
       this.el.shieldStatus.classList.toggle('broken', p.shieldBroken);
     } else {
       this.el.shield.parentElement.classList.add('hidden');
     }
 
-    this.el.level.textContent = g.xp.level;
+    writeText(this.el.level, g.xp.level);
     this.el.levelRing.style.background = `conic-gradient(${P.gold} ${g.xp.progress * 360}deg, rgba(255,255,255,.08) 0deg)`;
 
     // boost
@@ -270,9 +283,9 @@ export class HUD {
     // rift heat
     const heat = g.heat;
     this.el.heat.style.width = `${heat.heat * 100}%`;
-    this.el.heatTier.textContent = heat.tier;
-    this.el.mult.textContent = `x${heat.multiplier.toFixed(1)}`;
-    this.el.combo.textContent = heat.combo > 0 ? `COMBO ${heat.combo}` : '';
+    writeText(this.el.heatTier, heat.tier);
+    writeText(this.el.mult, `x${heat.multiplier.toFixed(1)}`);
+    writeText(this.el.combo, heat.combo > 0 ? `COMBO ${heat.combo}` : '');
 
     // the meter gets more violent as it climbs
     const t = heat.heat;
@@ -281,8 +294,8 @@ export class HUD {
     this.el.heatGlow.style.opacity = String(Math.max(0, (t - 0.45) * 1.1));
 
     // score + scrap
-    this.el.scrap.textContent = g.scrap.total.toLocaleString();
-    this.el.score.textContent = g.score.total.toLocaleString();
+    writeText(this.el.scrap, g.scrap.total.toLocaleString());
+    writeText(this.el.score, g.score.total.toLocaleString());
 
     // objective health + weak-point pips
     const enc = g.encounter;
@@ -298,27 +311,27 @@ export class HUD {
     if (g.escape.active) {
       const escape = g.escape.snapshot();
       const seconds = Math.max(0, Math.ceil(escape.remaining));
-      this.el.timerLabel.textContent = `COLLAPSE IN ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+      writeText(this.el.timerLabel, `COLLAPSE IN ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
       this.updateTimer(escape.remaining);
       this.el.objFill.style.width = `${escape.progress * 100}%`;
-      this.el.objSub.textContent = `${escape.phase} ${escape.intensity.tier}/5 / ${Math.ceil(escape.distanceLeft)}m / ${escape.armada?.alive || 0} HOSTILES`;
+      writeText(this.el.objSub, `${escape.phase} ${escape.intensity.tier}/5 / ${Math.ceil(escape.distanceLeft)}m / ${escape.armada?.alive || 0} HOSTILES`);
       this.setObjectiveWarning(escape.remaining < 25);
     }
 
     const signature = weaponPowerSignature(s, { heatMultiplier: g.heat.multiplier,
       shield: p.shield, treasureCharge: p.treasureCharge });
     this.arsenal.style.setProperty('--reactor', signature.color);
-    this.arsenal.querySelector('small').textContent = `REACTOR / TIER ${signature.tier} / ${g.upgrades.taken.length} AUGMENTS`;
-    this.arsenal.querySelector('strong').textContent = signature.label;
+    writeText(this.arsenalFields.tier, `REACTOR / TIER ${signature.tier} / ${g.upgrades.taken.length} AUGMENTS`);
+    writeText(this.arsenalFields.label, signature.label);
     const output = primaryWeaponOutput(s, { fireRate: p.fireRate, critBuffT: p.critBuffT,
       heatMultiplier: g.heat.multiplier, shield: p.shield, treasureCharge: p.treasureCharge,
       weakPoint: !!p.reticleLock && !!g.targeting?.current && g.targeting.current.kind !== 'enemy' });
-    this.arsenal.querySelector('.arsenalStats').textContent = `${Number(output.damage.toFixed(1))} SHOT · ${Number(output.fireRate.toFixed(1))}/SEC · ${Math.round(s.damageReduction * 100)}% ARMOR`;
+    writeText(this.arsenalFields.stats, `${Number(output.damage.toFixed(1))} SHOT · ${Number(output.fireRate.toFixed(1))}/SEC · ${Math.round(s.damageReduction * 100)}% ARMOR`);
     const guns = Object.keys(signature.weaponRanks).filter(kind => signature.weaponRanks[kind] > 0);
     const systems = guns.length ? `${guns.length} SYSTEMS` : 'PRIMARY';
-    this.arsenal.querySelector('.arsenalMods').textContent = signature.modifiers.length
+    writeText(this.arsenalFields.mods, signature.modifiers.length
       ? `${systems} / ${signature.modifiers.slice(0, 3).map(mod => `${mod.label} ×${mod.rank}`).join(' / ')}`
-      : `${systems} ONLINE`;
+      : `${systems} ONLINE`);
     this.augmentFlash = Math.max(0, this.augmentFlash - .05);
     this.arsenal.classList.toggle('installed', this.augmentFlash > 0);
 

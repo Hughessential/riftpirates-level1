@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
-import { MUSIC_FILES } from '../src/core/AudioManager.js';
+import { readdirSync } from 'node:fs';
+
+function runtimeAssets(directory, prefix = '') {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const path = `${prefix}${entry.name}`;
+    if (entry.isDirectory()) return runtimeAssets(new URL(`${entry.name}/`, directory), `${path}/`);
+    return /\.(mp3|m4a|wav|vox|ttf)$/.test(path) ? [path.split('/').map(encodeURIComponent).join('/')] : [];
+  });
+}
 
 const site = new URL(process.env.RIFT_URL || 'http://localhost:8000/riftpirates-level1/');
 const base = site.href.endsWith('/') ? site.href : `${site.href}/`;
@@ -34,13 +42,7 @@ try {
   assert.ok([...loaded].some(url => url.includes('/voxels/player-fleet/spaceships.vox')), 'Player ship fleet loads');
   assert.ok([...loaded].some(url => url.includes('/voxels/') && !url.includes('/player-fleet/')), 'Enemy voxel models load');
 
-  const assets = [
-    'fonts/rift-pixel.ttf',
-    'voxels/player-fleet/spaceships.vox',
-    'sfx/player_shot.wav',
-    'sfx/mayhem/prism.wav',
-    ...Object.values(MUSIC_FILES).map(file => `music/${encodeURIComponent(file)}`),
-  ];
+  const assets = runtimeAssets(new URL('../assets/', import.meta.url));
   const missing = await page.evaluate(async ({ base, assets }) => {
     const results = await Promise.all(assets.map(async path => {
       try {

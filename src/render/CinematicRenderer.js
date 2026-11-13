@@ -4,25 +4,31 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 
 // A quiet digital-print texture, not a glitch event. It never changes time,
 // blurs, flashes or reduces render resolution; aim lines remain pixel sharp.
 const RiftSignalShader = {
-  uniforms: { tDiffuse: { value: null }, resolution: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, resolution: { value: new THREE.Vector2(1, 1) },
+    offset: { value: 1.08 }, darkness: { value: .98 } },
   vertexShader: `varying vec2 vUv;
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse;
     uniform vec2 resolution;
+    uniform float offset;
+    uniform float darkness;
     varying vec2 vUv;
+    vec3 vignette(vec2 uv) {
+      vec2 center = (uv - vec2(0.5)) * offset;
+      return mix(texture2D(tDiffuse, uv).rgb, vec3(1.0 - darkness), dot(center, center));
+    }
     void main() {
       vec2 pixel = vUv * resolution;
       vec2 center = vUv - 0.5;
       float edge = smoothstep(0.18, 0.65, length(center));
-      vec2 offset = vec2(0.12 * edge / resolution.x, 0.0);
-      vec3 source = texture2D(tDiffuse, vUv).rgb;
-      vec3 split = vec3(texture2D(tDiffuse, vUv + offset).r,
-                        source.g, texture2D(tDiffuse, vUv - offset).b);
+      vec2 splitOffset = vec2(0.12 * edge / resolution.x, 0.0);
+      vec3 source = vignette(vUv);
+      vec3 split = vec3(vignette(vUv + splitOffset).r,
+                        source.g, vignette(vUv - splitOffset).b);
       float grain = fract(sin(dot(floor(pixel / 2.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
       float scan = 0.5 + 0.5 * cos(pixel.y * 3.14159265);
       vec3 color = split * (1.0 - 0.0035 * scan);
@@ -57,17 +63,13 @@ export class CinematicRenderer {
       0.52,
       0.82
     );
-    this.vignettePass = new ShaderPass(VignetteShader);
-    this.vignettePass.uniforms.offset.value = 1.08;
-    // Keep the edge target just above black; negative HDR values shift hue
-    // during tone mapping and make neutral space pick up a green cast.
-    this.vignettePass.uniforms.darkness.value = 0.98;
+    // Apply vignette at each signal sample in one shader. This removes an HDR
+    // fullscreen pass while retaining the same vignette-before-signal order.
     this.signalPass = new ShaderPass(RiftSignalShader);
     this.outputPass = new OutputPass();
 
     this.composer.addPass(this.renderPass);
     this.composer.addPass(this.bloomPass);
-    this.composer.addPass(this.vignettePass);
     this.composer.addPass(this.signalPass);
     this.composer.addPass(this.outputPass);
     this.setSize(innerWidth, innerHeight);
@@ -91,6 +93,7 @@ export class CinematicRenderer {
   }
 
   dispose() {
+    for (const pass of this.composer.passes) pass.dispose?.();
     this.composer.dispose();
   }
 }

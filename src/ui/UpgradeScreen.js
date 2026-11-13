@@ -79,7 +79,7 @@ export class UpgradeScreen {
 
   /** Gamepad navigation — called once per frame by Game.update. */
   update() {
-    if (!this.open || this.game.paused || !this._offers?.length) return;
+    if (Input.menuRouting || !this.open || this.game.paused || !this._offers?.length) return;
     const nav = Input.menuNav;
     const n = this._offers.length;
 

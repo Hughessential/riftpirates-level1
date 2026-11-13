@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { VOXLoader, buildMesh } from 'three/addons/loaders/VOXLoader.js';
+import { buildMesh } from 'three/addons/loaders/VOXLoader.js';
+import { readFleetVoxData } from './FleetVoxData.js';
+import { fetchAssetBuffer } from '../core/AssetLoader.js';
 
 /** Hull identity only. These records intentionally contain no gameplay stats. */
 export const PLAYER_SHIPS = Object.freeze([
@@ -61,21 +63,14 @@ function isColor(attribute, index, color) {
 /** Also used by the asset test; parsing never requires a browser or WebGL. */
 export function registerPlayerFleet(buffer) {
   if (prototypes.size === PLAYER_SHIPS.length) return getPlayerFleetStats();
-  const parsed = new VOXLoader().parse(buffer);
-  if (parsed.chunks?.length !== PLAYER_SHIPS.length) {
+  const chunks = readFleetVoxData(buffer);
+  if (chunks.length !== PLAYER_SHIPS.length) {
     throw new Error('The supplied player fleet must contain six separate hulls');
   }
   // The authored scene lays the ships beside one another. Build each source
   // model independently so those presentation translations never affect play.
-  parsed.scene?.traverse((object) => {
-    if (object.isMesh) {
-      object.geometry.dispose();
-      object.material.dispose();
-    }
-  });
-
   PLAYER_SHIPS.forEach((ship, index) => {
-    const chunk = parsed.chunks[index];
+    const chunk = chunks[index];
     const palette = Uint32Array.from(chunk.palette);
     for (const [slot, color] of Object.entries(PAINT)) palette[slot] = packedRGBA(color);
     palette[249] = packedRGBA(PRIMARIES[index]);
@@ -124,11 +119,8 @@ export function preloadPlayerFleet(onProgress = () => {}) {
   if (loading) return loading;
   loading = (async () => {
     try {
-      const response = await fetch(`${import.meta.env?.BASE_URL || './'}voxels/player-fleet/spaceships.vox`, {
-        signal: AbortSignal.timeout(12000),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      registerPlayerFleet(await response.arrayBuffer());
+      const buffer = await fetchAssetBuffer(`${import.meta.env?.BASE_URL || './'}voxels/player-fleet/spaceships.vox`);
+      registerPlayerFleet(buffer);
     } catch (error) {
       console.warn(`Using original player hull fallback: ${error.message}`);
     } finally {

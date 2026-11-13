@@ -1,0 +1,18 @@
+.controllerEntry{font:inherit;font-size:calc(7px*var(--m,1));color:#a5eecf;border:0;background:transparent;padding:0;margin-left:5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.controllerMode .controllerFocus{outline:3px solid #c5ff4b!important;outline-offset:5px!important;box-shadow:0 0 18px #7eff5c66!important}
+.controllerMode input[type=checkbox].controllerFocus{outline-offset:3px!important}
+.controllerHint{position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:150;color:#b5f5d2;background:#02070ee6;padding:7px 12px;font-size:8px;letter-spacing:.04em;pointer-events:none;white-space:nowrap;max-width:95vw}
+.controllerHint[hidden]{display:none}
+.controllerDialog{margin:auto;width:min(860px,94vw);max-height:90vh;overflow:auto;background:#030910;color:#c5e9e0;border:1px solid #30dcc9;padding:26px;font:12px 'Rift Pixel',monospace;box-shadow:0 0 45px #6014bb55}
+.controllerDialog::backdrop{background:#01020be8}
+.controllerDialog header,.controllerDialog footer{display:flex;align-items:center;justify-content:space-between;gap:20px}.controllerDialog h2{color:#2fe8e0;font-size:20px;margin:10px 0 20px}.controllerDialog small{color:#b8ff3a}
+.controllerDialog button,.controllerDialog select{font:inherit;color:#c8f5df;background:#061726;border:1px solid #396c76;padding:12px;cursor:pointer}.controllerDialog button:disabled{opacity:.4}.controllerDialog button:focus-visible,.controllerDialog select:focus-visible{outline:2px solid #baff49;outline-offset:3px}
+.controllerDialog p{line-height:1.7;margin:10px 0 18px}.controllerHelp{color:#91aeb5;font-size:10px}
+.controllerBindings{display:grid;grid-template-columns:1fr 1fr;gap:9px}.controllerBindings button{display:flex;justify-content:space-between;text-align:left;gap:15px;font-size:10px}.controllerBindings b{color:#baff49;white-space:nowrap}
+.controllerAxes{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:22px 0}.controllerAxes label{display:grid;gap:9px;font-size:10px}.controllerAxes select{width:100%}.controllerAxes input{width:100%}
+#controllerCapture{color:#baff49;min-height:30px}.controllerKeyboard>div{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}.controllerKeyboard output{display:block;margin:10px 0 20px;color:#baff49}
+@media(max-width:600px){.controllerDialog{padding:16px}.controllerBindings{grid-template-columns:1fr}.controllerHint{font-size:6px;white-space:normal;text-align:center}.controllerKeyboard>div{grid-template-columns:repeat(6,1fr)}}
+
+.controllerMode .labToggle:has(input.controllerFocus){outline:3px solid #c5ff4b;outline-offset:3px;box-shadow:0 0 18px #7eff5c66}
+
+.controllerAudioHint{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:300;background:#06101aee;border:1px solid #54dcca;color:#c5ffdc;padding:9px 12px;font-size:9px;pointer-events:none;max-width:90vw;text-align:center}.controllerAudioHint[hidden]{display:none}

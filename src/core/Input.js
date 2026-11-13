@@ -10,7 +10,8 @@ import { clamp, $ } from './Utils.js';
  *   Start      -> pause          d-pad + A -> pick an upgrade card
  * B and X are reserved for future abilities (bomb, charge shot).
  */
-const GP_DEADZONE = 0.24;
+const GP_DEADZONE = 0.18;
+export const DEFAULT_BUTTONS = { fire: 0, cancel: 1, brake: 3, rollLeft: 4, rollRight: 5, aim: 6, boost: 7, view: 8, pause: 9, up: 12, down: 13, left: 14, right: 15 };
 const GP_CAM_DEADZONE = 0.18;
 const GP_TRIGGER_ON = 0.12; // analog triggers count as held past this value
 
@@ -45,7 +46,13 @@ class InputImpl {
     this._rollQueue = 0; // -1 = left, +1 = right, 0 = none
 
     // one-frame d-pad/A edges for menu navigation, overwritten every poll
-    this.menuNav = { left: false, right: false, up: false, down: false, confirm: false };
+    this.menuNav = { left: false, right: false, up: false, down: false, confirm: false, cancel: false, pause: false, prevTab: false, nextTab: false, view: false };
+    this._padIndex = null;
+    this._navRepeat = {};
+    this.bindings = { ...DEFAULT_BUTTONS };
+    this.axes = [0, 1, 2, 3];
+    this.deadzone = GP_DEADZONE;
+    this.capture = null;
 
     // gamepad presence — drained by Game for the connect/disconnect toast
     this._padId = null;
@@ -213,81 +220,121 @@ class InputImpl {
    */
   pollGamepad() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    let pad = null;
-    for (const p of pads) {
-      if (p && p.connected) {
-        pad = p;
-        break;
-      }
-    }
+    this.padLost = this._padIndex != null && !Array.from(pads).some(p => p?.connected && p.index === this._padIndex);
+    let pad = Array.from(pads).find(p => p?.connected && p.index === this._padIndex);
+    if (!pad) pad = Array.from(pads).find(p => p?.connected && p.mapping === 'standard') || Array.from(pads).find(p => p?.connected);
+    const m = this.menuNav;
+    Object.keys(m).forEach(key => { m[key] = false; });
     if (!pad) {
-      if (this._padId) {
-        this._padEvent = { connected: false, id: this._padId };
-        this._padId = null;
-      }
-      this._padX = 0;
-      this._padY = 0;
-      this._camX = 0;
-      this._camY = 0;
-      this._padBoost = false;
-      this._padBrake = false;
-      this._padFire = false;
-      this._padAim = false;
-      const m = this.menuNav;
-      m.left = m.right = m.up = m.down = m.confirm = false;
+      if (this._padId) this._padEvent = { connected: false, id: this._padId };
+      this._padId = null;
+      this._padIndex = null;
+      this._padPrev = {};
+      this._navRepeat = {};
+      this._padX = this._padY = this._camX = this._camY = 0;
+      this._padBoost = this._padBrake = this._padFire = this._padAim = false;
+      this._rollQueue = 0;
+      this.capture = null;
       return;
     }
-    if (pad.id !== this._padId) {
+    const physicalHeld = i => !!pad.buttons[i] && (pad.buttons[i].pressed || pad.buttons[i].value > GP_TRIGGER_ON);
+    const changed = pad.id !== this._padId || pad.index !== this._padIndex;
+    if (changed) {
       this._padEvent = { connected: true, id: pad.id };
       this._padId = pad.id;
+      this._padIndex = pad.index;
+      this.loadController();
+      this._padPrev = {};
+      // The press which wakes/reconnects a controller must not launch or confirm.
+      for (let i = 0; i < pad.buttons.length; i++) this._padPrev[i] = physicalHeld(i);
+      this._navRepeat = {};
+      this.blockMenuCarryover();
     }
-
-    // deadzone with the remaining range rescaled to 0..1, so motion ramps
-    // smoothly from zero instead of jumping at the deadzone edge
-    const dz = (v, d) => {
-      const a = Math.abs(v || 0);
-      return a < d ? 0 : Math.sign(v) * Math.min(1, (a - d) / (1 - d));
-    };
-    this._padX = dz(pad.axes[0], GP_DEADZONE);
-    this._padY = -dz(pad.axes[1], GP_DEADZONE);
-    this._camX = dz(pad.axes[2], GP_CAM_DEADZONE);
-    this._camY = -dz(pad.axes[3], GP_CAM_DEADZONE);
-
-    // triggers report an analog value on most pads; past-threshold = held
-    const held = (i) => {
-      const b = pad.buttons[i];
-      return !!b && (b.pressed || (b.value || 0) > GP_TRIGGER_ON);
-    };
-    this._padFire = held(0); // A
-    this._padAim = held(6); // LT
-    this._padBoost = held(7); // RT
-    this._padBrake = held(3); // Y
-
-    // edge-triggered buttons
-    const edge = (i) => {
-      const now = held(i);
-      const fired = now && !this._padPrev[i];
-      this._padPrev[i] = now;
-      return fired;
-    };
+    if (this.capture) {
+      const held = pad.buttons.map((_, i) => physicalHeld(i));
+      if (!held.some(Boolean)) this.capture.armed = true;
+      if (performance.now() > this.capture.until) this.capture = null;
+      else if (this.capture.armed && held.some(Boolean)) {
+        const nextButton = held.findIndex(Boolean);
+        const previousButton = this.bindings[this.capture.action];
+        for (const action of Object.keys(this.bindings)) {
+          if (action !== this.capture.action && this.bindings[action] === nextButton) this.bindings[action] = previousButton;
+        }
+        this.bindings[this.capture.action] = nextButton;
+        this.saveController();
+        this.capture = null;
+        held.forEach((value, i) => { this._padPrev[i] = value; });
+        this.blockMenuCarryover();
+      }
+      this._padX = this._padY = this._camX = this._camY = 0;
+      this._padBoost = this._padBrake = this._padFire = this._padAim = false;
+      return;
+    }
+    const held = action => physicalHeld(this.bindings[action]);
+    const edge = action => held(action) && !this._padPrev[this.bindings[action]];
+    const dz = (v, d) => Math.abs(v || 0) < d ? 0 : Math.sign(v) * Math.min(1, (Math.abs(v) - d) / (1 - d));
+    const axisX = pad.axes[this.axes[0]] || 0, axisY = pad.axes[this.axes[1]] || 0;
+    if (Math.abs(axisX) < this.deadzone && Math.abs(axisY) < this.deadzone) this._blockMotionUntilNeutral = false;
+    this._padX = this._blockMotionUntilNeutral ? 0 : dz(axisX, this.deadzone);
+    this._padY = this._blockMotionUntilNeutral ? 0 : -dz(axisY, this.deadzone);
+    this._camX = dz(pad.axes[this.axes[2]], GP_CAM_DEADZONE);
+    this._camY = -dz(pad.axes[this.axes[3]], GP_CAM_DEADZONE);
+    if (!held('fire')) this._blockFireUntilRelease = false;
+    this._padFire = held('fire') && !this._blockFireUntilRelease;
+    this._padAim = held('aim');
+    this._padBoost = held('boost');
+    this._padBrake = held('brake');
     if (this.enabled) {
-      if (edge(4)) this._rollQueue = -1; // LB -> roll left
-      if (edge(5)) this._rollQueue = 1; // RB -> roll right
-    } else {
-      // keep prev state fresh so re-enabling doesn't fire a stale edge
-      [4, 5].forEach((i) => (this._padPrev[i] = held(i)));
+      if (edge('rollLeft')) this._rollQueue = -1;
+      if (edge('rollRight')) this._rollQueue = 1;
     }
-    // Start (9) toggles pause on the rising edge, regardless of enabled state
-    if (edge(9) && this._onPause) this._onPause();
+    m.confirm = edge('fire');
+    m.cancel = edge('cancel');
+    m.pause = edge('pause');
+    m.view = edge('view');
+    m.prevTab = edge('rollLeft');
+    m.nextTab = edge('rollRight');
+    const now = performance.now();
+    for (const [direction, stick] of [['left', axisX < -.55], ['right', axisX > .55], ['up', axisY < -.55], ['down', axisY > .55]]) {
+      const active = held(direction) || stick;
+      const repeat = this._navRepeat[direction];
+      if (changed && active) this._navRepeat[direction] = Infinity;
+      else if (!active) delete this._navRepeat[direction];
+      else if (repeat == null || now >= repeat) {
+        m[direction] = true;
+        this._navRepeat[direction] = now + (repeat == null ? 380 : 115);
+      }
+    }
+    for (let i = 0; i < pad.buttons.length; i++) this._padPrev[i] = physicalHeld(i);
+    if (m.pause && !this.menuRouting && this._onPause) this._onPause();
+  }
 
-    // Menu navigation (upgrade cards): one-frame edges, refreshed every poll
-    // so a button held before a screen opens can never fire a stale confirm.
-    const m = this.menuNav;
-    m.up = edge(12);
-    m.down = edge(13);
-    m.left = edge(14);
-    m.right = edge(15);
-    m.confirm = edge(0); // A
+  blockMenuCarryover() {
+    this._blockFireUntilRelease = true;
+    this._blockMotionUntilNeutral = true;
+    this._padFire = false;
+    this._rollQueue = 0;
+  }
+
+  loadController() {
+    let settings;
+    try { settings = JSON.parse(localStorage.getItem('riftpirates-controller-v1') || '{}')[this._padId]; } catch { /* private browsing */ }
+    this.bindings = { ...DEFAULT_BUTTONS };
+    if (settings?.buttons) for (const key of Object.keys(DEFAULT_BUTTONS)) {
+      if (Number.isInteger(settings.buttons[key]) && settings.buttons[key] >= 0 && settings.buttons[key] < 64) this.bindings[key] = settings.buttons[key];
+    }
+    if (new Set(Object.values(this.bindings)).size !== Object.keys(this.bindings).length) this.bindings = { ...DEFAULT_BUTTONS };
+    this.axes = [0, 1, 2, 3].map((fallback, i) => Number.isInteger(settings?.axes?.[i]) && settings.axes[i] >= 0 && settings.axes[i] < 16 ? settings.axes[i] : fallback);
+    this.deadzone = Number.isFinite(settings?.deadzone) ? clamp(settings.deadzone, .08, .4) : GP_DEADZONE;
+  }
+
+  saveController() {
+    if (!this._padId) return;
+    try {
+      const all = JSON.parse(localStorage.getItem('riftpirates-controller-v1') || '{}');
+      all[this._padId] = { buttons: this.bindings, axes: this.axes, deadzone: this.deadzone };
+      localStorage.setItem('riftpirates-controller-v1', JSON.stringify(all));
+    } catch { /* Settings remain usable for this session. */ }
   }
 
   /** Drain a pending barrel-roll request. Returns -1, 0 or +1. */

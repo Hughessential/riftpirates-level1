@@ -1,5 +1,6 @@
 import { Save, AUDIO_DEFAULTS, clampAudioVolume } from './SaveSystem.js';
 import { rand } from './Utils.js';
+import { fetchAssetBuffer, mapConcurrent } from './AssetLoader.js';
 
 /**
  * SFX are decoded into WebAudio buffers (short, fired constantly, need pitch
@@ -152,10 +153,14 @@ export class AudioManagerImpl {
   }
 
   async _loadSfx() {
-    const jobs = Object.entries(SFX_FILES).map(async ([key, file]) => {
+    // First interaction should make the primary gun, impact and menu audible
+    // before decoding every rare weapon/boss sample. Four workers keep the
+    // soundtrack and geometry uploads from competing with 46 simultaneous jobs.
+    const first = ['weapon_pulse', 'player_shot', 'ui_select', 'player_hurt', 'hit', 'enemy_shot'];
+    const keys = [...first, ...Object.keys(SFX_FILES).filter(key => !first.includes(key))];
+    await mapConcurrent(keys, 4, async (key) => {
       try {
-        const res = await fetch(`${ASSET_BASE}sfx/${file}`);
-        const arr = await res.arrayBuffer();
+        const arr = await fetchAssetBuffer(`${ASSET_BASE}sfx/${SFX_FILES[key]}`);
         this.buffers[key] = await this.ctx.decodeAudioData(arr);
         if (key.startsWith('weapon_')) {
           const samples = this.buffers[key].getChannelData(0);
@@ -170,7 +175,6 @@ export class AudioManagerImpl {
         /* a missing sample just means that cue is silent */
       }
     });
-    await Promise.all(jobs);
   }
 
   resume() {

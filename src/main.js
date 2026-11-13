@@ -10,6 +10,7 @@ import { ShipHangar } from './ui/ShipHangar.js';
 import { initMenuCursor } from './ui/MenuCursor.js';
 import { TestingGroundsPanel } from './ui/TestingGroundsPanel.js';
 import { initAudioSettings } from './ui/AudioSettings.js';
+import { ControllerMenus } from './ui/ControllerMenus.js';
 
 initVoxelTitle();
 initMenuCursor();
@@ -103,6 +104,7 @@ initAudioSettings();
 
 game.testing.onExit = showTitle;
 game.testingPanel = new TestingGroundsPanel(game.testing);
+game.controllerMenus = new ControllerMenus(game);
 
 // --- loop ---
 let last = performance.now();

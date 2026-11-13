@@ -70,6 +70,23 @@ The gamepad layout follows the classic Star Fox-style space-shooter map:
 | Pick an upgrade | `1` `2` `3` | d-pad + `A` | tap a card |
 | Skip a cutscene | `Space` / `Enter` | — | tap |
 
+Controller menus support the stick or D-pad to move focus, the south face button
+to select, the east face button to go back, and left/right to adjust sliders,
+numbers and choices. LB/RB switch Testing Grounds tabs. Title, ship hangar,
+pause/audio, augment cards, results and Testing Grounds use the same navigation.
+The augment search has a controller keyboard. Disconnecting pauses a live run;
+reconnecting or leaving a menu requires releasing confirm before firing.
+
+Use **CONTROLLER SETUP** on the title/pause menu (or View/Select) to save button
+bindings, stick axes and deadzone per device. MCON should use its **X-Input**
+mode. Xbox, PlayStation and Switch controllers use the browser's standard mapping;
+nonstandard devices can be configured in setup. Controller recognition still
+depends on the operating system/browser exposing the device through the Gamepad
+API. Automated checks use virtual pads, not physical MCON hardware.
+Some browsers require one click or key press before audio can play; if audio is
+blocked, a small hint explains how to enable it while controller navigation stays
+available.
+
 `B` (bomb / secondary) and `X` (charge shot) are reserved for future
 abilities.
 
@@ -170,6 +187,15 @@ Imported models are loaded before launch, share cached geometry, and fall back
 to procedural models if a file cannot load. Source paths are recorded in
 `assets/voxels/SOURCES.md`.
 
+The fleet parser builds each recolored hull once. Asset requests retry transient
+failures, and short sound downloads/decodes use four prioritized workers to avoid
+flooding startup. Three.js is bundled separately for caching across game updates.
+The finishing effects share one pass, unchanged HUD text avoids DOM rewrites,
+and hidden tabs stop rendering. During sustained slow gameplay, internal render
+resolution steps down conservatively (minimum 65%) and recovers after stable
+frames; UI size, camera proportions, enemies and combat stay unchanged. Returning
+to the title restores full detail.
+
 ---
 
 ## Layout
@@ -217,6 +243,9 @@ npm run test:carnage  # staged horde pressure, destruction pools, captures and c
 npm run test:display  # QHD/4K/ultrawide, monitor-density switches, loot and augment previews
 npm run test:intros   # all five cinematic reveals, pause/skip, camera and lab replay
 npm run test:audio    # saved music/SFX faders, mute, keyboard and pause behavior
+npm run test:controllers # virtual gamepads, menu coverage and per-device setup
+npm run test:assets   # parser fidelity, retries, bounded audio and failure recovery
+npm run test:render   # adaptive resolution, hidden tabs, HUD churn and GPU cleanup
 npm run test:approach # three pre-objective choices, safety/pause/reset regression
 npm run test:level    # full playthrough: every state, all five objectives, boss, victory, restart
 npm run test:combat   # every attack in every encounter actually fires and hurts

@@ -182,6 +182,7 @@ export class TestingGroundsPanel {
     // Capture before gameplay's global keys: typing a name must never fly,
     // fire, roll, pause, or pick a card underneath the native dialog.
     this._keyDown = event => {
+      if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open]')) return;
       const editing = /^(INPUT|SELECT|TEXTAREA)$/.test(event.target?.tagName);
       const shortcut = event.code === 'F2' || (event.code === 'Backquote' && !editing);
       if (shortcut || (this.dialog.open && event.code === 'Escape')) {
@@ -204,7 +205,7 @@ export class TestingGroundsPanel {
         event.stopImmediatePropagation();
       }
     };
-    this._keyUp = event => { if (this.dialog.open || event.code === 'F2' || event.code === 'Backquote') event.stopImmediatePropagation(); };
+    this._keyUp = event => { if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open]')) return; if (this.dialog.open || event.code === 'F2' || event.code === 'Backquote') event.stopImmediatePropagation(); };
     window.addEventListener('keydown', this._keyDown, true);
     window.addEventListener('keyup', this._keyUp, true);
   }

@@ -15,6 +15,7 @@ import { Environment } from '../render/Environment.js';
 import { CinematicRenderer } from '../render/CinematicRenderer.js';
 import { RiftWorldShowcase } from '../render/RiftWorldShowcase.js';
 import { displayMetrics, applyDisplayLayout } from '../render/DisplayLayout.js';
+import { AdaptiveResolution } from '../render/AdaptiveResolution.js';
 
 import { Player, BASE_STATS } from '../player/Player.js';
 import { PlayerWeapon } from '../player/PlayerWeapon.js';
@@ -63,9 +64,10 @@ export class Game {
       powerPreference: 'high-performance',
     });
     this.display = displayMetrics(innerWidth, innerHeight, devicePixelRatio, this.renderer.capabilities.maxTextureSize);
+    this.adaptiveResolution = new AdaptiveResolution();
     applyDisplayLayout(this.display);
     this.renderer.setClearColor(new THREE.Color(P.ink), 1);
-    this.renderer.setPixelRatio(this.display.pixelRatio);
+    this.renderer.setPixelRatio(this.display.pixelRatio * this.adaptiveResolution.scale);
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -219,7 +221,7 @@ export class Game {
     applyDisplayLayout(this.display);
     this.camera.aspect = this.display.aspect;
     this.camera.updateProjectionMatrix();
-    this.renderer.setPixelRatio(this.display.pixelRatio);
+    this.renderer.setPixelRatio(this.display.pixelRatio * this.adaptiveResolution.scale);
     this.renderer.setSize(this.display.width, this.display.height);
     this.presentation.setSize(this.display.width, this.display.height);
     this.worldShowcase.resize(this.camera.aspect);
@@ -319,6 +321,11 @@ export class Game {
   closeNexusRift() {
     if (this.rift) {
       this.scene.remove(this.rift);
+      this.rift.traverse(object => {
+        // Sprite geometry and textures belong to Three/shared texture caches.
+        if (object.isMesh && !object.isSprite) object.geometry?.dispose();
+        object.material?.dispose();
+      });
       this.rift = null;
     }
   }
@@ -362,6 +369,7 @@ export class Game {
   // ------------------------------------------------------------------- run flow
 
   prepareTitle() {
+    if (this.adaptiveResolution.restore()) this._resize();
     this.director.clearPresentation();
     this.escape.dispose();
     this.testing.deactivate();
@@ -523,11 +531,24 @@ export class Game {
   // ------------------------------------------------------------------- update
 
   update(rawDt) {
+    if (document.hidden) {
+      this.adaptiveResolution.update(rawDt, false);
+      this.syncMusicPause();
+      return;
+    }
     if (rawDt > 0) this.testing.fps += (1 / rawDt - this.testing.fps) * .05;
     this.syncMusicPause();
     Audio2.update(rawDt);
     // gamepad is polled every frame — even while paused, so Start can resume
     Input.pollGamepad();
+    this.controllerMenus?.update();
+    const qualityEligible = this.running && !this.paused && !this.testing.active &&
+      !this.director.intro.active && !this.director.inUpgrade && !this.upgradeScreen.open &&
+      !this.upgradeScreen.closing && !this.death.active;
+    if (this.adaptiveResolution.update(rawDt, qualityEligible)) {
+      this.renderer.setPixelRatio(this.display.pixelRatio * this.adaptiveResolution.scale);
+      this.presentation.setSize(this.display.width, this.display.height);
+    }
 
     // connect/disconnect notice — #toasts sits outside the HUD, so this is
     // visible even on the title screen (iOS only reveals a pad after the
