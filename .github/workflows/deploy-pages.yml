@@ -25,8 +25,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Build for the repository URL
-        run: npm run build -- --base=/riftpirates-level1/
+      - name: Build portable Pages assets
+        # Relative asset URLs keep the same artifact working at both the
+        # legacy /riftpirates-level1/ URL and the riftpirates.com root.
+        run: npm run build -- --base=./
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site
