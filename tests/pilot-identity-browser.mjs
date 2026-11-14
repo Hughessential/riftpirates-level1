@@ -19,7 +19,7 @@ try {
     });
   };
   const enter = async name => page.$eval('#pilotNameInput', (el, text) => { el.value = text; el.dispatchEvent(new Event('input', { bubbles: true })); }, name);
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto('http://localhost:8000/?lab=unlock', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready();
   await page.click('#launchBtn');
   assert.equal(await page.evaluate(() => RIFT.running), false, 'Launch waits for first identity confirmation');

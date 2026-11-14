@@ -27,7 +27,7 @@ globalThis.window = {
 storage.set(KEY, JSON.stringify({ music: 0, sfx: 1, bestScore: 12345 }));
 Save.load();
 assert.equal(Save.data.music, 0); assert.equal(Save.data.bestScore, 12345);
-assert.equal(Save.data.musicVolume, .65); assert.equal(Save.data.sfxVolume, .85);
+assert.equal(Save.data.musicVolume, .75); assert.equal(Save.data.sfxVolume, .75);
 storage.set(KEY, JSON.stringify({ musicVolume: 4, sfxVolume: -.5 }));
 Save.load();
 assert.equal(Save.data.musicVolume, 1); assert.equal(Save.data.sfxVolume, 0);
@@ -115,5 +115,5 @@ assert.equal(fallback.music.title.el.volume, .9);
 fallback.setMusicVolume(0);
 assert.equal(Save.data.music, 1, 'Zero level and mute remain independent');
 fallback.setMusicVolume(Infinity); fallback.setSfxVolume(-2);
-assert.equal(fallback.musicVol, .65); assert.equal(fallback.sfxVol, 0);
+assert.equal(fallback.musicVol, AUDIO_DEFAULTS.musicVolume); assert.equal(fallback.sfxVol, 0);
 console.log('PASS: saved independent audio levels, legacy save migration, clamping, real bus gains, mute memory, media fallback, pause and soundtrack ownership.');

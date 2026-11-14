@@ -10,12 +10,14 @@ import { ShipHangar } from './ui/ShipHangar.js';
 import { initMenuCursor } from './ui/MenuCursor.js';
 import { TestingGroundsPanel } from './ui/TestingGroundsPanel.js';
 import { initAudioSettings } from './ui/AudioSettings.js';
+import { applyUIScale, initUISettings } from './ui/UISettings.js';
 import { ControllerMenus } from './ui/ControllerMenus.js';
 import { PilotIdentity } from './ui/PilotIdentity.js';
 
 // Start the official title recording before voxel loading. Saved mute/volume
 // still apply, and browsers which block autoplay unlock on the first gesture.
 Save.load();
+applyUIScale();
 Audio2.setMusicPaused('background', document.hidden);
 Audio2.playTitle(0);
 Audio2.init({ loadSfx: false });
@@ -108,6 +110,14 @@ Input.init(game.renderer.domElement, {
 });
 
 initAudioSettings();
+initUISettings();
+for (const button of document.querySelectorAll('.tutorialReplayBtn')) {
+  button.addEventListener('click', () => {
+    game.tutorial.armReplay();
+    game.hud.toast('FIRST FLIGHT ARMED', 'The complete tutorial will begin on your next normal run.', '#27f5da',
+      { category: 'instruction', duration: 4.2 });
+  });
+}
 
 game.testing.onExit = showTitle;
 game.testingPanel = new TestingGroundsPanel(game.testing);

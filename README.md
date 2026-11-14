@@ -55,22 +55,22 @@ and sound effects, then launches, pauses and resumes a run.
 
 ### Controls
 
-The gamepad layout follows the classic Star Fox-style space-shooter map:
+The default gamepad layout keeps flight controls on the triggers and south face button:
 
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
 | Steer | `WASD` / arrows | left stick | drag anywhere |
 | Camera (auto-recenters on release) | — | right stick | — |
-| Fire / primary weapon | `Space` | `A` | the `✦` pad, above boost |
-| Aim / lock-on | `F` | `LT` | hold the fire pad |
-| Boost + Perfect Dodge | `Shift` | `RT` | the `»` pad, bottom-right |
-| Brake / slow down | `C` | `Y` | — |
-| Barrel Roll left / right | `Q` / `E` | `LB` / `RB` | — |
+| Fire / primary weapon | `Space` | `RT` | the `✦` pad, above boost |
+| Aim / lock-on | `F` | `X` | hold the fire pad |
+| Boost + Perfect Dodge | `Shift` | `LT` | the `»` pad, bottom-right |
+| Brake / slow down | `C` | `A` | — |
+| Barrel Roll left / right | double-tap `A` / `D` or arrows; `Q` / `E` shortcut | double-flick stick or double-tap d-pad; `LB` / `RB` shortcut | — |
 | Pause | `P` / `Esc` | `Start` | pause button |
-| Pick an upgrade | `1` `2` `3` | d-pad + `A` | tap a card |
-| Skip a cutscene | `Space` / `Enter` | — | tap |
+| Pick an upgrade | `A` / `D` or arrows, then hold `Space` | d-pad/stick, then hold `A` | tap a card |
+| Skip a cutscene | `Space` / `Enter` | `A` when available | tap |
 
-Controller menus support the stick or D-pad to move focus, the south face button
+Controller menus support the stick or D-pad to move focus, physical `A` regardless of the gameplay fire binding
 to select, the east face button to go back, and left/right to adjust sliders,
 numbers and choices. LB/RB switch Testing Grounds tabs. Title, ship hangar,
 pause/audio, augment cards, results and Testing Grounds use the same navigation.
@@ -87,8 +87,8 @@ Some browsers require one click or key press before audio can play; if audio is
 blocked, a small hint explains how to enable it while controller navigation stays
 available.
 
-`B` (bomb / secondary) and `X` (charge shot) are reserved for future
-abilities.
+Gameplay bindings remain remappable per controller. Menu confirmation always stays
+on physical `A`, so changing the primary-fire binding can never strand a menu.
 
 Firing is fully manual and shots only go where you're aimed: bolts fly
 straight down the nose, so you line up shots by flying. Holding **aim**
@@ -187,7 +187,7 @@ The escape now escalates through five assault stages: up to 40 live attackers,
 reinforcing formations, a surrounding capital fleet breaking apart, expanding
 blast rings and dense glowing wreckage. Required cyan openings remain visible
 as the armada and destruction intensify toward the final rift.
-Music starts at 65% and SFX at 85%. Separate volume sliders and mute controls on
+Music and SFX both start at 75%. Separate volume sliders and mute controls on
 the title and pause menus save your preferred mix across visits.
 
 Imported models are loaded before launch, share cached geometry, and fall back

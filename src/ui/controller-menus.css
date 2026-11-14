@@ -1,7 +1,7 @@
 .controllerEntry{font:inherit;font-size:calc(7px*var(--m,1));color:#a5eecf;border:0;background:transparent;padding:0;margin-left:5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .controllerMode .controllerFocus{outline:3px solid #c5ff4b!important;outline-offset:5px!important;box-shadow:0 0 18px #7eff5c66!important}
 .controllerMode input[type=checkbox].controllerFocus{outline-offset:3px!important}
-.controllerHint{position:fixed;bottom:4px;left:50%;transform:translateX(-50%);z-index:150;color:#b5f5d2;background:#02070ee6;padding:7px 12px;font-size:8px;letter-spacing:.04em;pointer-events:none;white-space:nowrap;max-width:95vw}
+.controllerHint{position:fixed;bottom:4px;left:50%;transform:translateX(-50%) scale(var(--ui-user-scale));transform-origin:center bottom;z-index:150;color:#b5f5d2;background:#02070ee6;padding:7px 12px;font-size:8px;letter-spacing:.04em;pointer-events:none;white-space:nowrap;max-width:calc(95vw/var(--ui-user-scale))}
 .controllerHint[hidden]{display:none}
 .controllerDialog{margin:auto;width:min(860px,94vw);max-height:90vh;overflow:auto;background:#030910;color:#c5e9e0;border:1px solid #30dcc9;padding:26px;font:12px 'Rift Pixel',monospace;box-shadow:0 0 45px #6014bb55}
 .controllerDialog::backdrop{background:#01020be8}
@@ -15,4 +15,4 @@
 
 .controllerMode .labToggle:has(input.controllerFocus){outline:3px solid #c5ff4b;outline-offset:3px;box-shadow:0 0 18px #7eff5c66}
 
-.controllerAudioHint{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:300;background:#06101aee;border:1px solid #54dcca;color:#c5ffdc;padding:9px 12px;font-size:9px;pointer-events:none;max-width:90vw;text-align:center}.controllerAudioHint[hidden]{display:none}
+.controllerAudioHint{position:fixed;top:8px;left:50%;transform:translateX(-50%) scale(var(--ui-user-scale));transform-origin:center top;z-index:300;background:#06101aee;border:1px solid #54dcca;color:#c5ffdc;padding:9px 12px;font-size:9px;pointer-events:none;max-width:calc(90vw/var(--ui-user-scale));text-align:center}.controllerAudioHint[hidden]{display:none}

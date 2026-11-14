@@ -9,6 +9,16 @@ function writeText(element, value) {
   if (element.textContent !== text) element.textContent = text;
 }
 
+export const HUD_NOTICE_DURATIONS = Object.freeze({ brief: 1.8, instruction: 5 });
+const noticeOptions = (options, fallback = HUD_NOTICE_DURATIONS.brief) => {
+  if (typeof options === 'number') options = { duration: options };
+  const category = options?.category === 'instruction' ? 'instruction' : 'brief';
+  const requested = Number(options?.duration);
+  return { ...(options || {}), category,
+    duration: Number.isFinite(requested) ? Math.max(.25,requested)
+      : category === 'instruction' ? HUD_NOTICE_DURATIONS.instruction : fallback };
+};
+
 /**
  * Persistent HUD (spec §42). The level badge is welded to the left end of the
  * health bar, League-style (Player notes) — it must stay legible at all times.
@@ -49,6 +59,16 @@ export class HUD {
     this._timerOn = false;
     this._acc = 0;
     this._lowHealthT = 0;
+    this._toastItems = [];
+    this._bannerLife = 0;
+    this._pickupAmount = 0;
+    this._pickupLife = 0;
+    this.scrapPickupEl = document.createElement('output');
+    this.scrapPickupEl.id = 'scrapPickup';
+    this.scrapPickupEl.setAttribute('role','status');
+    this.scrapPickupEl.setAttribute('aria-live','polite');
+    this.scrapPickupEl.hidden = true;
+    this.el.scrap.parentElement.appendChild(this.scrapPickupEl);
     this.arsenal = document.createElement('aside');
     this.arsenal.id = 'arsenalReadout';
     this.arsenal.innerHTML = '<small>REACTOR / TIER 0</small><strong>PULSE</strong><span class="arsenalStats"></span><span class="arsenalMods"></span>';
@@ -74,6 +94,9 @@ export class HUD {
 
   hide() {
     this.el.hud.classList.add('hidden');
+    // Toasts and banners live outside #hud so results/title can show controller
+    // notices. Clear run-owned messages when the HUD leaves flight.
+    this.clearNotices();
   }
 
   // --- objective bar -------------------------------------------------------
@@ -181,7 +204,8 @@ export class HUD {
 
   // --- notifications -------------------------------------------------------
 
-  banner(text, color = P.magenta) {
+  banner(text, color = P.magenta, options = {}) {
+    const opts = noticeOptions(options, 1.9);
     const b = this.el.banner;
     b.textContent = text;
     // Boss taunts are whole sentences; objective names are two or three words.
@@ -196,24 +220,97 @@ export class HUD {
     // restart the animation
     void b.offsetWidth;
     b.classList.add('show');
-    clearTimeout(this._bannerT);
-    this._bannerT = setTimeout(() => b.classList.remove('show'), 1900);
+    b.dataset.category = opts.category;
+    this._bannerLife = opts.duration;
   }
 
-  toast(title, sub = '', color = P.gold) {
+  toast(title, sub = '', color = P.gold, options = {}) {
+    const opts = noticeOptions(options);
+    // There is only one instructional lane. A newer step replaces the prior
+    // one predictably instead of building an unreadable wall.
+    if (opts.category === 'instruction') {
+      for (const item of this._toastItems.filter(item => item.category === 'instruction')) {
+        clearTimeout(item.wallTimer);
+        item.el.remove();
+      }
+      this._toastItems = this._toastItems.filter(item => item.category !== 'instruction');
+    }
     const t = document.createElement('div');
-    t.className = 'toast';
+    t.className = `toast ${opts.category}`;
+    t.dataset.category = opts.category;
+    t.style.setProperty('--toast-duration',`${opts.duration}s`);
     t.style.color = color;
     t.style.textShadow = `0 0 12px ${color}`;
     t.innerHTML = sub
       ? `<b>${title}</b><span>${sub}</span>`
       : `<b>${title}</b>`;
     this.el.toasts.appendChild(t);
-    setTimeout(() => t.remove(), 1800);
+    const item = { el:t,remaining:opts.duration,category:opts.category,wallTimer:null };
+    this._toastItems.push(item);
+    // The title/results attract loop intentionally does not update the HUD.
+    // Any notice created there needs a bounded wall-time fallback; notices
+    // created during flight remain simulation-time owned and pause-safe.
+    if (!this.game.running) item.wallTimer = setTimeout(() => {
+      item.el.remove();
+      const index = this._toastItems.indexOf(item);
+      if (index >= 0) this._toastItems.splice(index,1);
+    },opts.duration*1000);
     // never let toasts stack into a wall
     while (this.el.toasts.children.length > 4) {
-      this.el.toasts.firstChild.remove();
+      const oldest = this.el.toasts.firstChild;
+      oldest.remove();
+      clearTimeout(this._toastItems.find(item => item.el === oldest)?.wallTimer);
+      this._toastItems = this._toastItems.filter(item => item.el !== oldest);
     }
+  }
+
+  /** Combine a rapid shower into one exact, readable run-wallet increment. */
+  scrapPickup(amount,{ balance = this.game.scrap?.wallet?.balance } = {}) {
+    const gained = Math.max(0,Math.floor(Number(amount)||0));
+    if (!gained) return;
+    this._pickupAmount += gained;
+    this._pickupLife = .9;
+    writeText(this.scrapPickupEl,`+${this._pickupAmount.toLocaleString('en-US')} SCRAP`);
+    this.scrapPickupEl.hidden = false;
+    this.scrapPickupEl.classList.remove('pulse');
+    void this.scrapPickupEl.offsetWidth;
+    this.scrapPickupEl.classList.add('pulse');
+    if (Number.isFinite(balance)) writeText(this.el.scrap,Math.max(0,Math.floor(balance)).toLocaleString('en-US'));
+  }
+
+  _updateNotices(dt) {
+    const elapsed = Math.max(0,Number(dt)||0);
+    if (this._bannerLife > 0) {
+      this._bannerLife -= elapsed;
+      if (this._bannerLife <= 0) this.el.banner.classList.remove('show');
+    }
+    for (const item of [...this._toastItems]) {
+      item.remaining -= elapsed;
+      if (item.remaining <= 0) {
+        clearTimeout(item.wallTimer);
+        item.el.remove();
+        this._toastItems.splice(this._toastItems.indexOf(item),1);
+      }
+    }
+    if (this._pickupLife > 0) {
+      this._pickupLife -= elapsed;
+      if (this._pickupLife <= 0) {
+        this._pickupAmount = 0;
+        this.scrapPickupEl.hidden = true;
+        this.scrapPickupEl.classList.remove('pulse');
+      }
+    }
+  }
+
+  clearNotices() {
+    for (const item of this._toastItems) clearTimeout(item.wallTimer);
+    this.el.toasts.innerHTML = '';
+    this._toastItems.length = 0;
+    this.el.banner.classList.remove('show');
+    this._bannerLife = 0;
+    this._pickupAmount = this._pickupLife = 0;
+    this.scrapPickupEl.hidden = true;
+    this.scrapPickupEl.classList.remove('pulse');
   }
 
   flashDodge() {
@@ -241,6 +338,10 @@ export class HUD {
 
   update(dt) {
     const g = this.game;
+
+    // Notifications use simulation time: pausing the game preserves tutorial
+    // reading time and pickup feedback instead of consuming wall-clock time.
+    this._updateNotices(dt);
 
     // throttle: the HUD does not need 60Hz text updates
     this._acc += dt;
@@ -350,8 +451,7 @@ export class HUD {
     this.arsenal.classList.remove('installed');
     this.clearObjective();
     this.stopTimer();
-    this.el.toasts.innerHTML = '';
-    this.el.banner.classList.remove('show');
+    this.clearNotices();
     this.el.heatGlow.style.opacity = '0';
   }
 }

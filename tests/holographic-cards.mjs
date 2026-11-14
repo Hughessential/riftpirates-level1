@@ -80,7 +80,7 @@ try {
       }
       return faults;
     });
-    window.__tick = () => { __input.pollGamepad(); RIFT.controllerMenus.update(); };
+    window.__tick = () => { __input.pollGamepad(); RIFT.controllerMenus.update(); RIFT.upgradeScreen.update(); };
     window.__pad = {
       id: 'OHSNAP MCON / holographic card test', index: 0, connected: true, mapping: 'standard',
       axes: [0, 0, 0, 0], buttons: Array.from({ length: 18 }, () => ({ pressed: false, value: 0 })),
@@ -212,6 +212,95 @@ try {
   await page.screenshot({ path: `${artifacts}/reduced-motion.png` });
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 
+  // A confirm held before the cache appears is carryover, not intent. Require
+  // release and a brand-new hold for both keyboard and physical controller A.
+  await page.evaluate(() => RIFT.upgradeScreen.hide());
+  await page.keyboard.down('Space');
+  await show();
+  const keyboardCarry = await page.evaluate(() => ({ before:RIFT.upgrades.taken.length, done:__done }));
+  await new Promise(resolve => setTimeout(resolve, 650));
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  assert.deepEqual(await page.evaluate(() => ({ taken:RIFT.upgrades.taken.length, open:RIFT.upgradeScreen.open, holding:document.querySelector('.holoCard').classList.contains('holding') })),
+    { taken:keyboardCarry.before, open:true, holding:false }, 'Space held before opening cannot purchase or begin progress');
+  await page.keyboard.up('Space');
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  await page.keyboard.down('Space');
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  await new Promise(resolve => setTimeout(resolve, 650));
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  await page.keyboard.up('Space');
+  await finish(keyboardCarry.before, keyboardCarry.done);
+
+  const controllerCarry = await page.evaluate(() => {
+    __pads=[__pad]; __pad.buttons[0]={pressed:true,value:1}; __input.pollGamepad();
+    const before=RIFT.upgrades.taken.length, done=__done;
+    __show();
+    return { before, done };
+  });
+  await page.waitForSelector('#upgradeScreen.in .holoCard');
+  await new Promise(resolve => setTimeout(resolve, 650));
+  await page.evaluate(() => __tick());
+  assert.deepEqual(await page.evaluate(() => ({ taken:RIFT.upgrades.taken.length, open:RIFT.upgradeScreen.open, holding:document.querySelector('.holoCard').classList.contains('holding') })),
+    { taken:controllerCarry.before, open:true, holding:false }, 'Controller A held before opening cannot purchase or begin progress');
+  await page.evaluate(() => { __pad.buttons[0]={pressed:false,value:0}; __tick(); __pad.buttons[0]={pressed:true,value:1}; __tick(); });
+  await new Promise(resolve => setTimeout(resolve, 650));
+  await page.evaluate(() => { __tick(); __pad.buttons[0]={pressed:false,value:0}; __tick(); });
+  await finish(controllerCarry.before, controllerCarry.done);
+
+  await show();
+  await page.evaluate(() => RIFT.upgradeScreen._select(0));
+  const pausedHold = await page.evaluate(() => ({ before:RIFT.upgrades.taken.length, done:__done }));
+  await page.keyboard.down('Space');
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  await new Promise(resolve => setTimeout(resolve, 250));
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  const prePauseHold = await page.evaluate(() => ({
+    holding:RIFT.upgradeScreen.cards.children[RIFT.upgradeScreen.sel].classList.contains('holding'), raw:__input.purchaseConfirmHeld,
+    latch:RIFT.upgradeScreen._holdLatch, paused:RIFT.paused, open:RIFT.upgradeScreen.open,
+    sel:RIFT.upgradeScreen.sel, active:document.activeElement?.className,
+  }));
+  assert.equal(prePauseHold.holding, true, `Fresh hold begins before pause: ${JSON.stringify(prePauseHold)}`);
+  await page.evaluate(() => RIFT.togglePause());
+  assert.deepEqual(await page.evaluate(() => ({ paused:RIFT.paused, holding:[...document.querySelectorAll('.holoCard')].some(card => card.classList.contains('holding')) })),
+    { paused:true, holding:false }, 'Pausing immediately cancels visible hold progress');
+  await new Promise(resolve => setTimeout(resolve, 700));
+  await page.evaluate(() => { RIFT.togglePause(); RIFT.upgradeScreen.update(); });
+  await new Promise(resolve => setTimeout(resolve, 650));
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  assert.deepEqual(await page.evaluate(() => ({ taken:RIFT.upgrades.taken.length, open:RIFT.upgradeScreen.open, holding:[...document.querySelectorAll('.holoCard')].some(card => card.classList.contains('holding')) })),
+    { taken:pausedHold.before, open:true, holding:false }, 'Held confirm cannot accrue wall time or resume after pause');
+  await page.keyboard.up('Space');
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  await page.keyboard.down('Space');
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  await new Promise(resolve => setTimeout(resolve, 650));
+  await page.evaluate(() => RIFT.upgradeScreen.update());
+  await page.keyboard.up('Space');
+  await finish(pausedHold.before, pausedHold.done);
+
+  for (const key of ['Enter', 'Space']) {
+    await show();
+    const skip = await page.evaluate(() => ({ before:RIFT.upgrades.taken.length, done:__done, balance:RIFT.scrap.wallet.balance }));
+    await page.focus('.upSkip');
+    await page.keyboard.press(key);
+    assert.equal(await page.evaluate(() => RIFT.upgradeScreen.open), false, `${key} natively activates focused Skip`);
+    await page.evaluate(() => RIFT.scheduler.update(.3));
+    assert.deepEqual(await page.evaluate(() => ({ taken:RIFT.upgrades.taken.length, done:__done, balance:RIFT.scrap.wallet.balance })),
+      { taken:skip.before, done:skip.done + 1, balance:skip.balance }, `${key} Skip neither buys nor spends`);
+  }
+
+  // The shop owns A/D, including the Skip slot, and wraps without feeding a
+  // gameplay roll request into the player beneath the overlay.
+  await show();
+  await page.evaluate(() => { __input.enabled = false; __input._rollQueue = 0; RIFT.upgradeScreen._select(0); });
+  await page.keyboard.press('KeyA');
+  assert.deepEqual(await page.evaluate(() => ({ sel:RIFT.upgradeScreen.sel, skip:document.activeElement.matches('.upSkip'), roll:__input.consumeRoll() })),
+    { sel:3, skip:true, roll:0 }, 'A wraps left from the first card to Skip without rolling');
+  await page.keyboard.press('KeyD');
+  assert.deepEqual(await page.evaluate(() => ({ sel:RIFT.upgradeScreen.sel, first:document.activeElement.matches('.holoCard:nth-child(1)'), roll:__input.consumeRoll() })),
+    { sel:0, first:true, roll:0 }, 'D wraps right from Skip to the first card without rolling');
+  await page.evaluate(() => { RIFT.upgradeScreen.hide(); __input.enabled = true; });
+
   for (const input of ['mouse', 'keyboard', 'keyboard-focus', 'touch', 'gamepad']) {
     await show();
     const index = input === 'mouse' ? 0 : input === 'touch' ? 2 : 1;
@@ -220,12 +309,32 @@ try {
       balance: RIFT.scrap.wallet.balance, spent: RIFT.scrap.wallet.spent, price: RIFT.upgradeScreen._offers[index].price,
     }), index);
     if (input === 'mouse') await page.click('.holoCard:nth-child(1)');
-    if (input === 'keyboard') await page.keyboard.press('Digit2');
+    if (input === 'keyboard') {
+      await page.keyboard.press('Digit2');
+      assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), before, 'Number key focuses without purchasing');
+      await page.keyboard.down('Space');
+      await page.evaluate(() => RIFT.upgradeScreen.update());
+      await new Promise(resolve => setTimeout(resolve, 250));
+      await page.evaluate(() => RIFT.upgradeScreen.update());
+      assert.equal(await page.$eval('.holoCard:nth-child(2)', card => card.classList.contains('holding') && Number(card.style.getPropertyValue('--hold-progress')) > 0), true, 'Hold progress is visible');
+      await page.keyboard.up('Space');
+      await page.evaluate(() => RIFT.upgradeScreen.update());
+      assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), before, 'Early release cancels cleanly');
+      await page.keyboard.down('Space');
+      await page.evaluate(() => RIFT.upgradeScreen.update());
+      await new Promise(resolve => setTimeout(resolve, 650));
+      await page.evaluate(() => RIFT.upgradeScreen.update());
+      await page.keyboard.up('Space');
+    }
     if (input === 'keyboard-focus') {
       await page.focus('.holoCard:nth-child(1)');
       await page.keyboard.press('Tab');
       assert.equal(await page.evaluate(() => document.activeElement.matches('.holoCard:nth-child(2)')), true, 'Native keyboard focus reaches the next card');
       await page.keyboard.press('Enter');
+      assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), before, 'Enter cannot bypass hold confirmation');
+      await page.keyboard.down('Space'); await page.evaluate(() => RIFT.upgradeScreen.update());
+      await new Promise(resolve => setTimeout(resolve, 650));
+      await page.evaluate(() => RIFT.upgradeScreen.update()); await page.keyboard.up('Space');
     }
     if (input === 'touch') {
       const card = await page.$('.holoCard:nth-child(3)');
@@ -235,7 +344,9 @@ try {
     if (input === 'gamepad') {
       await page.evaluate(() => { __pads = [__pad]; __tick(); __press(15); });
       assert.equal(await page.evaluate(() => document.activeElement.matches('.holoCard')), true, 'Controller focuses a native card');
-      await page.evaluate(() => __press(0));
+      await page.evaluate(() => { __pad.buttons[0]={pressed:true,value:1}; __tick(); });
+      await new Promise(resolve => setTimeout(resolve, 650));
+      await page.evaluate(() => { __tick(); __pad.buttons[0]={pressed:false,value:0}; __tick(); });
     }
     await page.evaluate(() => {
       document.querySelector('.holoCard').click();

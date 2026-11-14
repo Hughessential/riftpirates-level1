@@ -181,7 +181,8 @@ export class FinalEscape {
     this.game.env.warpStars(.015);
     this._escalate();
     this.game.hud.banner('REACH THE FINAL RIFT', P.cyan);
-    this.game.hud.toast('THE GALAXY IS COLLAPSING', 'Fire through the armada. Boost through cyan gaps.', P.magenta);
+    this.game.hud.toast('REACH THE FINAL RIFT', 'FIRE THROUGH THE ARMADA · HOLD BOOST · STEER THROUGH CYAN OPENINGS', P.magenta,
+      { category: 'instruction', duration: 5.4 });
     Audio2.play('overload', .7, .68);
   }
 

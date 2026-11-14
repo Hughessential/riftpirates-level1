@@ -140,17 +140,24 @@
       <div class="menuLaunchNote"><b>ENTER THE RIFT</b><span>PLUNDER SCRAP. PURCHASE AUGMENTS.</span></div>
     </div>
     <div id="bootStatus" class="menuBoot" role="status"><span>ASSEMBLING THE ARMADA</span><progress id="bootProgress" max="1" value="0"></progress></div>
-    <div id="titleStats" class="stat menuStat"></div>
-    <div class="menuAudio audioMixer" aria-label="Audio settings">
-      <div class="audioChannel" data-audio-channel="music">
-        <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl">MUSIC: ON</button><output for="musicVolume" id="musicVolumeValue">65%</output></div>
-        <label class="audioVolumeLabel" for="musicVolume">Music volume</label>
-        <input type="range" id="musicVolume" min="0" max="100" step="1" value="65" data-audio-volume="music">
+    <div class="menuSettingsBlock">
+      <div id="titleStats" class="stat menuStat"></div>
+      <div class="menuAudio audioMixer" aria-label="Audio settings">
+        <div class="audioChannel" data-audio-channel="music">
+          <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl">MUSIC: ON</button><output for="musicVolume" id="musicVolumeValue">75%</output></div>
+          <label class="audioVolumeLabel" for="musicVolume">Music volume</label>
+          <input type="range" id="musicVolume" min="0" max="100" step="1" value="75" data-audio-volume="music">
+        </div>
+        <div class="audioChannel" data-audio-channel="sfx">
+          <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl">SFX: ON</button><output for="sfxVolume" id="sfxVolumeValue">75%</output></div>
+          <label class="audioVolumeLabel" for="sfxVolume">Sound effects volume</label>
+          <input type="range" id="sfxVolume" min="0" max="100" step="1" value="75" data-audio-volume="sfx">
+        </div>
       </div>
-      <div class="audioChannel" data-audio-channel="sfx">
-        <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl">SFX: ON</button><output for="sfxVolume" id="sfxVolumeValue">85%</output></div>
-        <label class="audioVolumeLabel" for="sfxVolume">Sound effects volume</label>
-        <input type="range" id="sfxVolume" min="0" max="100" step="1" value="85" data-audio-volume="sfx">
+      <div class="uiScaleSetting" aria-label="Interface settings">
+        <div><label for="uiScale">UI SIZE</label><output for="uiScale" id="uiScaleValue">110%</output></div>
+        <input type="range" id="uiScale" min="80" max="140" step="5" value="110" data-ui-scale>
+        <button type="button" class="btnGhost tutorialReplayBtn">REPLAY TUTORIAL NEXT RUN</button>
       </div>
     </div>
   </main>
@@ -162,7 +169,7 @@
       <span><i>03</i> CITADEL</span><span><i>04</i> INHIBITOR</span><span class="routeBoss"><i>05</i> THE ADMIRAL</span>
     </div>
     <div class="menuBottomline">
-      <span class="menuControls"><b>WASD</b> FLY <b>SPACE</b> FIRE <b>F</b> LOCK <b>SHIFT</b> BOOST <b>Q / E</b> ROLL <b>P</b> PAUSE <span>· CONTROLLER READY</span></span>
+      <span class="menuControls"><b>WASD / ARROWS</b> FLY · <b>SPACE / RT</b> FIRE · <b>F / X</b> LOCK · <b>SHIFT / LT</b> BOOST · <b>DOUBLE-TAP LEFT / RIGHT</b> ROLL · <b>P</b> PAUSE</span>
       <span class="menuSignature">PIRATES TAKE IT BACK. <b>✦</b></span>
     </div>
   </footer>
@@ -183,15 +190,20 @@
     <button class="btnBig pauseResume" id="resumeBtn">RESUME THE RAID <span aria-hidden="true">&gt;</span></button>
     <div class="pauseAudio audioMixer" aria-label="Audio settings">
       <div class="audioChannel" data-audio-channel="music">
-        <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl2">MUSIC: ON</button><output for="musicVolume2" id="musicVolume2Value">65%</output></div>
+        <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl2">MUSIC: ON</button><output for="musicVolume2" id="musicVolume2Value">75%</output></div>
         <label class="audioVolumeLabel" for="musicVolume2">Music volume</label>
-        <input type="range" id="musicVolume2" min="0" max="100" step="1" value="65" data-audio-volume="music">
+        <input type="range" id="musicVolume2" min="0" max="100" step="1" value="75" data-audio-volume="music">
       </div>
       <div class="audioChannel" data-audio-channel="sfx">
-        <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl2">SFX: ON</button><output for="sfxVolume2" id="sfxVolume2Value">85%</output></div>
+        <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl2">SFX: ON</button><output for="sfxVolume2" id="sfxVolume2Value">75%</output></div>
         <label class="audioVolumeLabel" for="sfxVolume2">Sound effects volume</label>
-        <input type="range" id="sfxVolume2" min="0" max="100" step="1" value="85" data-audio-volume="sfx">
+        <input type="range" id="sfxVolume2" min="0" max="100" step="1" value="75" data-audio-volume="sfx">
       </div>
+    </div>
+    <div class="uiScaleSetting pauseUiScale" aria-label="Interface settings">
+      <div><label for="uiScale2">UI SIZE</label><output for="uiScale2" id="uiScale2Value">110%</output></div>
+      <input type="range" id="uiScale2" min="80" max="140" step="5" value="110" data-ui-scale>
+      <button type="button" class="btnGhost tutorialReplayBtn">REPLAY TUTORIAL NEXT RUN</button>
     </div>
     <button class="btnGhost danger pauseQuit" id="quitBtn">ABANDON RUN</button>
     <div class="pauseKey">PRESS <b>P</b> OR <b>ESC</b> TO RETURN</div>
@@ -203,7 +215,7 @@
   <div class="eyebrow" id="upgradeTitle">UPGRADE CACHE</div>
   <div class="upSub" id="upgradeSub">CHOOSE ONE</div>
   <div id="upgradeCards"></div>
-  <div class="upHint">CLICK A CARD &middot; PRESS <b>1</b> <b>2</b> <b>3</b> &middot; OR <b>D-PAD</b> + <b>A</b></div>
+  <div class="upHint">A / D OR ARROWS SELECT · HOLD SPACE / A TO INSTALL · S SKIP &amp; SAVE</div>
 </div>
 
 <!-- ======================= results ======================= -->

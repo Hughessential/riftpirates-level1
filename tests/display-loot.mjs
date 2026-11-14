@@ -86,7 +86,8 @@ try {
     assert.equal(bounds.canvas.width, width); assert.equal(bounds.canvas.height, height);
     assert.ok(Math.abs(bounds.canvasW / bounds.canvasH - width / height) < .002);
     assert.equal(bounds.canvasW, bounds.targetW); assert.equal(bounds.canvasH, bounds.targetH);
-    assert.ok(bounds.main.bottom < bounds.footer.y, `Main/footer clearance at ${width}×${height}`);
+    assert.ok(bounds.main.bottom < bounds.footer.y,
+      `Main/footer clearance at ${width}×${height}: ${JSON.stringify({ main: bounds.main, footer: bounds.footer })}`);
     assert.ok(bounds.ship.bottom < bounds.footer.y && bounds.ship.right <= width);
     assert.ok(bounds.launch.right <= width && bounds.launch.y > 0);
     if (width >= 2560) assert.ok(bounds.logo.width > 1000, 'Title grows proportionally on large displays');

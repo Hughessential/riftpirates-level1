@@ -20,6 +20,25 @@ import { ApproachScenery, LivingDebrisField } from './ApproachScenery.js';
 const SPAWN_Z = -190;
 const KILL_Z = 22;
 
+export const CRATE_GLOW_PROFILE = Object.freeze({
+  normal: Object.freeze({ rate: 4.8, haloMin: 5.1, haloMax: 7.8, haloOpacityMin: .42, haloOpacityMax: .92,
+    coreMin: 2.3, coreMax: 3.25, coreOpacityMin: .54, coreOpacityMax: .9 }),
+  reduced: Object.freeze({ rate: .72, haloMin: 5.7, haloMax: 6.35, haloOpacityMin: .58, haloOpacityMax: .74,
+    coreMin: 2.55, coreMax: 2.8, coreOpacityMin: .66, coreOpacityMax: .76 }),
+});
+
+/** Localized, deterministic cache shimmer. Reduced motion keeps the treasure
+ * unmistakably bright while replacing the fast beat with a slow breathing cue. */
+export function crateGlowState(time, phase = 0, reducedMotion = false, out = {}) {
+  const p = reducedMotion ? CRATE_GLOW_PROFILE.reduced : CRATE_GLOW_PROFILE.normal;
+  const wave = .5 + .5 * Math.sin(Math.max(0, Number(time) || 0) * p.rate + phase);
+  out.haloSize = p.haloMin + (p.haloMax - p.haloMin) * wave;
+  out.haloOpacity = p.haloOpacityMin + (p.haloOpacityMax - p.haloOpacityMin) * wave;
+  out.coreSize = p.coreMin + (p.coreMax - p.coreMin) * wave;
+  out.coreOpacity = p.coreOpacityMin + (p.coreOpacityMax - p.coreOpacityMin) * wave;
+  return out;
+}
+
 export class Environment {
   constructor(scene, game) {
     this.scene = scene;
@@ -202,8 +221,17 @@ export class Environment {
     this.lootSerial = (this.lootSerial || 0) + 1;
     o.lootSourceId = opts.sourceId || `crate:${this.game.director?.state}:${this.lootSerial}`;
     o.lootValue = opts.value ?? 75;
-    if (!o.lootHalo) { o.lootHalo = glowSprite(P.gold,5,.32); o.g.add(o.lootHalo); }
+    if (!o.lootHalo) {
+      o.lootHalo = glowSprite(P.gold, 6, .68);
+      o.lootCore = glowSprite(P.white, 2.7, .76);
+      o.lootGlowState = {};
+      o.g.add(o.lootHalo, o.lootCore);
+    }
+    o.lootGlowPhase = (this.lootSerial * 2.399963) % TAU;
+    o.lootGlowReduced = Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
     o.lootHalo.visible = true;
+    o.lootCore.visible = true;
+    this._paintCrateGlow(o);
     o.target = new Target({ object3D:o.g,hp:35,radius:o.radius,priority:PRIORITY.ENEMY+5,
       kind:'treasure',label:`TREASURE CACHE / ${o.lootValue} SCRAP`,scrap:0,score:0,xp:0,
       onDeath:()=>this._openCrate(o), });
@@ -267,6 +295,8 @@ export class Environment {
   _release(o) {
     o.active = false;
     o.g.visible = false;
+    if (o.lootHalo) o.lootHalo.visible = false;
+    if (o.lootCore) o.lootCore.visible = false;
     if (o.target) {
       o.target.alive = false;
       o.target.targetable = false;
@@ -275,6 +305,14 @@ export class Environment {
   }
 
   // --- per-frame -----------------------------------------------------------
+
+  _paintCrateGlow(o) {
+    const glow = crateGlowState(this.game.time, o.lootGlowPhase, o.lootGlowReduced, o.lootGlowState);
+    o.lootHalo.material.opacity = glow.haloOpacity;
+    o.lootHalo.scale.set(glow.haloSize, glow.haloSize, 1);
+    o.lootCore.material.opacity = glow.coreOpacity;
+    o.lootCore.scale.set(glow.coreSize, glow.coreSize, 1);
+  }
 
   update(dt) {
     const g = this.game;
@@ -332,6 +370,7 @@ export class Environment {
       o.g.position.z += ws * (o.zf ?? 1) * dt;
       o.g.rotation.x += o.spin.x * dt;
       o.g.rotation.y += o.spin.y * dt;
+      this._paintCrateGlow(o);
       if (o.g.position.z > KILL_Z) {
         this._release(o);
         continue;

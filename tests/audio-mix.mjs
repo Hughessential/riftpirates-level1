@@ -81,8 +81,8 @@ try {
       summaries.push(summary);
       return { data, summary };
     }
-    const oldDefault = await render({ legacy: true, musicVolume: .65, sfxVolume: .85 });
-    const safeDefault = await render({ musicVolume: .65, sfxVolume: .85 });
+    const oldDefault = await render({ legacy: true, musicVolume: .75, sfxVolume: .75 });
+    const safeDefault = await render({ musicVolume: .75, sfxVolume: .75 });
     const oldMaximum = await render({ legacy: true });
     const safeMaximum = await render();
     const cleanMusic = await render({ musicOnly: true });

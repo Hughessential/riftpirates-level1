@@ -175,7 +175,6 @@ export class LevelDirector {
         g.hud.clearObjective();
         g.hud.setObjective('REACH THE FINAL RIFT', 'THE GALAXY IS COLLAPSING', P.cyan);
         g.hud.banner('THE NEXUS IS GONE. THE COLLAPSE HAS BEGUN.', P.violet);
-        g.hud.toast('REACH THE FINAL RIFT', 'HOLD BOOST · STEER THROUGH CYAN OPENINGS', P.cyan);
         g.escape.start();
         g.hud.startTimer(g.escape.remaining, 'GALACTIC COLLAPSE');
         Audio2.playEscape(.7, { restart: true });
@@ -267,11 +266,15 @@ export class LevelDirector {
     g.clearHazards();
     g.projectiles.reset();
     g.setWorldMood(color, 0.72, 0.8);
+    Input.enabled = false;
+    Input.reset();
 
     g.after(0.9, () => {
       g.upgradeScreen.show(cacheIndex, color, () => {
         // camera reorients toward the next sector, forward movement resumes
         g.camera3.setMode('traversal');
+        Input.reset();
+        Input.enabled = true;
         this.go(nextState);
       });
     });
@@ -338,15 +341,26 @@ export class LevelDirector {
     const d = this.data;
     if (event.cue) g.hud.toast(event.cue, event.hint, P.gold);
     if (event.type === 'wave') {
-      this._makePatrolRoom(event.enemies.length);
+      const pressure = g.tutorial?.approachPressure?.(d.sector, this.stateT);
+      const cap = pressure?.maxEnemies ?? d.cfg.maxEnemies ?? 7;
+      const available = Math.max(0, cap - g.enemies.countAlive());
+      const arrivals = pressure ? event.enemies.slice(0, available) : event.enemies;
+      // Normal authored waves retain their existing retirement/room behavior.
+      // The tutorial ramp never despawns an unclaimed teaching target to make
+      // room; it simply waits for a later authored cue.
+      if (!pressure) this._makePatrolRoom(arrivals.length);
       const side = event.formation === 'left' ? -1 : event.formation === 'right' ? 1 : 0;
-      event.enemies.forEach((type, i) => {
-        if (g.enemies.countAlive() >= (d.cfg.maxEnemies ?? 7)) return;
-        const slot = i - (event.enemies.length - 1) / 2;
+      arrivals.forEach((type, i) => {
+        if (g.enemies.countAlive() >= cap) return;
+        const slot = i - (arrivals.length - 1) / 2;
         const x = side ? side * 12 + slot * 4 : slot * 9;
-        g.enemies.spawn(type, x, 5 + Math.abs(slot) * 2, -95 - i * 5, {
+        const enemy = g.enemies.spawn(type, x, 5 + Math.abs(slot) * 2, -95 - i * 5, {
           fx: x, fy: 3 + Math.abs(slot) * 2, fz: -30 - Math.abs(slot) * 4,
         });
+        if (enemy && pressure) {
+          enemy.fireT = Math.max(enemy.fireT, pressure.routeFireDelay);
+          enemy.special.cooldown = Math.max(enemy.special.cooldown, pressure.routeFireDelay);
+        }
       });
     } else if (event.type === 'salvage') {
       g.env.spawnCrate({ x: event.x, y: event.y, value:75, sourceId:`wreckline:${d.sector}:${event.at}` });
@@ -354,7 +368,8 @@ export class LevelDirector {
       g.hud.toast('SALVAGE LANE', event.x < 0 ? 'Gold cache on your left' : event.x > 0 ? 'Gold cache on your right' : 'Gold cache ahead', P.gold);
     } else if (event.type === 'gate') {
       g.env.spawnGate({ x: event.x, y: event.y, rotation: event.rotation, spin: 0, drift: 0 });
-      g.hud.toast('LASER GATE INBOUND', 'Roll or steer around the magenta beam', P.magenta);
+      g.hud.toast('LASER GATE INBOUND', 'Roll or steer around the magenta beam', P.magenta,
+        { category: 'instruction', duration: 5 });
     } else if (event.type === 'ace') {
       // Guarantee space for the priority target even if the patrol is still alive.
       this._makePatrolRoom(1);
@@ -614,7 +629,8 @@ export class LevelDirector {
         g.scrap.burst(event.x,event.y,-54,event.value,.1,{ sourceId:event.sourceId,bundle:true,kind:'route',life:20 });
       } else {
         g.env.spawnCrate({ x:event.x,y:event.y,z:-64,value:event.value,sourceId:event.sourceId });
-        g.hud.toast('TREASURE POCKET', `${event.x<0?'LEFT':'RIGHT'} FLANK · BREAK THE GLOWING CACHE`, P.gold);
+        g.hud.toast('TREASURE POCKET', `${event.x<0?'LEFT':'RIGHT'} FLANK · BREAK THE GLOWING CACHE`, P.gold,
+          { category: 'instruction', duration: 4.8 });
       }
     }
 

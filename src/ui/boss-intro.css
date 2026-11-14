@@ -1,6 +1,7 @@
 /* Encounter-only cinema. Every animation is driven by the paused game clock. */
 .bossIntro{--boss-color:#20e7de;--intro-in:0;--intro-out:0;--intro-title:0;--intro-progress:0;
-  position:fixed;inset:0;z-index:18;overflow:hidden;pointer-events:none;color:#eaffff;
+  position:fixed;inset:0 auto auto 0;width:calc(100%/var(--ui-user-scale));height:calc(100%/var(--ui-user-scale));
+  transform:scale(var(--ui-user-scale));transform-origin:top left;z-index:18;overflow:hidden;pointer-events:none;color:#eaffff;
   font-family:'Rift Pixel',monospace;opacity:calc(1 - var(--intro-out));
   background:linear-gradient(90deg,rgba(0,0,4,.22),transparent 55%),linear-gradient(0deg,rgba(0,0,6,.82),transparent 40%)}
 .bossIntro[hidden]{display:none!important}
@@ -28,7 +29,7 @@
 .bossIntroSignalDot{width:6px;height:6px;background:var(--boss-color);box-shadow:0 0 10px var(--boss-color)}
 .bossIntroSignal i{display:block;width:clamp(60px,8vw,150px);height:2px;background:#ffffff1a}
 .bossIntroSignal i b{display:block;height:100%;width:calc(var(--intro-progress)*100%);background:var(--boss-color)}
-.bossIntroCopy{position:absolute;left:5.5%;bottom:17.5%;width:min(80vw,1400px);text-align:left;
+.bossIntroCopy{position:absolute;left:5.5%;bottom:17.5%;width:min(calc(80vw/var(--ui-user-scale)),calc(1400px/var(--ui-user-scale)));text-align:left;
   opacity:var(--intro-title);transform:translateY(calc((1 - var(--intro-title))*18px))}
 .bossIntroOverline{font-size:clamp(10px,.85vw,19px);color:var(--boss-color);letter-spacing:.25em;margin:0 0 15px}
 .bossIntroCopy h2{margin:0;font:inherit;font-size:clamp(30px,4.8vw,100px);font-weight:normal;line-height:1.2;letter-spacing:.005em;
@@ -45,7 +46,7 @@ body.bossIntroActive #objectiveName,body.bossIntroActive #encTimer,body.bossIntr
 body.bossIntroActive #banner,body.bossIntroActive #toasts,body.bossIntroActive #boostBtn,body.bossIntroActive #fireBtn,
 body.bossIntroActive #arsenalReadout{visibility:hidden}
 @media(max-width:900px){.bossIntroHeader{font-size:8px}.bossIntroHeader>span{max-width:35%;line-height:1.8}
-  .bossIntroHeader>div{gap:6px}.bossIntroCopy{bottom:21%;width:88vw}.bossIntroCopy h2{font-size:clamp(22px,5.4vw,46px)}
+  .bossIntroHeader>div{gap:6px}.bossIntroCopy{bottom:21%;width:calc(88vw/var(--ui-user-scale))}.bossIntroCopy h2{font-size:clamp(22px,5.4vw,46px)}
   .bossIntroFooter strong{display:none}.bossIntroFooter{bottom:2vh}.bossIntroSignal{top:17%;font-size:7px}}
 @media(max-height:600px){.bossIntroCopy{bottom:17%}.bossIntroCopy h2{font-size:clamp(22px,7vh,44px)}
   .bossIntroOverline{margin-bottom:8px}.bossIntroQuote{margin-top:8px}.bossIntroSignal{top:19%}}

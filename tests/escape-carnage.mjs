@@ -31,7 +31,7 @@ try {
     };
   });
   page.on('pageerror', e => errors.push(e.message));
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto('http://localhost:8000/?lab=unlock', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   await page.click('#testingGroundsBtn');
   await page.evaluate(async () => {

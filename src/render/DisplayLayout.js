@@ -13,7 +13,9 @@ export function displayMetrics(width, height, density = 1, maxTextureSize = 8192
 
 export function applyDisplayLayout(metrics) {
   const style = document.documentElement.style;
-  style.setProperty('--menu-scale', metrics.menuScale.toFixed(4));
+  const userScale = Math.max(.8, Math.min(1.4, Number(document.documentElement.dataset.uiScale) || 1.1));
+  style.setProperty('--viewport-menu-scale', metrics.menuScale.toFixed(4));
+  style.setProperty('--menu-scale', (metrics.menuScale * userScale).toFixed(4));
   style.setProperty('--menu-stage', `${metrics.stageWidth}px`);
   style.setProperty('--menu-left', `${metrics.stageLeft}px`);
 }

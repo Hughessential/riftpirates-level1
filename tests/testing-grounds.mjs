@@ -18,12 +18,15 @@ try {
   await page.setViewport({ width: 1440, height: 900 });
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto('http://localhost:8000/?lab=unlock', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT?.testing && !document.getElementById('launchBtn').disabled,
     { timeout: 120000 });
   const beforeSave = await page.evaluate(() => JSON.stringify(window.RIFT.save.data));
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const g = window.RIFT;
+    const inputUrl = performance.getEntriesByType('resource')
+      .find(entry => new URL(entry.name).pathname.endsWith('/src/core/Input.js')).name;
+    window.__labInput = (await import(inputUrl)).Input;
     window.__labStep = g.update.bind(g);
     window.__labRender = g.renderFrame.bind(g);
     g.update = () => {}; g.renderFrame = () => {};
@@ -82,8 +85,8 @@ try {
   assert.equal(protection.normalHit, true); assert.equal(protection.vulnerable, true);
   assert.equal(protection.broken, true, 'Deliberate shield test bypasses god mode');
 
-  const movement = await page.evaluate(async () => {
-    const { Input } = await import('/src/core/Input.js');
+  const movement = await page.evaluate(() => {
+    const Input = window.__labInput;
     const g = window.RIFT, p = g.player;
     g.testing.setSetting('infiniteBoost', true); g.testing.setSetting('unlimitedRolls', true);
     p.boost = 0; p.rollCd = 20;
@@ -126,8 +129,8 @@ try {
   assert.ok(Object.values(rebuild.all.ranks).every(r => r === 1));
   assert.equal(rebuild.all.finite, true); assert.equal(rebuild.cleared, true);
 
-  const firing = await page.evaluate(async () => {
-    const { Input } = await import('/src/core/Input.js');
+  const firing = await page.evaluate(() => {
+    const Input = window.__labInput;
     const g = window.RIFT, lab = g.testing;
     lab.clearArena(); lab.spawnDummies();
     const t = g.targets.find(t => t.alive && t.targetable && Math.abs(t.pos.x) < 1) || g.targets.find(t => t.alive);

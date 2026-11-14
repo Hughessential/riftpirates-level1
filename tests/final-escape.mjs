@@ -3,11 +3,12 @@ import { launchRun } from './helpers/start-run.mjs';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import { PILOT_IDENTITY_DEFAULTS } from '../src/core/PilotName.js';
-import { AUDIO_DEFAULTS } from '../src/core/SaveSystem.js';
+import { AUDIO_DEFAULTS, UI_SCALE_DEFAULT } from '../src/core/SaveSystem.js';
 
 const legacy = { scrapBanked: 321, bestScore: 1234567, bestTime: 900, bestGrade: 'S',
   runs: 11, clears: 4, music: 0, sfx: 1, seenIntro: 1, selectedShip: 'void-corsair' };
-const migratedLegacy = { ...legacy, ...AUDIO_DEFAULTS, ...PILOT_IDENTITY_DEFAULTS, lastBankedRunId: '' };
+const migratedLegacy = { ...legacy, ...AUDIO_DEFAULTS, uiScale: UI_SCALE_DEFAULT, tutorialComplete: false,
+  ...PILOT_IDENTITY_DEFAULTS, lastBankedRunId: '' };
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true, protocolTimeout: 180000,
@@ -29,7 +30,9 @@ try {
     const g = window.RIFT;
     window.__escapeStep = g.update.bind(g); window.__escapeRender = g.renderFrame.bind(g);
     g.update = () => {}; g.renderFrame = () => {};
-    window.__escapeInput = (await import('/src/core/Input.js')).Input;
+    const inputUrl = performance.getEntriesByType('resource')
+      .find(entry => /\/src\/core\/Input\.js(?:\?|$)/.test(entry.name)).name;
+    window.__escapeInput = (await import(inputUrl)).Input;
     window.__escapeBankCalls = 0;
     const bank = g.save.bankRun.bind(g.save);
     g.save.bankRun = run => { window.__escapeBankCalls++; return bank(run); };
@@ -306,7 +309,7 @@ try {
     if (decodeURIComponent(req.url()).endsWith('/music/The Very Very End.mp3')) { blockedFinale++; req.abort(); }
     else req.continue();
   });
-  await silentPage.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await silentPage.goto('http://localhost:8000/?lab=unlock', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await silentPage.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled,
     { timeout: 120000 });
   await silentPage.click('#testingGroundsBtn');

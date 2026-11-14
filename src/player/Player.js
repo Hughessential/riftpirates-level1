@@ -51,6 +51,9 @@ const ROLL_TIME = 0.42; // spin + i-frame duration
 const ROLL_CD = 0.7; // cooldown between rolls
 const ROLL_COST = 24; // boost energy spent per roll
 const ROLL_DASH = 30; // lateral dash speed at the start of the roll
+const NORMAL_ENGINE = new THREE.Color('#43eaff');
+const BOOST_ENGINE = new THREE.Color('#ff6a22');
+const BOOST_FLARE = new THREE.Color('#ffd34f');
 
 export class Player {
   constructor(scene, fx) {
@@ -65,19 +68,19 @@ export class Player {
 
     this.engines = [];
     for (const ex of [-0.48, 0, 0.48]) {
-      const gs = glowSprite(P.magenta, 1.4);
+      const gs = glowSprite(NORMAL_ENGINE, 1.4, .45);
       gs.position.set(ex, -0.32, 2.4);
       this.group.add(gs);
       this.engines.push(gs);
     }
 
     // boost trail — stronger while boosting (spec §5)
-    this.trail = glowSprite(P.cyan, 0, 0.3);
+    this.trail = glowSprite(BOOST_FLARE, 0, 0.3);
     this.trail.position.set(0, -0.2, 4.5);
     this.group.add(this.trail);
 
-    // aim reticle — sits on the fire line ahead of the nose while the aim
-    // trigger is held. A bright glowing red ring + crosshair; gold on lock.
+    // Flight reticle — a crisp flat sight line that stays readable without
+    // bloom. Aim/lock changes only its restrained solid color.
     this.reticle = new THREE.Group();
     const retMat = (opacity = 1) =>
       new THREE.MeshBasicMaterial({
@@ -104,16 +107,15 @@ export class Player {
       this.reticleTicks.push(tick);
       this.reticle.add(tick);
     }
-    // soft red halo behind the ring + hot center dot, so it reads as glowing
-    this.reticleGlow = glowSprite(P.red, 5.5, 0.55);
-    this.reticleGlow.renderOrder = 39;
-    this.reticleDot = glowSprite(P.red, 1.6, 1);
+    this.reticleDot = new THREE.Mesh(new THREE.CircleGeometry(.13, 16), retMat(1));
     this.reticleDot.renderOrder = 42;
-    this.reticle.add(this.reticleRing, this.reticleGlow, this.reticleDot);
+    this.reticle.add(this.reticleRing, this.reticleDot);
     this.reticle.position.set(0, 0.05, -26);
     this.reticle.visible = false;
     this.group.add(this.reticle);
     this.reticleLock = false;
+    this._boostVisual = 0;
+    this._engineColor = new THREE.Color();
 
     // shield bubble (only visible with the Shield Recharge upgrade)
     this.shieldMesh = new THREE.Mesh(
@@ -194,6 +196,8 @@ export class Player {
     this.frozen = false;
     this.reticle.visible = false;
     this.reticleLock = false;
+    this.reticle.scale.setScalar(1);
+    this._boostVisual = 0;
   }
 
   applyStats(stats) {
@@ -224,6 +228,10 @@ export class Player {
 
   get secondWindCharges() {
     return Math.max(0, Number(this.stats.secondWind) - this.secondWindUsed);
+  }
+
+  setReticleActive(active) {
+    this.reticle.visible = Boolean(active && this.alive && this.group.visible);
   }
 
   update(dt, ctx) {
@@ -360,26 +368,25 @@ export class Player {
     }
 
     // ---- aim reticle ----
-    const aiming = !this.frozen && Input.aiming;
-    this.reticle.visible = aiming;
-    if (aiming) {
-      const col = this.reticleLock ? P.gold : P.red;
-      this.reticleRing.material.color.set(col);
-      this.reticleDot.material.color.set(col);
-      this.reticleGlow.material.color.set(col);
-      for (const t of this.reticleTicks) t.material.color.set(col);
-      const pulse = 1 + (this.reticleLock ? 0.12 : 0.05) * Math.sin(ctx.time * (this.reticleLock ? 10 : 6));
-      this.reticle.scale.setScalar(pulse);
-    }
+    const col = this.reticleLock ? P.gold : P.red;
+    this.reticleRing.material.color.set(col);
+    this.reticleDot.material.color.set(col);
+    for (const t of this.reticleTicks) t.material.color.set(col);
+    this.reticle.scale.setScalar(1);
 
     // ---- visuals ----
-    const boostGlow = this.boosting ? 1 : 0;
+    this._boostVisual = THREE.MathUtils.damp(this._boostVisual, this.boosting ? 1 : 0, 18, dt);
+    this._engineColor.lerpColors(NORMAL_ENGINE, BOOST_ENGINE, this._boostVisual);
     this.engines.forEach((sp, i) => {
-      const f = 1.15 + Math.sin(ctx.time * 31 + i) * 0.12 + boostGlow * 0.5;
-      sp.scale.set(f, f * 1.6, 1);
+      sp.material.color.copy(this._engineColor);
+      sp.material.opacity = .42 + this._boostVisual * .48;
+      const f = .72 + Math.sin(ctx.time * 31 + i) * .055 + this._boostVisual * 1.05;
+      sp.scale.set(f, f * (1.35 + this._boostVisual * .8), 1);
     });
-    const tScale = damp(this.trail.scale.x, this.boosting ? 2.2 : 0, 12, dt);
-    this.trail.scale.set(tScale, tScale * 0.55, 1);
+    this.trail.material.color.copy(BOOST_FLARE);
+    this.trail.material.opacity = .15 + this._boostVisual * .65;
+    const tScale = damp(this.trail.scale.x, this._boostVisual * 3, 16, dt);
+    this.trail.scale.set(tScale, tScale * .42, 1);
 
   }
 

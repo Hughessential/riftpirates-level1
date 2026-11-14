@@ -152,7 +152,10 @@ try {
   // Replaying from the held lab console must return live controls when the
   // reveal ends, even though input was disabled at the moment it began.
   const labReplay = await page.evaluate(async () => {
-    const g = window.RIFT, input = (await import('/src/core/Input.js')).Input;
+    const g = window.RIFT;
+    const inputUrl = performance.getEntriesByType('resource').map(entry => entry.name)
+      .find(url => new URL(url).pathname.endsWith('/src/core/Input.js')) || '/src/core/Input.js';
+    const input = (await import(inputUrl)).Input;
     g.testing.enter();
     g.testing.loadScene('tower1', { introOnly: true });
     const held = g.director.intro.active && g.testing.panelOpen && !input.enabled;

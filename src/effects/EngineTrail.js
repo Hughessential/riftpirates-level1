@@ -3,9 +3,15 @@ import * as THREE from 'three';
 const CAPACITY = 1200;
 const CYAN = new THREE.Color('#55fff2');
 const BLUE = new THREE.Color('#487bff');
-const VIOLET = new THREE.Color('#b14dff');
-const PINK = new THREE.Color('#fa48cf');
-const MINT = new THREE.Color('#c8fff0');
+const BOOST_RED = new THREE.Color('#ff302f');
+const BOOST_ORANGE = new THREE.Color('#ff7a20');
+const BOOST_GOLD = new THREE.Color('#ffd34f');
+const BOOST_HOT = new THREE.Color('#fff2b5');
+
+export const ENGINE_TRAIL_PROFILE = Object.freeze({
+  normal: Object.freeze({ emission: 72, lifeMin: .58, lifeMax: .82, velocity: 3.6, sizeMin: .05, sizeMax: .095 }),
+  boost: Object.freeze({ emission: 360, lifeMin: 2.15, lifeMax: 2.75, velocity: 11.5, sizeMin: .09, sizeMax: .17 }),
+});
 
 /** Persistent, world-space exhaust: steering draws three curling voxel ribbons. */
 export class EngineTrail {
@@ -34,7 +40,7 @@ export class EngineTrail {
     }
     this.particles = Array.from({ length: CAPACITY }, () => ({
       age: 0, life: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
-      size: 0, phase: 0, lane: 0, boost: false,
+      size: 0, phase: 0, lane: 0, boostMix: 0,
     }));
     this.origins = Array.from({ length: 3 }, () => new THREE.Vector3());
     this.previous = this.origins.map(() => new THREE.Vector3());
@@ -43,6 +49,7 @@ export class EngineTrail {
     this._direction = new THREE.Vector3();
     this._transform = new THREE.Object3D();
     this._color = new THREE.Color();
+    this._boostColor = new THREE.Color();
     this._zero = new THREE.Matrix4().makeScale(0, 0, 0);
     // Allocate instance color buffers once, including for an initially empty plume.
     for (let i = 0; i < CAPACITY; i++) {
@@ -60,6 +67,7 @@ export class EngineTrail {
     this.time = 0;
     this.activeCount = 0;
     this.primed = false;
+    this.boostMix = 0;
     for (let i = 0; i < CAPACITY; i++) {
       this.particles[i].life = 0;
       this.core.setMatrixAt(i, this._zero);
@@ -82,7 +90,13 @@ export class EngineTrail {
         if (!this.primed) this.previous[i].copy(this.origins[i]);
       });
       this._direction.set(0, -.025, 1).transformDirection(player.group.matrixWorld);
-      this.carry += dt * (player.boosting ? 330 : 210);
+      // A short ease makes ignition/decay feel physical without allowing a
+      // stale boost plume to remain attached to the hull. Emitted cubes live
+      // in world space and continue aft while the new compact plume takes over.
+      this.boostMix = THREE.MathUtils.damp(this.boostMix, player.boosting ? 1 : 0, 18, dt);
+      const profile = ENGINE_TRAIL_PROFILE;
+      const emission = THREE.MathUtils.lerp(profile.normal.emission, profile.boost.emission, this.boostMix);
+      this.carry += dt * emission;
       const count = Math.floor(this.carry);
       this.carry -= count;
       for (let i = 0; i < count; i++) {
@@ -91,17 +105,22 @@ export class EngineTrail {
         this.cursor = (this.cursor + 1) % CAPACITY;
         this._position.lerpVectors(this.previous[lane], this.origins[lane], (i + 1) / count);
         const phase = Math.random() * Math.PI * 2;
-        const velocity = player.boosting ? 7.2 : 5.2;
+        const mix = this.boostMix;
+        const velocity = THREE.MathUtils.lerp(profile.normal.velocity, profile.boost.velocity, mix);
+        const lifeMin = THREE.MathUtils.lerp(profile.normal.lifeMin, profile.boost.lifeMin, mix);
+        const lifeMax = THREE.MathUtils.lerp(profile.normal.lifeMax, profile.boost.lifeMax, mix);
+        const sizeMin = THREE.MathUtils.lerp(profile.normal.sizeMin, profile.boost.sizeMin, mix);
+        const sizeMax = THREE.MathUtils.lerp(profile.normal.sizeMax, profile.boost.sizeMax, mix);
         Object.assign(p, {
-          age: 0, life: 2.8 + Math.random() * .65,
+          age: 0, life: lifeMin + Math.random() * (lifeMax - lifeMin),
           x: this._position.x + Math.cos(phase) * .075,
           y: this._position.y + Math.sin(phase) * .075,
           z: this._position.z + .08,
           vx: this._direction.x * velocity + player.vx * .025,
           vy: this._direction.y * velocity + player.vy * .025,
           vz: Math.max(3.5, this._direction.z * velocity),
-          size: (.065 + Math.random() * .095) * (player.boosting ? 1.2 : 1),
-          phase, lane, boost: player.boosting,
+          size: sizeMin + Math.random() * (sizeMax - sizeMin),
+          phase, lane, boostMix: mix,
         });
       }
       this.origins.forEach((origin, i) => this.previous[i].copy(origin));
@@ -109,6 +128,7 @@ export class EngineTrail {
     } else {
       this.primed = false;
       this.carry = 0;
+      this.boostMix = THREE.MathUtils.damp(this.boostMix, 0, 18, dt);
     }
 
     camera.updateMatrixWorld();
@@ -144,14 +164,16 @@ export class EngineTrail {
       d.updateMatrix();
       this.halo.setMatrixAt(i, d.matrix);
 
-      // Cyan ignition melts into electric blue, violet, then pink stardust.
-      const hueAge = Math.min(1, age * 1.65 + p.lane * .09);
-      if (hueAge < .34) this._color.lerpColors(CYAN, BLUE, hueAge / .34);
-      else if (hueAge < .7) this._color.lerpColors(BLUE, VIOLET, (hueAge - .34) / .36);
-      else this._color.lerpColors(VIOLET, PINK, (hueAge - .7) / .3);
-      if (p.boost && age < .13) this._color.lerp(MINT, (1 - age / .13) * .65);
+      // Normal thrust stays compact cyan/blue. Boost has its own unmistakable
+      // hot-gold ignition, orange body and red cooling wake.
+      const normal = this._color.lerpColors(CYAN, BLUE, Math.min(1, age * 1.4));
+      const boost = this._boostColor;
+      if (age < .18) boost.lerpColors(BOOST_HOT, BOOST_GOLD, age / .18);
+      else if (age < .55) boost.lerpColors(BOOST_GOLD, BOOST_ORANGE, (age - .18) / .37);
+      else boost.lerpColors(BOOST_ORANGE, BOOST_RED, (age - .55) / .45);
+      normal.lerp(boost, p.boostMix);
       const shimmer = .85 + .15 * Math.sin(this.time * 7 + p.phase);
-      this._color.multiplyScalar((p.boost ? 2.2 : 1.85) * fade * shimmer);
+      this._color.multiplyScalar(THREE.MathUtils.lerp(1.45, 2.25, p.boostMix) * fade * shimmer);
       this.core.setColorAt(i, this._color);
       this.halo.setColorAt(i, this._color);
     }

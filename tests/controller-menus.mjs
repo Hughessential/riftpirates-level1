@@ -14,13 +14,13 @@ try {
     window.__pads = [];
     Object.defineProperty(navigator, 'getGamepads', { value: () => window.__pads });
   });
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   await page.evaluate(async () => {
     const inputUrl = performance.getEntriesByType('resource').find(entry => /\/src\/core\/Input\.js(?:\?|$)/.test(entry.name)).name;
     window.__input = (await import(inputUrl)).Input;
     window.RIFT.update = () => {};
-    window.__tick = () => { __input.pollGamepad(); RIFT.controllerMenus.update(); };
+    window.__tick = () => { __input.pollGamepad(); RIFT.controllerMenus.update(); RIFT.upgradeScreen.update(); };
     window.__pad = { id: 'OHSNAP MCON / virtual standard layout', index: 0, connected: true, mapping: 'standard', axes: [0,0,0,0], buttons: Array.from({length: 18}, () => ({pressed: false, value: 0})) };
     window.__press = i => { __pad.buttons[i] = {pressed: true, value: 1}; __tick(); __pad.buttons[i] = {pressed: false, value: 0}; __tick(); };
     window.__go = selector => {
@@ -36,6 +36,23 @@ try {
   await page.evaluate(() => { __pad.buttons[0] = {pressed: false, value: 0}; __tick(); __press(13); });
   const focusDebug = await page.evaluate(() => ({root:RIFT.controllerMenus.root?.id,focus:RIFT.controllerMenus.focused?.outerHTML,active:RIFT.controllerMenus.active,pad:__input._padId,bind:__input.bindings}));
   assert.equal(await page.evaluate(() => document.activeElement.id), 'musicTgl', JSON.stringify(focusDebug));
+  const reservedConfirm = await page.evaluate(() => {
+    // A custom map is allowed to contain button 0, but physical A remains the
+    // contextual menu confirm instead of also becoming Back/cancel.
+    const originalCancel = __input.bindings.cancel;
+    const originalBrake = __input.bindings.brake;
+    __input.bindings.cancel = 0;
+    __input.bindings.brake = 1;
+    const before = RIFT.save.data.music;
+    __press(0);
+    const after = RIFT.save.data.music;
+    __input.bindings.cancel = originalCancel;
+    __input.bindings.brake = originalBrake;
+    __press(0); // Restore the test's music setting for the remaining scenarios.
+    return { before, after, focus: document.activeElement.id };
+  });
+  assert.notEqual(reservedConfirm.after, reservedConfirm.before, 'Physical A still confirms when cancel is mapped to button 0');
+  assert.equal(reservedConfirm.focus, 'musicTgl');
   const mix = await page.evaluate(() => { __go('#musicVolume'); const before = Number(document.activeElement.value); __press(14); return {before, after:Number(document.activeElement.value)}; });
   assert.equal(mix.after, mix.before - 5);
   await page.evaluate(() => { __go('#shipSelectBtn'); __press(0); });
@@ -49,9 +66,57 @@ try {
   await page.evaluate(() => { __go('#pilotNameInput'); __press(0); __go('[data-key="clear"]'); __press(0); __go('[data-key="A"]'); __press(0); __go('[data-key="-"]'); __press(0); __go('[data-key="1"]'); __press(0); __press(1); __go('#pilotNameConfirm'); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.runPilotName), 'A-1', 'Controller keyboard creates and snapshots a pilot name');
   assert.equal(await page.evaluate(() => RIFT.running), true);
-  await page.evaluate(() => { RIFT.scrap.wallet.credit(5000); RIFT.upgradeScreen.show(1, '#22ffee', () => {}); __input.enabled=false; __tick(); __press(15); __press(0); });
+  await page.evaluate(() => { RIFT.tutorial.start({force:true}); RIFT.tutorial.showStep(3); __input.enabled=true; RIFT.controllerMenus.setActive(false); __tick(); });
+  await page.evaluate(() => __press(0));
+  assert.equal(await page.evaluate(() => RIFT.tutorial.active), true, 'Gameplay A remains brake and cannot immediately skip the tutorial');
+  await page.evaluate(() => __press(13));
+  assert.equal(await page.evaluate(() => document.activeElement.matches('#openingTutorial button')), true, 'D-pad deliberately focuses tutorial Skip');
+  await page.evaluate(() => __press(0));
+  assert.equal(await page.evaluate(() => RIFT.tutorial.active), false, 'Physical A activates the focused tutorial Skip');
+  const defaults = await page.evaluate(() => {
+    __input.enabled = true;
+    __tick(); // Release the menu-to-flight carryover guards.
+    const held = index => {
+      __pad.buttons[index] = {pressed:true,value:1}; __tick();
+      const state = {fire:__input.firing,boost:__input.read().boost,brake:__input.braking,aim:__input.aiming};
+      __pad.buttons[index] = {pressed:false,value:0}; __tick(); return state;
+    };
+    const fire=held(7), boost=held(6), brake=held(0), aim=held(2);
+    __input._resetRollTaps(); __press(14); __press(14); const dpadRoll=__input.consumeRoll();
+    __input._resetRollTaps(); __pad.axes[0]=-1; __tick(); __tick();
+    const heldRoll=__input.consumeRoll(); __pad.axes[0]=0; __tick(); __pad.axes[0]=-1; __tick();
+    __pad.axes[0]=0; __tick(); __pad.axes[0]=-1; __tick(); const stickRoll=__input.consumeRoll(); __pad.axes[0]=0; __tick();
+    return {bindings:{...__input.bindings},fire,boost,brake,aim,dpadRoll,heldRoll,stickRoll};
+  });
+  assert.deepEqual(defaults.bindings, { fire:7,cancel:1,brake:0,rollLeft:4,rollRight:5,aim:2,boost:6,view:8,pause:9,up:12,down:13,left:14,right:15 });
+  assert.equal(defaults.fire.fire, true); assert.equal(defaults.boost.boost, true);
+  assert.equal(defaults.brake.brake, true); assert.equal(defaults.aim.aim, true);
+  assert.equal(defaults.dpadRoll, -1, 'Released d-pad double-tap rolls left');
+  assert.equal(defaults.heldRoll, 0, 'Held stick cannot count as two flicks');
+  assert.equal(defaults.stickRoll, -1, 'Two neutral-separated stick flicks roll left');
+  const pauseOnA = await page.evaluate(() => {
+    const originalPause = __input.bindings.pause;
+    const originalBrake = __input.bindings.brake;
+    __input.bindings.pause = 0;
+    __input.bindings.brake = originalPause;
+    __press(0);
+    const paused = RIFT.paused;
+    const focused = document.activeElement.id;
+    __press(0);
+    const resumed = !RIFT.paused;
+    __input.bindings.pause = originalPause;
+    __input.bindings.brake = originalBrake;
+    return { paused, focused, resumed };
+  });
+  assert.deepEqual(pauseOnA, { paused:true, focused:'resumeBtn', resumed:true },
+    'A saved pause-on-A mapping works in flight while physical A still confirms the pause menu');
+  await page.evaluate(async () => {
+    RIFT.scrap.wallet.credit(5000); RIFT.upgradeScreen.show(1, '#22ffee', () => {}); __input.enabled=false; __tick(); __press(15);
+    __pad.buttons[0]={pressed:true,value:1}; __tick(); await new Promise(resolve=>setTimeout(resolve,650)); __tick();
+    __pad.buttons[0]={pressed:false,value:0}; __tick();
+  });
   assert.equal(await page.evaluate(() => RIFT.upgrades.taken.length), 1, 'Augment selection installs exactly one upgrade');
-  await page.evaluate(() => { RIFT.upgradeScreen.hide(); RIFT.director.go('TOWER_1_INTRO'); RIFT.director.update(1); __tick(); __pad.buttons[0]={pressed:true,value:1}; __tick(); RIFT.director.update(.016); __pad.buttons[0]={pressed:false,value:0}; __tick(); });
+  await page.evaluate(() => { RIFT.upgradeScreen.hide(); RIFT.save.data.seenIntro=1; RIFT.director.go('TOWER_1_INTRO'); RIFT.director.update(1); __tick(); __tick(); __pad.buttons[0]={pressed:true,value:1}; __tick(); RIFT.director.update(.016); __pad.buttons[0]={pressed:false,value:0}; __tick(); });
   assert.equal(await page.evaluate(() => RIFT.director.state), 'TOWER_1_COMBAT', 'Fresh confirm skips an eligible boss intro');
   await page.evaluate(() => __press(9));
   assert.equal(await page.evaluate(() => RIFT.paused), true);
@@ -74,7 +139,7 @@ try {
   assert.equal(await page.evaluate(() => RIFT.titleMode), true, 'Results title return works');
 
   // Every testing-ground control class is reachable and editable without a mouse.
-  await page.evaluate(() => { __go('#testingGroundsBtn'); __press(0); });
+  await page.evaluate(() => { RIFT.testingPanel._setUnlocked(true, {quiet:true}); __go('#testingGroundsBtn'); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.testing.panelOpen), true);
   const god = await page.evaluate(() => { __go('[data-setting="godMode"]'); const before=document.activeElement.checked; __press(0); return {before,after:document.activeElement.checked}; });
   assert.notEqual(god.before, god.after);
@@ -106,18 +171,20 @@ try {
   assert.equal(await page.evaluate(() => RIFT.running), false, 'Skipping reveal does not start a new run');
   await page.evaluate(() => __press(1));
 
-  // Existing assignments swap, so remapping confirm onto Back cannot strand the menu.
+  // Gameplay fire can move to Back without moving physical-A menu confirmation.
   await page.evaluate(() => { __go('#controllerSettingsBtn'); __press(0); __go('[data-bind="fire"]'); __press(0); __press(1); });
-  assert.deepEqual(await page.evaluate(() => [__input.bindings.fire, __input.bindings.cancel]), [1,0]);
-  await page.evaluate(() => { __go('#controllerReset'); __press(1); __press(1); });
+  assert.deepEqual(await page.evaluate(() => [__input.bindings.fire, __input.bindings.cancel]), [1,7]);
+  await page.evaluate(() => { __go('#controllerReset'); __press(0); __press(1); });
   // Raw/nonstandard devices can bind real button indices and persist them.
   await page.evaluate(() => { __go('#controllerSettingsBtn'); __press(0); __go('[data-bind="fire"]'); __press(0); __press(2); });
   assert.equal(await page.evaluate(() => __input.bindings.fire), 2);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('riftpirates-controller-v1'))[__pad.id].buttons.fire), 2);
-  await page.evaluate(() => { __press(1); __go('#launchBtn'); __press(2); });
-  assert.equal(await page.evaluate(() => RIFT.running), true, 'Remapped confirm launches');
+  await page.evaluate(() => { __pads=[]; __tick(); __pads=[__pad]; __tick(); __pad.buttons[0]={pressed:false,value:0}; __tick(); });
+  assert.equal(await page.evaluate(() => __input.bindings.fire), 2, 'Existing per-device gameplay mapping survives reconnect');
+  await page.evaluate(() => { __press(1); __go('#launchBtn'); __press(0); });
+  assert.equal(await page.evaluate(() => RIFT.running), true, 'Physical A launches after gameplay fire is remapped');
   await page.evaluate(() => { RIFT.quitRun(); __tick(); __press(1); __pad.id='DualSense Wireless Controller'; __pad.index=2; __pad.mapping='standard'; __pads=[null,null,__pad]; __tick(); });
-  assert.equal(await page.evaluate(() => __input.bindings.fire), 0, 'New controller gets its own standard defaults');
+  assert.equal(await page.evaluate(() => __input.bindings.fire), 7, 'New controller gets the new trigger-fire default');
   await page.evaluate(() => { __pad.axes[1]=.8; __tick(); __pad.axes[1]=0; __tick(); });
   assert.equal(await page.evaluate(() => document.activeElement.id), 'musicTgl', 'Analog stick navigates');
   await page.evaluate(() => { __go('#launchBtn'); __press(0); const other={...__pad,id:'Xbox Controller',index:0,buttons:__pad.buttons.map(()=>({pressed:false,value:0}))}; __pads=[other,null,__pad]; __tick(); });

@@ -5,7 +5,7 @@ import './controller-menus.css';
 
 const controls = 'button,input:not([type="hidden"]),select,textarea';
 const visible = el => !el.disabled && !el.closest('[hidden],.hidden') && el.getClientRects().length > 0;
-const labels = { fire: 'CONFIRM / FIRE', cancel: 'BACK', brake: 'BRAKE', rollLeft: 'LEFT ROLL / PREVIOUS TAB', rollRight: 'RIGHT ROLL / NEXT TAB', aim: 'AIM', boost: 'BOOST', view: 'CONTROLLER SETUP', pause: 'PAUSE', up: 'MENU UP', down: 'MENU DOWN', left: 'MENU LEFT', right: 'MENU RIGHT' };
+const labels = { fire: 'PRIMARY FIRE', cancel: 'BACK', brake: 'BRAKE', rollLeft: 'LEFT ROLL / PREVIOUS TAB', rollRight: 'RIGHT ROLL / NEXT TAB', aim: 'AIM / LOCK', boost: 'BOOST', view: 'CONTROLLER SETUP', pause: 'PAUSE', up: 'MENU UP', down: 'MENU DOWN', left: 'MENU LEFT', right: 'MENU RIGHT' };
 
 /** One focus owner per frame. Native controls receive their normal input/change
  * events, so controller edits use exactly the same settings paths as the mouse. */
@@ -40,7 +40,9 @@ export class ControllerMenus {
     button.className = 'controllerEntry';
     button.textContent = 'CONTROLLER SETUP';
     button.addEventListener('click', () => this.openSettings());
-    document.querySelector('.menuControls>span').replaceWith(button);
+    const slot = document.querySelector('.menuControls>span');
+    if (slot) slot.replaceWith(button);
+    else document.querySelector('.menuControls')?.append(button);
     const pauseButton = button.cloneNode(true);
     pauseButton.id = 'controllerSettingsPauseBtn';
     pauseButton.className = 'btnGhost labPauseEntry';
@@ -49,7 +51,7 @@ export class ControllerMenus {
     this.settings = document.createElement('dialog');
     this.settings.id = 'controllerSettings';
     this.settings.className = 'controllerDialog';
-    this.settings.innerHTML = `<header><div><small>FLY YOUR WAY</small><h2>CONTROLLER SETUP</h2></div><button data-close aria-label="Close controller settings">×</button></header><p id="controllerName" role="status"></p><p class="controllerHelp">MCON: use X-Input mode. Xbox, PlayStation and Switch layouts use browser standard mapping. For other layouts, select an action and press its physical button. Settings are saved for each controller.</p><div class="controllerBindings">${Object.entries(labels).map(([id, label]) => `<button data-bind="${id}"><span>${label}</span><b></b></button>`).join('')}</div><div class="controllerAxes">${['STEER X', 'STEER Y', 'CAMERA X', 'CAMERA Y'].map((label, i) => `<label>${label}<select data-axis="${i}">${Array.from({length: 16}, (_, n) => `<option value="${n}">AXIS ${n}</option>`).join('')}</select></label>`).join('')}<label>STICK DEADZONE<input type="range" id="controllerDeadzone" min="8" max="40" step="1"><output id="controllerDeadzoneValue"></output></label></div><p id="controllerCapture" role="status"></p><footer><button id="controllerReset">RESET THIS CONTROLLER</button><button data-close>DONE</button></footer>`;
+    this.settings.innerHTML = `<header><div><small>FLY YOUR WAY</small><h2>CONTROLLER SETUP</h2></div><button data-close aria-label="Close controller settings">×</button></header><p id="controllerName" role="status"></p><p class="controllerHelp">MCON: use X-Input mode. Default flight: RT fire · LT boost · A brake · X aim · double-flick or D-pad roll · Start pause. Menus always confirm with physical A. Xbox, PlayStation and Switch layouts use browser standard mapping. For other layouts, select an action and press its physical button. Settings are saved for each controller.</p><div class="controllerBindings">${Object.entries(labels).map(([id, label]) => `<button data-bind="${id}"><span>${label}</span><b></b></button>`).join('')}</div><div class="controllerAxes">${['STEER X', 'STEER Y', 'CAMERA X', 'CAMERA Y'].map((label, i) => `<label>${label}<select data-axis="${i}">${Array.from({length: 16}, (_, n) => `<option value="${n}">AXIS ${n}</option>`).join('')}</select></label>`).join('')}<label>STICK DEADZONE<input type="range" id="controllerDeadzone" min="8" max="40" step="1"><output id="controllerDeadzoneValue"></output></label></div><p id="controllerCapture" role="status"></p><footer><button id="controllerReset">RESET THIS CONTROLLER</button><button data-close>DONE</button></footer>`;
     document.body.append(this.settings);
     this.settings.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => this.closeSettings()));
     this.settings.querySelectorAll('[data-bind]').forEach(el => el.addEventListener('click', () => {
@@ -131,7 +133,7 @@ export class ControllerMenus {
 
   setActive(active) {
     this.active = active;
-    if (active) this.hint.textContent = `STICK / D-PAD MOVE · ${Input.bindings.fire === 0 ? 'SOUTH' : 'BUTTON ' + Input.bindings.fire} SELECT · ${Input.bindings.cancel === 1 ? 'EAST' : 'BUTTON ' + Input.bindings.cancel} BACK · LEFT / RIGHT ADJUST · LB / RB TABS`;
+    if (active) this.hint.textContent = `STICK / D-PAD MOVE · SOUTH / A SELECT · ${Input.bindings.cancel === 1 ? 'EAST' : 'BUTTON ' + Input.bindings.cancel} BACK · LEFT / RIGHT ADJUST · LB / RB TABS`;
     document.body.classList.toggle('controllerMode', active);
     if (!active) this.focused?.classList.remove('controllerFocus');
     this.hint.hidden = !active || !this.root;
@@ -143,7 +145,9 @@ export class ControllerMenus {
     if (this.game.pilotIdentity?.dialog.open) return this.game.pilotIdentity.dialog;
     if (this.game.testingPanel?.dialog.open) return this.game.testingPanel.dialog;
     if (this.game.hangar?.dialog.open) return this.game.hangar.dialog;
-    for (const id of ['pauseScreen', 'resultsScreen', 'upgradeScreen', 'titleScreen']) {
+    // The tutorial Skip is controller-accessible, but upgrade choices keep
+    // priority while the final cache lesson and shop are both visible.
+    for (const id of ['pauseScreen', 'resultsScreen', 'upgradeScreen', 'openingTutorial', 'titleScreen']) {
       const el = document.getElementById(id);
       if (el && !el.classList.contains('hidden')) return el;
     }
@@ -206,16 +210,33 @@ export class ControllerMenus {
     if (root !== this.root) {
       if (this.root && !root) Input.blockMenuCarryover();
       this.root = root;
+      this.tutorialSkipArmed = false;
       this.focused?.classList.remove('controllerFocus');
       this.focused = null;
       if (this.active && root) {
-        const preferred = root.querySelector('#victorySkip:not([hidden])') || root.querySelector('#launchBtn,#resumeBtn,#againBtn,#pilotNameInput,.shipOption[aria-pressed="true"],.upCard,[role="tab"][aria-selected="true"]');
-        const items = [...root.querySelectorAll(controls)].filter(visible);
-        this.focus(preferred && visible(preferred) ? preferred : items[0]);
+        // Flight-stick movement must not pre-focus Skip: otherwise the A brake
+        // lesson would also activate it. A deliberate D-pad move arms Skip.
+        if (root.id !== 'openingTutorial') {
+          const preferred = root.querySelector('#victorySkip:not([hidden])') || root.querySelector('#launchBtn,#resumeBtn,#againBtn,#pilotNameInput,.shipOption[aria-pressed="true"],.upCard,[role="tab"][aria-selected="true"]');
+          const items = [...root.querySelectorAll(controls)].filter(visible);
+          this.focus(preferred && visible(preferred) ? preferred : items[0]);
+        }
       }
     }
     this.hint.hidden = !this.active || !root || root.tagName === 'DIALOG';
     if (!connected) return;
+    if (root && nav.confirm) {
+      // Physical A owns confirmation whenever a menu is present, even when a
+      // preserved custom gameplay map assigns pause/back/view/shoulder to the
+      // same button. Outside menus those saved mappings remain fully usable.
+      const buttonZeroConflicts = {
+        cancel: 'cancel', pause: 'pause', view: 'view',
+        rollLeft: 'prevTab', rollRight: 'nextTab',
+      };
+      for (const [action, navKey] of Object.entries(buttonZeroConflicts)) {
+        if (Input.bindings[action] === 0) nav[navKey] = false;
+      }
+    }
     if (nav.view && !this.settings.open && !this.keyboard.open) { this.openSettings(); this.consume(); return; }
     if (!root) {
       if (nav.pause) { this.game.togglePause(); this.consume(); }
@@ -228,7 +249,7 @@ export class ControllerMenus {
       else if (root === this.game.pilotIdentity?.dialog) this.game.pilotIdentity.close();
       else if (root === this.game.testingPanel?.dialog) this.game.testingPanel.close();
       else if (root === this.game.hangar?.dialog) this.game.hangar.close();
-      else if (root.id === 'pauseScreen' || root.id === 'upgradeScreen') this.game.togglePause();
+      else if (root.id === 'pauseScreen' || root.id === 'upgradeScreen' || (root.id === 'openingTutorial' && nav.pause)) this.game.togglePause();
       else if (root.id === 'resultsScreen') document.getElementById('toTitleBtn').click();
       this.consume(); return;
     }
@@ -236,6 +257,17 @@ export class ControllerMenus {
     if (!Object.values(nav).some(Boolean)) return;
     let items = [...root.querySelectorAll(controls)].filter(visible);
     if (!items.length) { this.consume(); return; }
+    if (root.id === 'openingTutorial' && !this.tutorialSkipArmed) {
+      const direction = nav.left || nav.right || nav.up || nav.down;
+      const physicalDpad = [12, 13, 14, 15].some(index => Input._padPrev[index]);
+      if (direction && physicalDpad) {
+        this.tutorialSkipArmed = true;
+        this.focus(items[0]);
+        Audio2.play('ui_move', 0.3, 1.1);
+      }
+      // Physical A remains gameplay brake until Skip is deliberately armed.
+      this.consume(); return;
+    }
     if (!items.includes(this.focused)) this.focus(items.includes(document.activeElement) ? document.activeElement : items[0]);
     if (root === this.game.testingPanel?.dialog && (nav.prevTab || nav.nextTab)) {
       const tabs = ['pilot', 'augments', 'arena', 'effects'];
@@ -249,6 +281,11 @@ export class ControllerMenus {
     } else if (nav.prevTab || nav.nextTab) this.move(items, nav.nextTab ? 1 : -1);
     if (nav.confirm) {
       const el = this.focused;
+      // Augment cards own the south-button hold gesture. Skip and every other
+      // menu action remain immediate; gameplay fire mappings never affect A.
+      if (root.id === 'upgradeScreen' && el.classList.contains('upCard')) {
+        this.consume(); return;
+      }
       Input.blockMenuCarryover();
       if (el.matches('input[type="search"],input[type="text"],textarea')) {
         this.searchField = el;

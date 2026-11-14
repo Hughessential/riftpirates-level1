@@ -11,7 +11,7 @@ const browser=await puppeteer.launch({executablePath:'/Applications/Google Chrom
 try{
   const page=await browser.newPage();await page.setViewport({width:1440,height:900});
   page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(process.env.RIFT_TEST_URL||'http://localhost:8000/',{waitUntil:'domcontentloaded',timeout:120000});
+  await page.goto(process.env.RIFT_TEST_URL||'http://localhost:8000/?lab=unlock',{waitUntil:'domcontentloaded',timeout:120000});
   await page.waitForFunction(()=>window.RIFT&&!document.getElementById('launchBtn').disabled,{timeout:120000});
   await page.click('#testingGroundsBtn');
   await page.evaluate(async()=>{

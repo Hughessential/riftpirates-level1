@@ -7,9 +7,15 @@ import { PILOT_IDENTITY_DEFAULTS, validatePilotName } from './PilotName.js';
 
 const KEY = 'riftpirates-level1-v1';
 
-export const AUDIO_DEFAULTS = { musicVolume: .65, sfxVolume: .85 };
+export const AUDIO_DEFAULTS = { musicVolume: .75, sfxVolume: .75 };
 export const clampAudioVolume = (value, fallback) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+export const UI_SCALE_DEFAULT = 1.1;
+export const clampUIScale = value => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return UI_SCALE_DEFAULT;
+  return Math.round(Math.max(.8, Math.min(1.4, numeric)) * 20) / 20;
+};
 
 const mem = {};
 const store = {
@@ -39,6 +45,8 @@ const DEFAULTS = {
   music: 1,
   sfx: 1,
   ...AUDIO_DEFAULTS,
+  uiScale: UI_SCALE_DEFAULT,
+  tutorialComplete: false,
   ...PILOT_IDENTITY_DEFAULTS,
   seenIntro: 0, // lets us offer a skip on the Nexus cinematic after the first view
   selectedShip: 'rift-talon', // cosmetic hull only; never changes run stats
@@ -49,6 +57,9 @@ export const Save = {
   data: { ...DEFAULTS },
 
   load() {
+    // Each load begins from the current schema so fields missing from an older
+    // save receive additive defaults without inheriting stale in-memory data.
+    this.data = { ...DEFAULTS };
     try {
       const raw = store.get(KEY);
       if (raw) {
@@ -63,6 +74,8 @@ export const Save = {
     for (const [key, fallback] of Object.entries(AUDIO_DEFAULTS)) {
       this.data[key] = clampAudioVolume(this.data[key], fallback);
     }
+    this.data.uiScale = clampUIScale(this.data.uiScale);
+    this.data.tutorialComplete = this.data.tutorialComplete === true;
     const pilot = validatePilotName(this.data.pilotName);
     this.data.pilotName = pilot.valid ? pilot.name : PILOT_IDENTITY_DEFAULTS.pilotName;
     this.data.pilotNameConfirmed = pilot.valid && this.data.pilotNameConfirmed === true;

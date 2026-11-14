@@ -68,6 +68,8 @@ class Enemy {
     game.enemies.lootSerial = (game.enemies.lootSerial || 0) + 1;
     this.lootSourceId = `enemy:${game.enemies.lootSerial}`;
     this.lootStage = game.director?.state || 'TESTING';
+    this.killLootIssued = false;
+    this.killLootAuthorized = false;
     this.actionScale = 1;
     this.strafeDir = Math.random() < 0.5 ? -1 : 1;
     this.repositionT = rand(3, 6);
@@ -119,10 +121,16 @@ class Enemy {
     });
     Audio2.play('enemy_death', 0.5, this.elite ? 0.8 : 1.05, 0.08);
 
-    g.scrap.burst(this.x,this.y,this.z,this.target.scrap,1,{
-      sourceId:this.lootSourceId,kind:this.elite?'elite':'enemy',budgetGroup:`enemies:${this.lootStage}`,
-      budgetLimit:this.lootStage==='ESCAPE'?200:this.lootStage.includes('COMBAT')?48:96,
-    });
+    // A pooled enemy life owns exactly one reward source. Cleanup/despawn never
+    // enters die(), and the authored stage budgets remain the authority over
+    // whether that source is eligible to pay.
+    if (!this.killLootIssued) {
+      this.killLootIssued = true;
+      this.killLootAuthorized = g.scrap.burst(this.x,this.y,this.z,this.target.scrap,1,{
+        sourceId:this.lootSourceId,kind:this.elite?'elite':'enemy',budgetGroup:`enemies:${this.lootStage}`,
+        budgetLimit:this.lootStage==='ESCAPE'?200:this.lootStage.includes('COMBAT')?48:96,
+      });
+    }
     g.score.add(t.score, this.elite ? 'ELITE KILL' : 'ENEMY KILL');
     g.heat.onKill();
     g.xp.add(t.xp);

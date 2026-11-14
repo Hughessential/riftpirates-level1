@@ -17,8 +17,8 @@ try {
     await page.evaluate(() => { window.RIFT.renderFrame = () => {}; });
   };
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' }); await ready();
-  assert.equal(await page.$eval('#musicVolume', e => e.value), '65');
-  assert.equal(await page.$eval('#sfxVolume', e => e.value), '85');
+  assert.equal(await page.$eval('#musicVolume', e => e.value), '75');
+  assert.equal(await page.$eval('#sfxVolume', e => e.value), '75');
   assert.equal(await page.$eval('#musicVolume', e => e.labels[0].textContent), 'Music volume');
   await page.evaluate(() => {
     window.__audioKeysLeaked = [];
@@ -47,19 +47,23 @@ try {
   const rect = await page.$eval('#sfxVolume', e => {
     const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height };
   });
+  const faderHit = await page.evaluate(rect => document.elementFromPoint(
+    rect.x + rect.width * .4, rect.y + rect.height * .5)?.id, rect);
+  assert.equal(faderHit, 'sfxVolume', 'The fixed route footer never covers the title SFX fader');
   await page.mouse.click(rect.x + rect.width * .4, rect.y + rect.height * .5);
   const sfx = await page.evaluate(() => ({
     saved: window.RIFT.save.data.sfxVolume,
     title: Number(document.getElementById('sfxVolume').value),
     pause: Number(document.getElementById('sfxVolume2').value),
   }));
-  assert.ok(sfx.saved > .3 && sfx.saved < .5); assert.equal(sfx.title, sfx.pause);
+  assert.ok(sfx.saved > .3 && sfx.saved < .5, `SFX fader pointer update: ${JSON.stringify({rect,sfx})}`); assert.equal(sfx.title, sfx.pause);
   assert.equal(Math.round(sfx.saved * 100), sfx.title);
   const bounds = await page.evaluate(() => {
     const mixer = document.querySelector('.menuAudio').getBoundingClientRect();
     return { bottom: mixer.bottom, footer: document.querySelector('.menuFooter').getBoundingClientRect().top, right: mixer.right };
   });
-  assert.ok(bounds.bottom < bounds.footer && bounds.right <= 1280, 'Title mixer fits above the route footer');
+  assert.ok(bounds.bottom < bounds.footer && bounds.right <= 1280,
+    `Title mixer fits above the route footer: ${JSON.stringify(bounds)}`);
 
   await launchRun(page); await page.click('#pauseBtn');
   const paused = await page.evaluate(() => ({ time: window.RIFT.runTime, owner: window.RIFT.audio.musicOwner }));

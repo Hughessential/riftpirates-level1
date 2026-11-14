@@ -8,6 +8,7 @@ import { Scheduler } from './Scheduler.js';
 import { CameraRig } from './CameraRig.js';
 import { LevelDirector } from './LevelDirector.js';
 import { TestingGrounds } from './TestingGrounds.js';
+import { OpeningTutorial } from './OpeningTutorial.js';
 import { FinalEscape } from '../encounters/FinalEscape.js';
 
 import { initTextures, buildVoxels, glowSprite, Tex } from '../render/VoxelBuilder.js';
@@ -163,6 +164,7 @@ export class Game {
     this.director = new LevelDirector(this);
     this.escape = new FinalEscape(this);
     this.testing = new TestingGrounds(this);
+    this.tutorial = new OpeningTutorial(this);
 
     // --- run state ---
     this.time = 0;
@@ -197,6 +199,7 @@ export class Game {
     };
 
     addEventListener('resize', () => this._resize());
+    addEventListener('rift-ui-scale', () => this._resize());
     document.addEventListener('fullscreenchange', () => this._resize());
     window.visualViewport?.addEventListener('resize', () => this._resize());
     this._watchDisplayDensity();
@@ -381,6 +384,7 @@ export class Game {
   // ------------------------------------------------------------------- run flow
 
   prepareTitle() {
+    this.tutorial?.stop();
     if (this.adaptiveResolution.restore()) this._resize();
     this.director.clearPresentation();
     this.escape.dispose();
@@ -423,7 +427,7 @@ export class Game {
     this.syncMusicPause();
   }
 
-  startRun({ testing = false } = {}) {
+  startRun({ testing = false, tutorial = false } = {}) {
     this.director.clearPresentation();
     this.escape.dispose();
     if (!testing) this.testing.deactivate();
@@ -490,6 +494,7 @@ export class Game {
 
     this.director.reset();
     this.director.go(STATE.INTRO);
+    this.tutorial.start({ testing, force: tutorial });
     this.syncMusicPause();
   }
 
@@ -515,6 +520,7 @@ export class Game {
     if (victory && (this._terminalOutcome !== 'victory' || !this._escapeCleared)) return;
     if (!victory && this._terminalOutcome === 'victory') return;
     this._terminalOutcome = victory ? 'victory' : 'defeat';
+    this.tutorial?.stop();
     if (victory) Audio2.playVictory();
     else Audio2.playDeath();
     this.director.clearPresentation();
@@ -545,6 +551,7 @@ export class Game {
     if (this.director.state === STATE.DYING) return;
     this.paused = !this.paused;
     $('pauseScreen').classList.toggle('hidden', !this.paused);
+    if (this.paused) this.upgradeScreen.cancelHoldForPause();
     Input.enabled = !this.paused && !this.director.inUpgrade && !this.director.intro.active && !this.testing?.panelOpen;
     if (this.paused) {
       Audio2.pauseMusic();
@@ -568,7 +575,18 @@ export class Game {
 
   // ------------------------------------------------------------------- update
 
+  _reticleShouldBeActive() {
+    return !document.hidden && this.running && !this.paused && this.player.alive && !this.player.frozen &&
+      !this._terminalOutcome && !this.death.active && COMBAT_STATES.has(this.director.state) &&
+      !this.director.intro.active && !this.director.inUpgrade && !this.upgradeScreen.open &&
+      !this.upgradeScreen.closing && !(this.testing.active && this.testing.panelOpen);
+  }
+
   update(rawDt) {
+    // The flat sight is persistent only during live, controllable flight.
+    // Central ownership hides it immediately on pauses, shops, cinematics,
+    // death/results, title screens and Testing Grounds dialogs.
+    this.player?.setReticleActive(this._reticleShouldBeActive());
     if (document.hidden) {
       this.adaptiveResolution.update(rawDt, false);
       this.syncMusicPause();
@@ -644,16 +662,22 @@ export class Game {
     // The scheduler still runs so the card dismissal/recovery can complete.
     const choosing = this.director.inUpgrade || this.upgradeScreen.open || this.upgradeScreen.closing;
     this.scheduler.update(dt);
+    // The tutorial owns no world simulation, but it must observe the first
+    // cache while choice time is frozen so the final lesson can complete.
+    this.tutorial.update(dt);
     if (choosing || this.director.inUpgrade || this.upgradeScreen.open || this.upgradeScreen.closing) {
       this.fx.update(dt, 0);
-      this.hud.update(dt);
+      // Choice screens freeze simulation time. Keep instructional/readability
+      // timers frozen with the rest of the run instead of consuming them while
+      // the player studies an augment.
+      this.hud.update(0);
       this.renderFrame(dt);
       return;
     }
     this.time += dt;
     if (this.director.inCombat) this.runTime += dt;
 
-    this.director.update(dt);
+    if (!this.tutorial.blocksRoute) this.director.update(dt);
     if (this.director.state === STATE.ESCAPE) Audio2.syncEscapeTime(this.escape.elapsed);
     if (this.running && !this._terminalOutcome && !this.director.inUpgrade) this._updateWorld(dt);
 

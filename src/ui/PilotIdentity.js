@@ -179,16 +179,20 @@ export class PilotIdentity {
     if (![this.position.x, this.position.y, this.position.z].every(Number.isFinite) ||
         Math.abs(this.position.x) > 1 || Math.abs(this.position.y) > 1 || Math.abs(this.position.z) > 1) { this.hideTag(); return; }
     const bounds = canvas.getBoundingClientRect();
+    const uiScale = Math.max(.8, Math.min(1.4, Number(document.documentElement.dataset.uiScale) || 1));
+    const offsetY = PILOT_TAG_LAYOUT.offsetY * uiScale;
+    const edge = PILOT_TAG_LAYOUT.edge * uiScale;
+    const maxWidth = PILOT_TAG_LAYOUT.maxWidth * uiScale;
     const x = bounds.left + (this.position.x * .5 + .5) * bounds.width;
-    const y = bounds.top + (.5 - this.position.y * .5) * bounds.height + PILOT_TAG_LAYOUT.offsetY;
+    const y = bounds.top + (.5 - this.position.y * .5) * bounds.height + offsetY;
     // Hide at edges instead of clamping a detached label to the viewport.
     if (this.lastRunName !== game.runPilotName) {
       this.lastRunName = game.runPilotName;
       this.tagText.textContent = safePilotName(game.runPilotName);
     }
-    const halfWidth = Math.min(PILOT_TAG_LAYOUT.maxWidth, 48 + this.tagText.textContent.length * 9) * .5;
-    if (x < bounds.left + halfWidth + PILOT_TAG_LAYOUT.edge || x > bounds.right - halfWidth - PILOT_TAG_LAYOUT.edge ||
-        y < bounds.top + PILOT_TAG_LAYOUT.edge || y > bounds.bottom - 30) { this.hideTag(); return; }
+    const halfWidth = Math.min(maxWidth, (48 + this.tagText.textContent.length * 9) * uiScale) * .5;
+    if (x < bounds.left + halfWidth + edge || x > bounds.right - halfWidth - edge ||
+        y < bounds.top + edge || y > bounds.bottom - 30 * uiScale) { this.hideTag(); return; }
     this.tag.style.transform = `translate3d(${Math.round(x)}px,${Math.round(y)}px,0) translateX(-50%)`;
     this.tag.hidden = false;
   }

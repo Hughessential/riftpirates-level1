@@ -204,5 +204,22 @@ export const TRAVERSAL = {
   },
 };
 
+/** First-flight teaching lane. LevelDirector is held through the action lesson,
+ * then the first authored route segment resumes under this softer pressure. */
+export const TUTORIAL_OPENING = Object.freeze({
+  maxEnemies: 1,
+  // The authored route resumes after the lesson, but its first four wave cues
+  // stay a one-ship teaching ramp until the first augment cache.
+  routePressureSeconds: 22,
+  routeFireDelay: 6.5,
+  enemyType: 'scout',
+  enemyHpScale: .55,
+  enemyX: 0,
+  enemyY: 4,
+  enemyZ: -26,
+  fireDelay: 12,
+  briefingSeconds: 5.5,
+});
+
 /** Par time for the time bonus (spec §28). Beat it and you're rewarded. */
 export const PAR_TIME = 11 * 60; // 11 minutes

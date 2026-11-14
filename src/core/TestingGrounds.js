@@ -41,8 +41,8 @@ export class TestingGrounds {
 
   changed() { this.onChange?.(); }
 
-  enter() {
-    if (this.active && this.game.running && this.game.player.alive) {
+  enter({ tutorial = false } = {}) {
+    if (this.active && this.game.running && this.game.player.alive && !tutorial) {
       this.setPanelOpen(true);
       return;
     }
@@ -51,9 +51,11 @@ export class TestingGrounds {
     this._disposeEncounter();
     this.game.hangar?.close();
     Audio2.init(); Audio2.resume();
-    this.game.startRun({ testing: true });
+    this.game.startRun({ testing: true, tutorial });
     for (const id of ['titleScreen', 'resultsScreen', 'pauseScreen']) $(id).classList.add('hidden');
-    this.loadScene('sandbox');
+    // `?tutorial=1&lab=1` and explicit QA calls get the real opening route;
+    // ordinary Testing Grounds entry remains the existing free-flight sandbox.
+    this.loadScene(this.game.tutorial.active ? 'approach1' : 'sandbox');
     this.spawnDummies();
     this.setPanelOpen(true);
   }

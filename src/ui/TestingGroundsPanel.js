@@ -27,6 +27,14 @@ const option = ([value, label]) => `<option value="${value}">${label}</option>`;
 export class TestingGroundsPanel {
   constructor(testing) {
     this.testing = testing;
+    const labAccess = new URLSearchParams(location.search).get('lab');
+    // ?lab=1 retains the existing auto-enter workflow in main.js. The
+    // reveal-only variant lets automated title/menu flows exercise the same
+    // unlocked controls without beginning a test run during boot.
+    this.devAccess = labAccess === '1' || labAccess === 'unlock';
+    this.unlocked = this.devAccess;
+    this.secretArmed = false;
+    this.secretBuffer = '';
     this.activeTab = 'pilot';
     this.search = '';
     this.category = 'ALL';
@@ -115,6 +123,20 @@ export class TestingGroundsPanel {
   }
 
   _addEntrances() {
+    this.globeTarget = document.createElement('button');
+    this.globeTarget.type = 'button';
+    this.globeTarget.id = 'labGlobeUnlock';
+    this.globeTarget.setAttribute('aria-label', 'Mysterious rift globe');
+    const armSecret = () => {
+      if (this.unlocked) return;
+      this.secretArmed = true;
+      this.secretBuffer = '';
+      this.globeTarget.setAttribute('aria-description', 'The globe is listening. Enter the hidden access word.');
+    };
+    this.globeTarget.addEventListener('click', armSecret);
+    this.globeTarget.addEventListener('focus', armSecret);
+    document.getElementById('titleScreen').append(this.globeTarget);
+
     this.titleEntry = document.createElement('button');
     this.titleEntry.type = 'button';
     this.titleEntry.id = 'testingGroundsBtn';
@@ -122,12 +144,23 @@ export class TestingGroundsPanel {
     this.titleEntry.innerHTML = '<span aria-hidden="true">[+]</span> TESTING GROUNDS <kbd>F2</kbd>';
     this.titleEntry.addEventListener('click', () => this.open());
     document.getElementById('titleScreen').append(this.titleEntry);
-    const pauseEntry = document.createElement('button');
-    pauseEntry.id = 'testingGroundsPauseBtn';
-    pauseEntry.className = 'btnGhost labPauseEntry';
-    pauseEntry.textContent = 'ENTER TESTING GROUNDS / F2';
-    pauseEntry.addEventListener('click', () => this.open());
-    document.getElementById('quitBtn').before(pauseEntry);
+    this.pauseEntry = document.createElement('button');
+    this.pauseEntry.id = 'testingGroundsPauseBtn';
+    this.pauseEntry.className = 'btnGhost labPauseEntry';
+    this.pauseEntry.textContent = 'ENTER TESTING GROUNDS / F2';
+    this.pauseEntry.addEventListener('click', () => this.open());
+    document.getElementById('quitBtn').before(this.pauseEntry);
+    this._setUnlocked(this.unlocked, { quiet: true });
+  }
+
+  _setUnlocked(unlocked, { quiet = false } = {}) {
+    this.unlocked = Boolean(unlocked);
+    this.titleEntry?.classList.toggle('hidden', !this.unlocked);
+    this.pauseEntry?.classList.toggle('hidden', !this.unlocked);
+    this.globeTarget?.classList.toggle('labUnlocked', this.unlocked);
+    if (this.unlocked && !quiet) {
+      this.testing.game.hud.toast('BRIMBY SIGNAL ACCEPTED', 'TESTING GROUNDS ACCESS / THIS SESSION ONLY', '#27f5da', { duration: 4.2, category: 'instruction' });
+    }
   }
 
   _buildAugments() {
@@ -187,8 +220,15 @@ export class TestingGroundsPanel {
     // fire, roll, pause, or pick a card underneath the native dialog.
     this._keyDown = event => {
       if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open],#pilotIdentityDialog[open]')) return;
-      const editing = /^(INPUT|SELECT|TEXTAREA)$/.test(event.target?.tagName);
-      const shortcut = event.code === 'F2' || (event.code === 'Backquote' && !editing);
+      const editing = event.target?.matches?.('input,select,textarea,[contenteditable="true"]') ?? false;
+      if (this.secretArmed && !this.unlocked && !editing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key?.length === 1) {
+        this.secretBuffer = `${this.secretBuffer}${event.key.toLowerCase()}`.slice(-6);
+        if (this.secretBuffer === 'brimby') {
+          this.secretArmed = false;
+          this._setUnlocked(true);
+        }
+      }
+      const shortcut = this.unlocked && (event.code === 'F2' || (event.code === 'Backquote' && !editing));
       if (shortcut || (this.dialog.open && event.code === 'Escape')) {
         event.preventDefault(); event.stopImmediatePropagation();
         if (!event.repeat) this.dialog.open ? this.close() : this.open();
@@ -209,7 +249,7 @@ export class TestingGroundsPanel {
         event.stopImmediatePropagation();
       }
     };
-    this._keyUp = event => { if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open],#pilotIdentityDialog[open]')) return; if (this.dialog.open || event.code === 'F2' || event.code === 'Backquote') event.stopImmediatePropagation(); };
+    this._keyUp = event => { if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open],#pilotIdentityDialog[open]')) return; if (this.dialog.open || (this.unlocked && (event.code === 'F2' || event.code === 'Backquote'))) event.stopImmediatePropagation(); };
     window.addEventListener('keydown', this._keyDown, true);
     window.addEventListener('keyup', this._keyUp, true);
   }
@@ -259,11 +299,13 @@ export class TestingGroundsPanel {
   }
 
   open() {
+    if (!this.unlocked) return false;
     this.testing.game?.hangar?.close();
     if (!this.testing.active) this.testing.enter();
     Input.reset();
     this.testing.setPanelOpen(true);
     this.renderState();
+    return true;
   }
 
   close() {

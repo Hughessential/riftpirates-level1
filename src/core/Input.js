@@ -3,17 +3,18 @@ import { clamp, $ } from './Utils.js';
 /**
  * Steer, boost, brake, roll, aim, manual fire, camera, pause.
  * Floating joystick + fire/boost pads on touch, drag-to-steer + WASD/arrows on
- * desktop, and full standard-mapping gamepad support (Star Fox-style layout):
+ * desktop, and full standard-mapping gamepad support:
  *   left stick -> steer          right stick -> camera (recenters on release)
- *   LB / RB    -> barrel roll    A -> fire      LT -> aim / lock-on
- *   RT -> boost                  Y -> brake
- *   Start      -> pause          d-pad + A -> pick an upgrade card
- * B and X are reserved for future abilities (bomb, charge shot).
+ *   RT -> fire                   LT -> boost     A -> brake
+ *   X -> aim / lock-on           LB / RB -> optional roll shortcuts
+ *   Start -> pause               physical A -> menu confirmation
  */
 const GP_DEADZONE = 0.18;
-export const DEFAULT_BUTTONS = { fire: 0, cancel: 1, brake: 3, rollLeft: 4, rollRight: 5, aim: 6, boost: 7, view: 8, pause: 9, up: 12, down: 13, left: 14, right: 15 };
+export const DEFAULT_BUTTONS = { fire: 7, cancel: 1, brake: 0, rollLeft: 4, rollRight: 5, aim: 2, boost: 6, view: 8, pause: 9, up: 12, down: 13, left: 14, right: 15 };
 const GP_CAM_DEADZONE = 0.18;
 const GP_TRIGGER_ON = 0.12; // analog triggers count as held past this value
+export const ROLL_DOUBLE_TAP_MS = 280;
+const isTextEntry = target => target?.matches?.('input:not([type="range"]):not([type="checkbox"]),textarea,[contenteditable="true"]');
 
 class InputImpl {
   constructor() {
@@ -30,6 +31,7 @@ class InputImpl {
     this._stickX = 0;
     this._stickY = 0;
     this._mouseDown = false;
+    this._spacePhysicalHeld = false;
 
     // gamepad state, refreshed once per frame by pollGamepad()
     this._padX = 0;
@@ -41,9 +43,15 @@ class InputImpl {
     this._padFire = false;
     this._padAim = false;
     this._padPrev = {}; // previous per-button pressed state, for edge detection
+    this.menuConfirmHeld = false; // always physical south/A; never a gameplay binding
+    this.menuConfirmPhysicalHeld = false;
+    this._blockMenuConfirmUntilRelease = false;
+    this._blockKeyboardFireUntilRelease = false;
 
     // one-shot barrel-roll requests, drained by the player each frame
     this._rollQueue = 0; // -1 = left, +1 = right, 0 = none
+    this._rollTapTimes = new Map();
+    this._rollStickDir = 0;
 
     // one-frame d-pad/A edges for menu navigation, overwritten every poll
     this.menuNav = { left: false, right: false, up: false, down: false, confirm: false, cancel: false, pause: false, prevTab: false, nextTab: false, view: false };
@@ -53,6 +61,10 @@ class InputImpl {
     this.axes = [0, 1, 2, 3];
     this.deadzone = GP_DEADZONE;
     this.capture = null;
+    // A connected but idle controller must not steal tutorial/help copy from a
+    // player who is actively using the keyboard. This survives run resets so a
+    // controller-confirmed launch opens with controller instructions.
+    this.lastInputFamily = 'keyboard';
 
     // gamepad presence — drained by Game for the connect/disconnect toast
     this._padId = null;
@@ -180,24 +192,38 @@ class InputImpl {
     });
 
     addEventListener('keydown', (e) => {
+      if (!e.repeat) this.lastInputFamily = 'keyboard';
       const wasDown = this._keys[e.code];
       this._keys[e.code] = true;
+      if (e.code === 'Space') this._spacePhysicalHeld = true;
       if (e.code === 'KeyP' || e.code === 'Escape') {
         if (this._onPause) this._onPause();
       }
-      // barrel roll — edge-triggered, so holding the key doesn't spin forever
-      if (!wasDown && this.enabled) {
+      // Roll shortcuts and double taps are edge-triggered. Key repeat and text
+      // entry never count, and Input.enabled is false while a menu owns input.
+      if (!wasDown && !e.repeat && this.enabled && !isTextEntry(e.target)) {
         if (e.code === 'KeyQ') this._rollQueue = -1;
         else if (e.code === 'KeyE') this._rollQueue = 1;
+        else if (e.code === 'KeyA' || e.code === 'ArrowLeft') this._recordRollTap(`key:${e.code}`, -1);
+        else if (e.code === 'KeyD' || e.code === 'ArrowRight') this._recordRollTap(`key:${e.code}`, 1);
       }
-      if (e.code === 'Space') e.preventDefault();
+      // Keep gameplay Space from scrolling the page, but preserve the native
+      // keyboard click contract for the shop's separate Skip button.
+      if (e.code === 'Space' && !e.target?.closest?.('.upSkip')) e.preventDefault();
     });
     addEventListener('keyup', (e) => {
       this._keys[e.code] = false;
+      if (e.code === 'Space') {
+        this._spacePhysicalHeld = false;
+        this._blockKeyboardFireUntilRelease = false;
+      }
     });
     addEventListener('blur', () => {
       this._keys = {};
+      this._spacePhysicalHeld = false;
+      this._blockKeyboardFireUntilRelease = false;
       this._rollQueue = 0;
+      this._resetRollTaps();
       this.boost = false;
       fOff();
       stickEnd();
@@ -207,17 +233,17 @@ class InputImpl {
   /**
    * Poll the first connected gamepad. Called once per frame by Game.update
    * (even while paused, so Start can un-pause). Standard mapping,
-   * Star Fox-style layout:
+   * Default gameplay layout:
    *   left stick  (axes 0/1) -> steer the ship
    *   right stick (axes 2/3) -> camera, recenters when released
-   *   LB (4) / RB (5)        -> barrel roll left / right
-   *   A (0)                  -> fire (held)
-   *   LT (6)                 -> aim / lock-on (held)
-   *   RT (7)                 -> boost (held)
-   *   Y (3)                  -> brake (held)
+   *   RT (7)                 -> fire (held)
+   *   LT (6)                 -> boost (held)
+   *   A (0)                  -> brake (held)
+   *   X (2)                  -> aim / lock-on (held)
+   *   double-flick / d-pad   -> barrel roll left / right
+   *   LB (4) / RB (5)        -> optional roll shortcuts
    *   Start (9)              -> pause toggle
-   *   d-pad (12-15) + A      -> upgrade-card navigation (menuNav edges)
-   * B (1) and X (2) stay unbound — reserved for future abilities.
+   *   d-pad (12-15) + A (0)  -> menu navigation and confirmation
    */
   pollGamepad() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -234,13 +260,23 @@ class InputImpl {
       this._navRepeat = {};
       this._padX = this._padY = this._camX = this._camY = 0;
       this._padBoost = this._padBrake = this._padFire = this._padAim = false;
+      this.menuConfirmHeld = false;
+      this.menuConfirmPhysicalHeld = false;
       // Keyboard Q/E uses the same queue. Preserve fresh key presses through
       // ordinary no-controller polling; only a real disconnect cancels input.
-      if (this.padLost) this._rollQueue = 0;
+      if (this.padLost) {
+        this._rollQueue = 0;
+        this.lastInputFamily = 'keyboard';
+      }
       this.capture = null;
       return;
     }
     const physicalHeld = i => !!pad.buttons[i] && (pad.buttons[i].pressed || pad.buttons[i].value > GP_TRIGGER_ON);
+    // Presence alone is not input. Only a real button/stick action makes the
+    // controller the active family used by contextual tutorial copy.
+    if (pad.buttons.some((_, i) => physicalHeld(i)) || pad.axes.some(value => Math.abs(value || 0) > Math.max(this.deadzone, .25))) {
+      this.lastInputFamily = 'controller';
+    }
     const changed = pad.id !== this._padId || pad.index !== this._padIndex;
     if (changed) {
       this._padEvent = { connected: true, id: pad.id };
@@ -275,6 +311,7 @@ class InputImpl {
     }
     const held = action => physicalHeld(this.bindings[action]);
     const edge = action => held(action) && !this._padPrev[this.bindings[action]];
+    const physicalEdge = index => physicalHeld(index) && !this._padPrev[index];
     const dz = (v, d) => Math.abs(v || 0) < d ? 0 : Math.sign(v) * Math.min(1, (Math.abs(v) - d) / (1 - d));
     const axisX = pad.axes[this.axes[0]] || 0, axisY = pad.axes[this.axes[1]] || 0;
     if (Math.abs(axisX) < this.deadzone && Math.abs(axisY) < this.deadzone) this._blockMotionUntilNeutral = false;
@@ -290,16 +327,34 @@ class InputImpl {
     if (this.enabled) {
       if (edge('rollLeft')) this._rollQueue = -1;
       if (edge('rollRight')) this._rollQueue = 1;
+      if (physicalEdge(14)) this._recordRollTap('pad:dpad-left', -1);
+      if (physicalEdge(15)) this._recordRollTap('pad:dpad-right', 1);
+      const flick = axisX < -.68 ? -1 : axisX > .68 ? 1 : 0;
+      if (Math.abs(axisX) < .34) this._rollStickDir = 0;
+      else if (flick && !this._rollStickDir) {
+        this._rollStickDir = flick;
+        this._recordRollTap(`pad:stick-${flick}`, flick);
+      }
+    } else {
+      this._rollStickDir = 0;
     }
-    m.confirm = edge('fire');
-    m.cancel = edge('cancel');
-    m.pause = edge('pause');
-    m.view = edge('view');
-    m.prevTab = edge('rollLeft');
-    m.nextTab = edge('rollRight');
+    this.menuConfirmPhysicalHeld = physicalHeld(0);
+    if (!this.menuConfirmPhysicalHeld) this._blockMenuConfirmUntilRelease = false;
+    this.menuConfirmHeld = this.menuConfirmPhysicalHeld && !this._blockMenuConfirmUntilRelease;
+    m.confirm = physicalEdge(0) && !this._blockMenuConfirmUntilRelease;
+    // Physical south/A is always exposed as contextual confirm. Keep saved
+    // gameplay bindings functional too; ControllerMenus resolves a button-0
+    // conflict in favor of confirm only while an actual menu owns input.
+    const contextualEdge = action => edge(action);
+    const contextualHeld = action => this.bindings[action] === 0 ? false : held(action);
+    m.cancel = contextualEdge('cancel');
+    m.pause = contextualEdge('pause');
+    m.view = contextualEdge('view');
+    m.prevTab = contextualEdge('rollLeft');
+    m.nextTab = contextualEdge('rollRight');
     const now = performance.now();
     for (const [direction, stick] of [['left', axisX < -.55], ['right', axisX > .55], ['up', axisY < -.55], ['down', axisY > .55]]) {
-      const active = held(direction) || stick;
+      const active = contextualHeld(direction) || stick;
       const repeat = this._navRepeat[direction];
       if (changed && active) this._navRepeat[direction] = Infinity;
       else if (!active) delete this._navRepeat[direction];
@@ -314,9 +369,29 @@ class InputImpl {
 
   blockMenuCarryover() {
     this._blockFireUntilRelease = true;
+    this._blockMenuConfirmUntilRelease = true;
     this._blockMotionUntilNeutral = true;
     this._padFire = false;
+    this.menuConfirmHeld = false;
     this._rollQueue = 0;
+    this._resetRollTaps();
+  }
+
+  blockKeyboardFireUntilRelease() {
+    this._blockKeyboardFireUntilRelease = true;
+  }
+
+  _recordRollTap(source, direction, now = performance.now()) {
+    const previous = this._rollTapTimes.get(source) || -Infinity;
+    if (now - previous <= ROLL_DOUBLE_TAP_MS) {
+      this._rollQueue = direction;
+      this._rollTapTimes.delete(source);
+    } else this._rollTapTimes.set(source, now);
+  }
+
+  _resetRollTaps() {
+    this._rollTapTimes.clear();
+    this._rollStickDir = 0;
   }
 
   loadController() {
@@ -358,6 +433,11 @@ class InputImpl {
     return !!this._keys[code];
   }
 
+  /** Raw hold state used to reject a confirm already down when a shop opens. */
+  get purchaseConfirmHeld() {
+    return this._spacePhysicalHeld || this.menuConfirmPhysicalHeld;
+  }
+
   /** Consume a one-shot key press (used for the cinematic skip). */
   consumeKey(code) {
     if (this._keys[code]) {
@@ -384,20 +464,20 @@ class InputImpl {
     };
   }
 
-  /** Manual fire — held A, Space, or the touch fire pad. */
+  /** Manual fire — held RT by default, Space, or the touch fire pad. */
   get firing() {
-    return this.enabled && (this._padFire || this.fireHeld || !!this._keys.Space);
+    return this.enabled && (this._padFire || this.fireHeld || (!!this._keys.Space && !this._blockKeyboardFireUntilRelease));
   }
 
   /**
-   * Aim mode — held LT or F. On touch, holding the fire pad aims too, since
+   * Aim mode — held X by default or F. On touch, holding the fire pad aims too, since
    * there's no room for a separate aim pad.
    */
   get aiming() {
     return this.enabled && (this._padAim || !!this._keys.KeyF || this.fireHeld);
   }
 
-  /** Brake — held Y on a pad, C on the keyboard. */
+  /** Brake — held A by default, C on the keyboard. */
   get braking() {
     return this.enabled && (this._padBrake || !!this._keys.KeyC);
   }
@@ -422,7 +502,9 @@ class InputImpl {
     this._padBrake = false;
     this._padFire = false;
     this._padAim = false;
+    this.menuConfirmHeld = false;
     this._rollQueue = 0;
+    this._resetRollTaps();
   }
 }
 

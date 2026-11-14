@@ -28,15 +28,22 @@ export class UpgradeScreen {
     this.skipButton.addEventListener('click', () => this._skip());
     this.skipButton.addEventListener('focus', () => { this.sel = this._offers.length; this._paintSel(); });
     this.skipButton.addEventListener('mouseenter', () => { this.sel = this._offers.length; this._paintSel(); });
-    this.el.querySelector('.upHint').textContent = '1 / 2 / 3 PURCHASE · S SKIP & SAVE · TAB / D-PAD SELECT · ENTER / A CONFIRM';
+    this.el.querySelector('.upHint').textContent = 'A / D OR ARROWS SELECT · HOLD SPACE / A TO INSTALL · S SKIP & SAVE';
     this.open = false;
     this.closing = false;
     this.sel = 0; // gamepad-highlighted card
+    this.holdDuration = 600;
+    this._holdStarted = 0;
+    this._holdCard = null;
+    this._holdLatch = false;
     this._generation = 0;
     this._onKey = this._onKey.bind(this);
     this.el.dataset.suspended = String(document.hidden);
     document.addEventListener('visibilitychange', () => {
       this.el.dataset.suspended = String(document.hidden);
+      // Controller state is not guaranteed to emit a browser blur. Never let
+      // an invisible tab accrue wall-clock hold progress toward a purchase.
+      if (document.hidden) this.cancelHoldForPause();
     });
   }
 
@@ -51,6 +58,9 @@ export class UpgradeScreen {
     this._offerToken = offers[0]?.offerToken;
     this.onDone = onDone;
     this.open = true;
+    // A held brake/confirm or fire key must be released after the shop appears;
+    // only a fresh hold may begin an installation.
+    this._holdLatch = Input.purchaseConfirmHeld;
 
     const approach = typeof source === 'object' && source !== null;
     const sectorNames = ['OUTER DEFENSE', 'MIDRIFT', 'INNER CITADEL', 'INHIBITOR'];
@@ -74,6 +84,11 @@ export class UpgradeScreen {
         this._paintSel();
       });
       card.addEventListener('focus', () => { this.sel = i; this._paintSel(); });
+      // Native buttons activate on Enter/Space. Keyboard/card purchases use
+      // the explicit hold gesture instead; pointer and touch clicks stay fast.
+      card.addEventListener('keydown', event => {
+        if (event.code === 'Space' || event.code === 'Enter') event.preventDefault();
+      });
       this.cards.appendChild(card);
     });
 
@@ -98,8 +113,14 @@ export class UpgradeScreen {
 
   /** Gamepad navigation — called once per frame by Game.update. */
   update() {
-    if (!this.open || this.game.paused || !this._offers?.length) return;
+    if (!this.open || !this._offers?.length) {
+      this._cancelHold(); return;
+    }
+    if (this.game.paused) {
+      this.cancelHoldForPause(); return;
+    }
     this._refreshWallet();
+    this._updateHold(Input.purchaseConfirmHeld);
     if (Input.menuRouting) return;
     const nav = Input.menuNav;
     const n = this._offers.length + 1;
@@ -110,7 +131,7 @@ export class UpgradeScreen {
       this._paintSel();
       Audio2.play('ui_move', 0.3, 1.1);
     }
-    if (nav.confirm) this.sel === this._offers.length ? this._skip() : this._pick(this._offers[this.sel].id);
+    if (nav.confirm && this.sel === this._offers.length) this._skip();
   }
 
   _paintSel() {
@@ -129,11 +150,86 @@ export class UpgradeScreen {
   _onKey(e) {
     if (!this.open || this.game.paused || e.repeat) return;
     if (e.code === 'KeyS') { e.preventDefault(); this._skip(); return; }
+    if (e.code === 'Space' || e.code === 'Enter') {
+      // Preserve native button activation for the separate Skip action. Cards
+      // still suppress the synthetic click and use the explicit hold path.
+      if (e.target !== this.skipButton) e.preventDefault();
+      return;
+    }
+    const direction = ['KeyA', 'ArrowLeft'].includes(e.code) ? -1
+      : ['KeyD', 'ArrowRight'].includes(e.code) ? 1 : 0;
+    if (direction) {
+      e.preventDefault();
+      this._moveSelection(direction);
+      return;
+    }
     const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code);
     if (i >= 0 && this._offers[i]) {
       e.preventDefault();
-      this._pick(this._offers[i].id);
+      this._select(i);
     }
+  }
+
+  _select(index) {
+    const changed = index !== this.sel;
+    // Changing focus by itself is not a hold cancellation: number keys and
+    // A/D should let the player immediately begin holding Space. Only require
+    // a release when the selection changes during an active hold gesture.
+    if (changed) this._cancelHold(Boolean(this._holdCard || Input.purchaseConfirmHeld));
+    this.sel = index;
+    this._paintSel();
+    const selected = index < this._offers.length ? this.cards.children[index] : this.skipButton;
+    selected?.focus({ preventScroll: true });
+    if (changed) Audio2.play('ui_move', 0.3, 1.1);
+  }
+
+  _moveSelection(direction) {
+    const n = this._offers.length + 1;
+    this._select((this.sel + direction + n) % n);
+  }
+
+  _updateHold(held, now = performance.now()) {
+    if (!held) {
+      this._holdLatch = false;
+      this._cancelHold();
+      return;
+    }
+    if (this._holdLatch || this.sel >= this._offers.length) return;
+    const card = this.cards.children[this.sel];
+    if (!card) return;
+    if (card !== this._holdCard) {
+      this._cancelHold();
+      this._holdCard = card;
+      this._holdStarted = now;
+      card.classList.add('holding');
+      card.style.setProperty('--hold-progress', '0');
+      this.status.textContent = 'HOLD SPACE / A TO INSTALL · RELEASE TO CANCEL';
+    }
+    const progress = Math.min(1, (now - this._holdStarted) / this.holdDuration);
+    card.style.setProperty('--hold-progress', progress.toFixed(3));
+    if (progress < 1) return;
+    const id = this._offers[this.sel]?.id;
+    this._holdLatch = true;
+    this._cancelHold();
+    Input.blockMenuCarryover();
+    Input.blockKeyboardFireUntilRelease();
+    this._pick(id);
+  }
+
+  _cancelHold(requireRelease = false) {
+    if (this._holdCard) {
+      this._holdCard.classList.remove('holding');
+      this._holdCard.style.removeProperty('--hold-progress');
+    }
+    this._holdCard = null;
+    this._holdStarted = 0;
+    if (requireRelease) this._holdLatch = true;
+  }
+
+  cancelHoldForPause() {
+    // Game time stops while paused, and a held confirm must not resume the
+    // installation. Release once, then begin a fresh full hold.
+    this._cancelHold(Input.purchaseConfirmHeld);
   }
 
   _pick(id, offerToken = this._offerToken) {
@@ -170,6 +266,7 @@ export class UpgradeScreen {
 
   _skip() {
     if (!this.open || this.game.paused || !this.game.upgrades.skip(this._offerToken)) return;
+    this._cancelHold(true);
     this.open = false;
     this.closing = true;
     removeEventListener('keydown', this._onKey);
@@ -192,6 +289,8 @@ export class UpgradeScreen {
   }
 
   hide() {
+    this._cancelHold();
+    this._holdLatch = false;
     this._generation += 1;
     if (this._dismiss) this.game.scheduler.cancel(this._dismiss);
     if (this._animateIn != null) cancelAnimationFrame(this._animateIn);

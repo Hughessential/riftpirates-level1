@@ -4,11 +4,17 @@ import { Audio2 } from '../core/AudioManager.js';
 import { rand } from '../core/Utils.js';
 import { RunWallet } from './RunWallet.js';
 
+const TAU = Math.PI * 2;
+
 export const LOOT_POOL_SIZE = 260;
 // Authorization is finite, even in a stalled encounter. Every authorized source
 // fits in the pending queue; pool pressure delays value without discarding it.
 export const MAX_RUN_REWARDS = 2048;
 export const LOOT_COLORS = Object.freeze([0xf4f8ff, 0xffca43, 0xa956ff, 0x27f5da, 0xff53cb]);
+export const LOOT_GLOW = Object.freeze({
+  haloOpacity:.34, pulseRate:4.8, reducedPulseRate:1.15,
+  scalePulse:.2, reducedScalePulse:.08, haloSize:3.15,
+});
 export const LOOT_DENOMINATIONS = Object.freeze([
   { value: 2, name: 'SHARD', color: 0xf4f8ff, size: .75, sides: 3 },
   { value: 10, name: 'SALVAGE', color: 0xff53cb, size: 1.05, sides: 4 },
@@ -54,9 +60,11 @@ export class ScrapSystem {
   constructor(scene, game) {
     this.game = game; this.wallet = new RunWallet(); this.pool = [];
     this.halos = new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({
-      map: Tex.glow, transparent: true, opacity: .17, blending: THREE.AdditiveBlending, depthWrite: false }),LOOT_POOL_SIZE);
+      map: Tex.glow, transparent: true, opacity: LOOT_GLOW.haloOpacity, blending: THREE.AdditiveBlending, depthWrite: false }),LOOT_POOL_SIZE);
     this.halos.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.halos.frustumCulled = false;
-    this._transform = new THREE.Object3D(); scene.add(this.halos);
+    this._transform = new THREE.Object3D(); this._haloColor = new THREE.Color();
+    this.reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scene.add(this.halos);
     for (let i = 0; i < LOOT_POOL_SIZE; i++) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: Tex.diamond, transparent: true, depthWrite: false }));
       sp.visible = false; scene.add(sp);
@@ -93,7 +101,8 @@ export class ScrapSystem {
       const reward = this.pending[0], value = reward.pieces[reward.next++], d = denomination(value);
       Object.assign(o,{ active:true,reward,value,x:reward.x+rand(-reward.spread,reward.spread),
         y:reward.y+rand(-reward.spread,reward.spread),z:reward.z+rand(-reward.spread,reward.spread),
-        vx:rand(-2.5,2.5)*reward.spread,vy:rand(-2,3)*reward.spread,vz:rand(3,7),life:reward.life,tint:d.color,size:d.size });
+        vx:rand(-2.5,2.5)*reward.spread,vy:rand(-2,3)*reward.spread,vz:rand(3,7),life:reward.life,
+        age:0,pulsePhase:rand(0,TAU),tint:d.color,size:d.size });
       o.sp.material.map = lootTexture(d,value); o.sp.material.color.setHex(d.color).multiplyScalar(1.7);
       o.sp.material.opacity = 1; o.sp.visible = true; o.sp.scale.setScalar(o.size); o.sp.position.set(o.x,o.y,o.z);
       if (reward.next >= reward.pieces.length) this.pending.shift();
@@ -114,6 +123,9 @@ export class ScrapSystem {
     const gained = total-reward.awarded; reward.awarded = total;
     if (this.wallet.credit(gained)) {
       this.metrics.collectedBase += o.value;
+      // This callback receives the exact integer credited after cumulative
+      // source rounding, so the HUD can never overstate a fragmented reward.
+      if (gained > 0) g.hud?.scrapPickup?.(gained,{ sourceId:reward.sourceId,kind:reward.kind,balance:this.wallet.balance });
       g.augmentEffects?.onScrap(gained,{ sourceId:reward.sourceId,firstCollection,baseValue:o.value,kind:reward.kind });
       if (p.stats.scrapYield > 0) g.score.add(gained*12*p.stats.scrapYield,'PLUNDER');
       if (firstCollection) g.heat.onScrapCollected();
@@ -126,7 +138,7 @@ export class ScrapSystem {
     let picked = 0, haloCount = 0; this._flushPending();
     for (const o of this.pool) {
       if (!o.active) continue;
-      o.life -= dt; const drag = Math.max(0,1-dt*2);
+      o.life -= dt; o.age += dt; const drag = Math.max(0,1-dt*2);
       o.vx *= drag; o.vy *= drag; o.vz *= drag; o.x += o.vx*dt; o.y += o.vy*dt;
       o.z += (o.vz+worldSpeed*.8*o.reward.speed)*dt;
       const distance = Math.hypot(o.x-p.x,o.y-p.y,o.z);
@@ -138,12 +150,17 @@ export class ScrapSystem {
       if (o.life <= 0 || o.z > 22) {
         this.metrics.expiredBase += o.value; o.active = false; o.sp.visible = false; o.reward = null; continue;
       }
-      o.sp.position.set(o.x,o.y,o.z); o.sp.material.rotation = Math.sin(o.life*1.3)*.15;
-      o.sp.scale.setScalar(o.size*(1+.09*Math.sin(o.life*8+o.value))); o.sp.material.opacity = Math.min(1,o.life);
+      const pulseRate = this.reducedMotion ? LOOT_GLOW.reducedPulseRate : LOOT_GLOW.pulseRate;
+      const pulse = .5 + .5*Math.sin(o.age*pulseRate+o.pulsePhase);
+      o.sp.position.set(o.x,o.y,o.z); o.sp.material.rotation = this.reducedMotion ? 0 : Math.sin(o.age*1.3+o.pulsePhase)*.15;
+      o.sp.scale.setScalar(o.size*(1+(this.reducedMotion?LOOT_GLOW.reducedScalePulse:LOOT_GLOW.scalePulse)*pulse));
+      o.sp.material.opacity = Math.min(this.reducedMotion ? .82 + .18 * pulse : .7 + .3 * pulse, o.life);
       const transform = this._transform; transform.position.set(o.x,o.y,o.z);
       if (g.camera) transform.quaternion.copy(g.camera.quaternion);
-      transform.scale.setScalar(o.size*(2.4+.15*Math.sin(o.life*5))); transform.updateMatrix();
-      this.halos.setMatrixAt(haloCount,transform.matrix); this.halos.setColorAt(haloCount++,o.sp.material.color);
+      transform.scale.setScalar(o.size * (LOOT_GLOW.haloSize + (this.reducedMotion ? .3 : .75) * pulse)); transform.updateMatrix();
+      this.halos.setMatrixAt(haloCount,transform.matrix);
+      this._haloColor.setHex(o.tint).multiplyScalar(this.reducedMotion ? 1.35 + .2 * pulse : 1.45 + .45 * pulse);
+      this.halos.setColorAt(haloCount++,this._haloColor);
     }
     this.halos.count = haloCount; this.halos.instanceMatrix.needsUpdate = true;
     if (this.halos.instanceColor) this.halos.instanceColor.needsUpdate = true;

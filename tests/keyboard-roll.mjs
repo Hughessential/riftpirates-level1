@@ -15,7 +15,7 @@ try {
     Object.defineProperty(navigator, 'getGamepads', { value: () => [] });
     localStorage.setItem('riftpirates-level1-v1', JSON.stringify({ pilotName: 'ROLL TEST', pilotNameConfirmed: true, music: 0 }));
   });
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled);
   await page.click('#launchBtn');
   await page.evaluate(async () => {
@@ -31,6 +31,7 @@ try {
     const p = RIFT.player;
     p.rollT = p.rollCd = 0; p.boost = p.stats.boostCapacity;
     p.x = p.vx = 0; p.group.rotation.z = 0;
+    __rollInput._rollQueue = 0; __rollInput._resetRollTaps();
   });
   const step = (frames = 1) => page.evaluate(frames => {
     for (let i = 0; i < frames; i++) __rollStep(1 / 60);
@@ -53,6 +54,32 @@ try {
     assert.ok(held.time <= 0, 'Holding Q/E does not continuously roll');
     await page.keyboard.up(key);
   }
+  for (const [key, direction] of [['a', -1], ['d', 1], ['ArrowLeft', -1], ['ArrowRight', 1]]) {
+    await ready();
+    await page.keyboard.press(key);
+    assert.ok((await step()).time <= 0, `One ${key} tap only steers`);
+    await page.keyboard.press(key);
+    const rolling = await step();
+    assert.ok(rolling.time > 0, `Double-tap ${key} starts a roll`);
+    assert.equal(rolling.dir, direction);
+  }
+  await ready();
+  await page.keyboard.down('a');
+  await page.keyboard.down('a');
+  assert.ok((await step(3)).time <= 0, 'Held/repeated movement input cannot roll without a release');
+  await page.keyboard.up('a');
+  await ready();
+  await page.keyboard.press('d');
+  await new Promise(resolve => setTimeout(resolve, 330));
+  await page.keyboard.press('d');
+  assert.ok((await step()).time <= 0, 'Two taps outside the timing window do not roll');
+  await ready();
+  await page.evaluate(() => {
+    const input = document.createElement('input'); input.id = 'rollTypingProbe'; document.body.append(input); input.focus();
+  });
+  await page.keyboard.press('a'); await page.keyboard.press('a');
+  assert.ok((await step()).time <= 0, 'Typing never triggers a roll');
+  await page.evaluate(() => document.getElementById('rollTypingProbe').remove());
   await ready();
   await page.keyboard.press('q');
   const first = await step();
@@ -75,5 +102,5 @@ try {
   assert.ok((await step()).time <= 0, 'Losing focus clears an unconsumed keyboard roll');
   await page.keyboard.up('e');
   assert.deepEqual(errors, []);
-  console.log('PASS: real keyboard Q/E with no controller, both dash/spin directions, one-shot presses, cooldown/energy guards, pause and blur safety.');
+  console.log('PASS: real Q/E and released double-tap A/D/arrows, both roll directions, timeout/repeat/typing guards, cooldown/energy, pause and blur safety.');
 } finally { await browser.close(); }
