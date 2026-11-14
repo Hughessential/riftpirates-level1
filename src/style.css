@@ -364,12 +364,6 @@ b{font-weight:900}
 .menuStat{font-family:inherit;margin:22px 0 0;font-size:11px;line-height:1.5;letter-spacing:.1em;color:var(--acid)}
 .menuStat b{color:var(--cyan)}.menuStat .gold{color:#ffd447}
 .menuSettingsBlock{position:relative}
-.menuAudio{display:flex;align-items:center;gap:14px;margin-top:12px}
-#titleScreen .menuAudio .btnGhost{padding:5px 0;border:0;border-radius:0;box-shadow:none;
-  font-family:inherit;font-size:11px;letter-spacing:.1em;color:#84bd91}
-#titleScreen .menuAudio .btnGhost.on{color:#a7ff28;text-shadow:0 0 8px #a7ff2836}
-#titleScreen .menuAudio .btnGhost:hover{color:#fff}
-#titleScreen .menuAudio .btnGhost:focus-visible{outline:1px solid var(--acid);outline-offset:4px}
 .audioMark{display:flex;align-items:center;gap:2px;height:13px;margin-right:3px;color:#00fff0;filter:drop-shadow(0 0 5px #00fff080)}
 .audioMark i{display:block;width:2px;background:currentColor;height:5px}
 .audioMark i:nth-child(2),.audioMark i:nth-child(4){height:9px}.audioMark i:nth-child(3){height:13px}
@@ -425,7 +419,7 @@ b{font-weight:900}
 @media (max-height:760px) and (min-width:901px){
   .menuMain{width:min(48vw,650px);top:46%}.voxelLogo{margin-top:13px;margin-bottom:8px}
   .menuTagline{margin:17px 0 9px}.menuManifesto{font-size:12px}.menuActions{margin-top:16px}
-  .menuStat{margin-top:15px}.menuAudio{margin-top:8px}.menuMasthead{top:23px}
+  .menuStat{margin-top:15px}.menuMasthead{top:23px}
   .menuFooter{bottom:21px}.menuRoute{padding:13px 0}.menuBottomline{margin-top:12px}
 }
 @media (max-width:1100px){.menuLaunchNote{display:none}.menuRoute{gap:15px;font-size:8px}.menuSignature{display:none}}
@@ -437,7 +431,7 @@ b{font-weight:900}
   .voxelLogo{margin-top:20px}.menuFooter{position:relative;left:auto;right:auto;bottom:auto;margin:0 6vw 25px}
   .menuRoute{gap:14px;flex-wrap:wrap;justify-content:flex-start}.menuRoute .routeOrigin{width:100%;margin-bottom:2px}
   .menuKicker{font-size:8px;gap:8px}.menuTagline{font-size:8px;gap:8px}.menuTagline>span+span::before{margin-right:8px}
-  .showcaseCoordinates,.showcaseStamp{display:none}.menuAudio{margin-top:17px}.menuSignature{display:none}
+  .showcaseCoordinates,.showcaseStamp{display:none}.menuSignature{display:none}
   .menuControls{line-height:1.6}.menuRoute .routeOrigin b{font-size:10px}.menuSpectrum{opacity:.6}
 }
 @media (max-width:520px){
@@ -488,9 +482,10 @@ b{font-weight:900}
 @media(prefers-reduced-motion:reduce){#openingTutorial>div i{transition:none}}
 
 /* Pausing opens a suspended rift instrument: rings turn while the raid is held. */
-#pauseScreen.riftPause{isolation:isolate;overflow:hidden;z-index:40;background:rgba(1,1,5,.89);backdrop-filter:blur(4px);
+#pauseScreen.riftPause{isolation:isolate;width:100%;height:100%;zoom:1;overflow:hidden;z-index:40;background:rgba(1,1,5,.89);backdrop-filter:blur(4px);
   --pause-cyan:#24ffe0;--pause-gold:#ffd34a;--pause-violet:#a139f1}
-.pauseConsole{position:relative;width:min(580px,85vw);padding:35px 42px 25px;text-align:center;
+.pauseConsole{position:relative;width:min(580px,85vw);padding:35px 42px 25px;text-align:center;zoom:var(--ui-user-scale);
+  flex-shrink:0;
   background:linear-gradient(145deg,#06080df5,#07020bfa);border:1px solid #375d52;
   box-shadow:0 0 0 8px #030306b0,0 0 0 9px #322239,0 30px 80px #000,0 0 70px #6520b31a}
 .pauseConsole::before,.pauseConsole::after{content:'';position:absolute;left:-10px;right:-10px;height:12px;pointer-events:none;
@@ -536,8 +531,22 @@ b{font-weight:900}
   #titleScreen .menuLaunch{height:60px;width:300px}.launchGlyph{width:213px}
   .menuLaunchNote{display:none}.menuMasthead{top:17px;padding-bottom:10px}.menuBrand{font-size:11px}.menuEdition{font-size:10px}
   .menuFooter{bottom:17px}.menuRoute{font-size:9px;padding:12px 0}.menuRoute .routeOrigin{font-size:10px}
-  .pauseConsole{padding:24px 36px 20px;width:min(520px,85vw)}.pauseSeal{width:39px;height:39px;margin-bottom:15px}
-  #pauseScreen .pausedTitle{margin-top:17px}.pauseMessage{margin:14px 0 23px}.pauseAudio{margin:20px 0 14px}
+  .pauseConsole{padding:15px 28px 13px;width:min(500px,85vw)}.pauseSeal{display:none}
+  #pauseScreen .eyebrow{font-size:8px}#pauseScreen .pausedTitle{width:76%;margin:8px auto 4px}
+  .pauseMessage{margin:7px 0 11px;font-size:8px}#pauseScreen .pauseResume{padding:11px 10px;font-size:12px}
+  .pauseAudio{margin:10px 0 7px}.pauseUiScale{margin-bottom:5px}.pauseKey{margin-top:7px;font-size:7px}
+}
+@media (max-height:950px) and (min-width:901px){
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseConsole{
+    padding:15px 28px 13px;width:min(500px,85vw)}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseSeal{display:none}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #pauseScreen .eyebrow{font-size:8px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #pauseScreen .pausedTitle{width:76%;margin:8px auto 4px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseMessage{margin:7px 0 11px;font-size:8px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #pauseScreen .pauseResume{padding:11px 10px;font-size:12px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseAudio{margin:10px 0 7px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseUiScale{margin-bottom:5px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseKey{margin-top:7px;font-size:7px}
 }
 @media(max-width:1100px){.menuBrand{font-size:10px}.menuEdition{font-size:10px}.menuRoute{gap:13px;font-size:8px}.menuRoute .routeOrigin{font-size:10px}}
 @media(max-width:900px){
@@ -545,6 +554,15 @@ b{font-weight:900}
   .menuBrand{font-size:9px}.menuEdition{font-size:8px}.menuKicker{font-size:9px}.menuTagline{font-size:10px}
   .pauseCoordinate{display:none}.pauseConsole{padding:28px 25px 23px}.pauseOrbit{width:96vw}
   .menuFooter{margin-top:20px}.pauseOrbitB{width:120vw}.pauseOrbitC{width:145vw}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseConsole{padding:13px 16px 10px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseSeal{display:none}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #pauseScreen .eyebrow{font-size:7px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #pauseScreen .pausedTitle{width:72%;margin:6px auto 3px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseMessage{margin:5px 0 8px;font-size:7px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #pauseScreen .pauseResume{padding:9px 7px;font-size:9px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseAudio{margin:7px 0 5px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseUiScale{margin-bottom:3px}
+  :is(html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .pauseKey{margin-top:5px;font-size:6px}
 }
 @media(prefers-reduced-motion:reduce){.pauseOrbit,#menuCursorStar svg{animation:none!important}#menuCursorStar{transition:none}}
 
@@ -656,8 +674,7 @@ b{font-weight:900}
   #titleScreen .menuLaunch{width:calc(340px*var(--m));height:calc(70px*var(--m));gap:calc(25px*var(--m));padding:calc(17px*var(--m)) calc(25px*var(--m)) calc(21px*var(--m))}
   .launchGlyph{width:calc(245px*var(--m))}.launchArrow{font-size:calc(36px*var(--m))}
   .menuLaunchNote{font-size:calc(9px*var(--m));max-width:calc(150px*var(--m));gap:calc(7px*var(--m))}.menuLaunchNote b{font-size:calc(10px*var(--m))}
-  .menuStat{font-size:calc(11px*var(--m));margin-top:calc(8px*var(--m))}.menuAudio{gap:calc(14px*var(--m));margin-top:calc(10px*var(--m))}
-  #titleScreen .menuAudio .btnGhost{font-size:calc(11px*var(--m))}
+  .menuStat{font-size:calc(11px*var(--m));margin-top:calc(8px*var(--m))}
   .menuFooter{bottom:calc(24px*var(--m))}.menuRoute{font-size:calc(10px*var(--m));gap:calc(20px*var(--m));padding:calc(17px*var(--m)) 0}
   .menuRoute .routeOrigin{font-size:calc(12px*var(--m))}.routeOrigin b{font-size:calc(14px*var(--m))}
   .menuBottomline{margin-top:calc(17px*var(--m))}.menuControls,.menuControls b{font-size:calc(9px*var(--m))}.menuControls>span{font-size:calc(7px*var(--m))}.menuSignature{font-size:calc(8px*var(--m))}
@@ -685,9 +702,8 @@ b{font-weight:900}
 @media(min-width:2100px) and (min-height:1100px){#arsenalReadout{left:24px;bottom:145px;width:420px;font-size:11px;padding:14px 16px}#arsenalReadout small,#arsenalReadout .arsenalMods{font-size:9px}#arsenalReadout strong{font-size:18px}}
 @media(max-width:900px){#arsenalReadout{bottom:140px;max-width:240px;font-size:7px}#arsenalReadout strong{font-size:10px}.arsenalMods{display:none}}
 
-/* Compact saved audio mixer: square neon faders on the title and pause menus. */
-.audioMixer.menuAudio,.audioMixer.pauseAudio{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(20px*var(--m,1));max-width:calc(420px*var(--m,1))}
-.audioMixer.pauseAudio{max-width:none}
+/* Shared saved audio mixer: square neon faders in Options and pause. */
+.audioMixer.pauseAudio{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(20px*var(--m,1))}
 .audioMixer .audioChannel{--mixer-accent:#00fff0;min-width:0;padding:4px 9px 0;border-left:1px solid #00fff04d;background:linear-gradient(90deg,#00fff007,transparent)}
 .audioMixer [data-audio-channel="sfx"]{--mixer-accent:#d84fff;border-left-color:#d84fff4d;background:linear-gradient(90deg,#d84fff07,transparent)}
 .audioMixer .audioChannelHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -711,31 +727,34 @@ b{font-weight:900}
   border:0;color:#8fa97d;text-align:left;font-size:calc(8px*var(--m,1));box-shadow:none}
 .pauseUiScale{margin:0 auto 12px;text-align:left}.pauseUiScale .tutorialReplayBtn{text-align:center}
 @media(min-width:901px){
-  /* Keep the desktop mixer and interface scale on one compact settings row.
-     The control remains native/focusable but no longer pushes the hero into
-     the fixed route footer at the 110% fresh-save scale. */
-  .menuSettingsBlock>.uiScaleSetting{position:absolute;left:calc(440px*var(--m,1));bottom:0;
-    width:calc(260px*var(--m,1));max-width:calc(100% - 440px*var(--m,1));margin:0}
-  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuMain{top:41%}
-  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuSettingsBlock{
-    position:absolute;left:calc(380px*var(--m,1));right:0;bottom:0;width:auto}
-  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuSettingsBlock .menuStat{margin-top:0}
-  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuSettingsBlock .menuAudio{
-    max-width:none;margin-top:calc(7px*var(--m,1));gap:calc(8px*var(--m,1))}
-  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuSettingsBlock>.uiScaleSetting{
-    position:static;width:100%;max-width:none;margin-top:calc(5px*var(--m,1))}
+  /* At enlarged UI sizes, reserve space for the stats and Options beneath
+     Launch. The decorative logo stays bounded while controls remain enlarged. */
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuMain{
+    top:46%;transform:translateY(-46%)}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .voxelLogo{
+    width:min(100%,calc(600px*var(--viewport-menu-scale,1)));margin:calc(12px*var(--m,1)) 0 calc(8px*var(--m,1))}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuTagline{
+    margin:calc(12px*var(--m,1)) 0 calc(8px*var(--m,1))}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuActions{
+    margin-top:calc(12px*var(--m,1))}
 }
 @media(min-width:901px) and (max-height:850px){
-  /* The audio/interface row added to the hero needs real space above the
-     fixed route footer on laptop-height and external-display browser chrome. */
+  /* Keep the hero above the route footer on laptop-height displays. */
   .menuMain{width:min(48.5vw,calc(760px*var(--m,1)))}
-  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuMain{top:39%}
 }
-@media(max-width:500px){.audioMixer.menuAudio,.audioMixer.pauseAudio{gap:10px}.audioMixer .audioChannel{padding-left:6px;padding-right:6px}}
+@media(min-width:901px) and (max-height:950px){
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .voxelLogo{
+    width:min(100%,40vh);margin:calc(6px*var(--m,1)) 0}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuTagline{
+    margin:calc(6px*var(--m,1)) 0}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .menuActions{
+    margin-top:calc(6px*var(--m,1))}
+}
+@media(max-width:500px){.audioMixer.pauseAudio{gap:10px}.audioMixer .audioChannel{padding-left:6px;padding-right:6px}}
 
 /* Zoomed fixed/modal surfaces use an inverse logical ceiling so their final
    painted bounds remain inside the physical viewport at 80–140%. */
 dialog{max-width:calc((100vw - 24px)/var(--ui-user-scale))!important;
   max-height:calc((100vh - 24px)/var(--ui-user-scale))!important}
 .pauseConsole{max-width:calc((100vw - 48px)/var(--ui-user-scale));
-  max-height:calc((100vh - 48px)/var(--ui-user-scale));overflow:auto}
+  max-height:calc((100vh - 48px)/var(--ui-user-scale));overflow:visible}

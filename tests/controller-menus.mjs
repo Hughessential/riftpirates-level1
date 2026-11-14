@@ -35,7 +35,9 @@ try {
   assert.equal(await page.evaluate(() => RIFT.running), false, 'Wake/reconnect confirm is ignored');
   await page.evaluate(() => { __pad.buttons[0] = {pressed: false, value: 0}; __tick(); __press(13); });
   const focusDebug = await page.evaluate(() => ({root:RIFT.controllerMenus.root?.id,focus:RIFT.controllerMenus.focused?.outerHTML,active:RIFT.controllerMenus.active,pad:__input._padId,bind:__input.bindings}));
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'musicTgl', JSON.stringify(focusDebug));
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'optionsBtn', JSON.stringify(focusDebug));
+  await page.evaluate(() => { __press(0); __go('#musicTgl'); });
+  assert.equal(await page.$eval('#optionsDialog', el => el.open), true, 'Controller opens title Options');
   const reservedConfirm = await page.evaluate(() => {
     // A custom map is allowed to contain button 0, but physical A remains the
     // contextual menu confirm instead of also becoming Back/cancel.
@@ -55,6 +57,12 @@ try {
   assert.equal(reservedConfirm.focus, 'musicTgl');
   const mix = await page.evaluate(() => { __go('#musicVolume'); const before = Number(document.activeElement.value); __press(14); return {before, after:Number(document.activeElement.value)}; });
   assert.equal(mix.after, mix.before - 5);
+  const scale = await page.evaluate(() => { __go('#uiScale'); const before = Number(document.activeElement.value); __press(15); return {before, after:Number(document.activeElement.value), saved:RIFT.save.data.uiScale}; });
+  assert.equal(scale.after, scale.before + 5, 'Controller adjusts UI size inside Options');
+  assert.equal(scale.saved, scale.after / 100);
+  await page.evaluate(() => { __press(14); __press(1); });
+  assert.equal(await page.$eval('#optionsDialog', el => el.open), false, 'Controller Back closes Options');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'optionsBtn', 'Controller returns to Options');
   await page.evaluate(() => { __go('#shipSelectBtn'); __press(0); });
   assert.equal(await page.evaluate(() => RIFT.hangar.dialog.open), true);
   const ship = await page.evaluate(() => { const before=RIFT.hangar.selectedId; __press(15); return {before, after:RIFT.hangar.selectedId}; });
@@ -186,7 +194,7 @@ try {
   await page.evaluate(() => { RIFT.quitRun(); __tick(); __press(1); __pad.id='DualSense Wireless Controller'; __pad.index=2; __pad.mapping='standard'; __pads=[null,null,__pad]; __tick(); });
   assert.equal(await page.evaluate(() => __input.bindings.fire), 7, 'New controller gets the new trigger-fire default');
   await page.evaluate(() => { __pad.axes[1]=.8; __tick(); __pad.axes[1]=0; __tick(); });
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'musicTgl', 'Analog stick navigates');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'optionsBtn', 'Analog stick navigates');
   await page.evaluate(() => { __go('#launchBtn'); __press(0); const other={...__pad,id:'Xbox Controller',index:0,buttons:__pad.buttons.map(()=>({pressed:false,value:0}))}; __pads=[other,null,__pad]; __tick(); });
   assert.equal(await page.evaluate(() => __input._padId), 'DualSense Wireless Controller', 'An idle second pad cannot steal control');
   await page.evaluate(() => { __pads=__pads.slice(0,1); __tick(); });

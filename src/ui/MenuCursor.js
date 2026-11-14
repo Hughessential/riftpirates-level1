@@ -55,6 +55,11 @@ export function initMenuCursor() {
     // This keeps both the star and its full-viewport tail above modal backdrops.
     const parent = dialogStack.findLast(dialog => dialog.open) || document.body;
     if (layer.parentElement !== parent) parent.append(layer);
+    // Native top-layer dialogs inherit the saved UI zoom. Counter it here so
+    // pointer coordinates and the trail canvas remain in physical viewport
+    // pixels instead of expanding to 80–140% with whichever modal owns them.
+    const parentZoom = parent === document.body ? 1 : Number.parseFloat(getComputedStyle(parent).zoom) || 1;
+    layer.style.zoom = String(1 / parentZoom);
     if (visible) resize();
   }
   function observeDialogs() {
@@ -148,6 +153,7 @@ export function initMenuCursor() {
   window.addEventListener('blur', () => { lastPointer = false; paintVisibility(); });
   document.addEventListener('visibilitychange', paintVisibility);
   window.addEventListener('resize', () => { clear(); resize(); });
+  window.addEventListener('rift-ui-scale', paintVisibility);
   motion.addEventListener('change', () => { clear(); paintVisibility(); });
   new MutationObserver(paintVisibility).observe(title, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(observeDialogs).observe(document.body, { childList: true });

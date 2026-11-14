@@ -295,9 +295,15 @@ export class AudioManagerImpl {
     if (this.music[name]) return this.music[name];
     const file = MUSIC_FILES[name];
     if (!file) return null;
-    const el = new Audio(`${ASSET_BASE}music/${encodeURIComponent(file)}`);
+    const el = new Audio();
+    // Respect saved mute before the first request. The title recording is
+    // several megabytes and must not compete with game geometry for players
+    // who have explicitly disabled music. Enabling music below promotes the
+    // element back to an eager stream before playback resumes. Set preload
+    // before src so eager Safari implementations cannot start a muted request.
+    el.preload = Save.data.music ? 'auto' : 'none';
+    el.src = `${ASSET_BASE}music/${encodeURIComponent(file)}`;
     el.loop = false;
-    el.preload = 'auto';
     el.volume = 0;
     const entry = { name, el, gain: null, node: null, level: 0, tail: 1, generation: 0 };
     if (this.ctx) {
@@ -540,6 +546,7 @@ export class AudioManagerImpl {
     Save.save();
     if (this.musicGain) this.musicGain.gain.value = on ? this.musicVol : 0;
     for (const entry of Object.values(this.music)) {
+      entry.el.preload = on ? 'auto' : 'none';
       this._applyLevel(entry);
       if (!on) entry.el.pause();
     }

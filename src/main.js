@@ -13,6 +13,7 @@ import { initAudioSettings } from './ui/AudioSettings.js';
 import { applyUIScale, initUISettings } from './ui/UISettings.js';
 import { ControllerMenus } from './ui/ControllerMenus.js';
 import { PilotIdentity } from './ui/PilotIdentity.js';
+import { OptionsMenu } from './ui/OptionsMenu.js';
 
 // Start the official title recording before voxel loading. Saved mute/volume
 // still apply, and browsers which block autoplay unlock on the first gesture.
@@ -80,7 +81,9 @@ function showTitle() {
 }
 
 function launch() {
+  game.optionsMenu.close({ restoreFocus: false });
   hangar.close();
+  hangar.releasePreview();
   $('titleScreen').classList.add('hidden');
   // Audio must never block the run from starting: init() builds the context
   // and graph synchronously (ready right away) and decodes SFX in the
@@ -111,6 +114,7 @@ Input.init(game.renderer.domElement, {
 
 initAudioSettings();
 initUISettings();
+game.optionsMenu = new OptionsMenu(game);
 for (const button of document.querySelectorAll('.tutorialReplayBtn')) {
   button.addEventListener('click', () => {
     game.tutorial.armReplay();

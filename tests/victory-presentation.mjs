@@ -46,7 +46,7 @@ try {
       for (const id of ['resultsTitle', 'resultsPilotName', 'resultsShipName', 'scoreRow', 'resultsGrid', 'againBtn', 'toTitleBtn']) {
         const element = document.getElementById(id), rect = element.getBoundingClientRect();
         if (!rect.width || !rect.height) faults.push(`${id}: invisible`);
-        if (rect.left < -1 || rect.right > innerWidth + 1) faults.push(`${id}: horizontal overflow`);
+        if (rect.left < -1 || rect.right > innerWidth + 1) faults.push(`${id}: horizontal overflow (${rect.left.toFixed(1)}..${rect.right.toFixed(1)} / ${innerWidth})`);
       }
       if (innerWidth >= 1000) for (const id of ['againBtn', 'toTitleBtn']) {
         const rect = document.getElementById(id).getBoundingClientRect();
@@ -90,13 +90,26 @@ try {
   assert.equal(await page.$eval('#scoreBig', el => el.textContent), '1,234,567', 'Gamepad confirm skips through the native button');
   await page.evaluate(() => { __pads = []; __Input.pollGamepad(); RIFT.controllerMenus.update(); });
 
-  for (const viewport of [{width:2560,height:1440}, {width:1280,height:800}, {width:390,height:844}]) {
+  for (const viewport of [{width:2560,height:1440}, {width:1920,height:1080}, {width:1440,height:900}, {width:1280,height:800}, {width:390,height:844}]) {
     await page.setViewport({ ...viewport, hasTouch: true });
-    await page.evaluate(() => RIFT.resultsScreen.presentation.resize());
-    assert.deepEqual(await page.evaluate(() => __layout()), [], `Responsive results at ${viewport.width}×${viewport.height}`);
+    for (const scale of [.8, .85, .9, .95, 1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4]) {
+      await page.evaluate((value) => {
+        document.documentElement.style.setProperty('--ui-user-scale', String(value));
+        document.documentElement.dataset.uiScale = String(value);
+        dispatchEvent(new CustomEvent('rift-ui-scale', { detail: value }));
+        RIFT.resultsScreen.presentation.resize();
+      }, scale);
+      assert.deepEqual(await page.evaluate(() => __layout()), [],
+        `Responsive results at ${viewport.width}×${viewport.height} / ${Math.round(scale * 100)}% UI`);
+    }
     await page.screenshot({ path: `${artifacts}/victory-${viewport.width}.png` });
   }
   await page.setViewport({width:1440,height:900,hasTouch:true});
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--ui-user-scale', '1.1');
+    document.documentElement.dataset.uiScale = '1.1';
+    dispatchEvent(new CustomEvent('rift-ui-scale', { detail: 1.1 }));
+  });
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   await page.evaluate(() => __preview());
   assert.deepEqual(await page.evaluate(() => ({revealing:RIFT.resultsScreen.presentation.revealing, particles:RIFT.resultsScreen.presentation.pool.filter(p=>p.life>0).length, text:document.getElementById('scoreBig').textContent})),

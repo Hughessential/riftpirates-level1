@@ -5,6 +5,12 @@ import { hopperVoxels } from '../render/Models.js';
 import { Input } from '../core/Input.js';
 import './ship-hangar.css';
 
+/** Pre-rendered from the real VOX hulls so menus stay instant and accurate. */
+function shipThumbnail(id) {
+  const base = import.meta.env?.BASE_URL || './';
+  return new URL(`${base}images/ships/${id}.webp`, document.baseURI).href;
+}
+
 /** Cosmetic selection is kept outside the gameplay stat/upgrade systems. */
 export class ShipHangar {
   constructor({ selectedId, onSelect }) {
@@ -14,6 +20,7 @@ export class ShipHangar {
     this.reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
     this.models = new Map();
     this.thumbnails = new Map();
+    PLAYER_SHIPS.forEach((ship) => this.thumbnails.set(ship.id, shipThumbnail(ship.id)));
 
     this.card = document.createElement('button');
     this.card.id = 'shipSelectBtn';
@@ -30,7 +37,7 @@ export class ShipHangar {
     this.dialog.innerHTML = `
       <div class="hangarHeader"><div><span class="hangarEyebrow">THE STOLEN FLEET / SIX WAYS TO MAKE AN ENTRANCE</span><h2 id="hangarTitle">PICK YOUR SHIP.</h2></div><button id="hangarClose" aria-label="Close ship hangar">×</button></div>
       <div class="hangarBody">
-        <div class="hangarPreview"><div class="hangarOrbit" aria-hidden="true"></div><div class="hangarCanvas"></div><span class="hangarPreviewLabel">RIFT REPAINT / VOXEL ORIGINAL</span><div class="hangarShipInfo"><span id="hangarNumber"></span><h3 id="hangarShipName"></h3><p id="hangarShipTagline"></p></div></div>
+        <div class="hangarPreview"><div class="hangarOrbit" aria-hidden="true"></div><div class="hangarCanvas"><img class="hangarPreviewPlaceholder" alt=""><span class="hangarPreviewStatus">3D HULL STANDBY</span></div><span class="hangarPreviewLabel">RIFT REPAINT / VOXEL ORIGINAL</span><div class="hangarShipInfo"><span id="hangarNumber"></span><h3 id="hangarShipName"></h3><p id="hangarShipTagline"></p></div></div>
         <div class="hangarChoices"><p class="hangarRule">YOUR STYLE. SAME FIREPOWER.<span>Every ship has identical handling, weapons, hull and hitbox. Pick the silhouette you love.</span></p><div class="shipGrid" role="group" aria-label="Choose a cosmetic ship"></div><button class="hangarConfirm" id="hangarConfirm">FLY THIS SHIP <span aria-hidden="true">→</span></button><p class="hangarKeys">← → BROWSE · 1–6 SELECT · ENTER CONFIRM</p></div>
       </div>`;
     document.body.append(this.dialog);
@@ -39,8 +46,9 @@ export class ShipHangar {
       button.className = 'shipOption';
       button.dataset.shipId = ship.id;
       button.setAttribute('aria-pressed', 'false');
-      button.innerHTML = `<span class="shipIndex">0${index + 1}</span><img alt=""><strong>${ship.name}</strong><span class="shipSelectedMark" aria-hidden="true">◆</span>`;
+      button.innerHTML = `<span class="shipIndex">0${index + 1}</span><img alt="" loading="eager" decoding="async"><strong>${ship.name}</strong><span class="shipSelectedMark" aria-hidden="true">◆</span>`;
       button.addEventListener('click', () => this.select(ship.id));
+      button.querySelector('img').src = this.thumbnails.get(ship.id);
       this.dialog.querySelector('.shipGrid').append(button);
       return button;
     });
@@ -58,16 +66,15 @@ export class ShipHangar {
     });
     this.dialog.addEventListener('close', () => this.card.focus({ preventScroll: true }));
     addEventListener('resize', () => { if (this.dialog.open) this.resize(); });
-    // One small renderer serves all six thumbnails and the rotating preview.
-    // It never renders frames during gameplay or while the hangar is closed.
-    this.createPreview();
+    // The title uses tiny pre-rendered WebP thumbnails. The extra WebGL context is only
+    // created after the player opens the hangar, never during menu startup.
     this.select(this.selectedId);
   }
 
   createPreview() {
     try {
-      this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
-      this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: 'high-performance' });
+      this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
       this.renderer.setSize(400, 270);
       this.renderer.setClearColor(0x000000, 0);
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -75,7 +82,8 @@ export class ShipHangar {
       this.renderer.toneMappingExposure = 1.25;
       this.renderer.domElement.setAttribute('aria-label', 'Rotating preview of the selected ship');
       this.renderer.domElement.setAttribute('role', 'img');
-      this.dialog.querySelector('.hangarCanvas').append(this.renderer.domElement);
+      const canvasHost = this.dialog.querySelector('.hangarCanvas');
+      canvasHost.append(this.renderer.domElement);
       this.scene = new THREE.Scene();
       this.camera = new THREE.PerspectiveCamera(36, 400 / 270, 0.1, 60);
       this.camera.position.set(7, 5.2, -9);
@@ -88,17 +96,12 @@ export class ShipHangar {
       }
       for (const ship of PLAYER_SHIPS) {
         const model = createPlayerShip(ship.id, { size: 5.8, castShadow: false, receiveShadow: false }) || buildVoxels(hopperVoxels(), 0.28);
-        model.visible = false;
+        model.visible = ship.id === this.selectedId;
         this.models.set(ship.id, model);
         this.scene.add(model);
-        model.visible = true;
-        this.renderer.render(this.scene, this.camera);
-        this.thumbnails.set(ship.id, this.renderer.domElement.toDataURL('image/png'));
-        model.visible = false;
       }
-      this.buttons.forEach((button) => {
-        button.querySelector('img').src = this.thumbnails.get(button.dataset.shipId);
-      });
+      canvasHost.classList.add('ready');
+      this.resize();
     } catch (error) {
       // A preview context failure must never prevent the actual game launching.
       this.renderer?.dispose();
@@ -119,6 +122,9 @@ export class ShipHangar {
     const image = this.card.querySelector('img');
     image.hidden = !thumbnail;
     if (thumbnail) image.src = thumbnail;
+    const previewImage = this.dialog.querySelector('.hangarPreviewPlaceholder');
+    previewImage.hidden = !thumbnail;
+    if (thumbnail) previewImage.src = thumbnail;
     this.dialog.querySelector('#hangarNumber').textContent = `HULL 0${index + 1} / 06`;
     this.dialog.querySelector('#hangarShipName').textContent = ship.name;
     this.dialog.querySelector('#hangarShipTagline').textContent = ship.tagline;
@@ -157,11 +163,41 @@ export class ShipHangar {
     if (this.dialog.open) return;
     this.dialog.showModal();
     this.time = 0;
-    this.resize();
     this.buttons.find((button) => button.dataset.shipId === this.selectedId).focus();
+    if (this.renderer) this.resize();
+    else if (!this.previewQueued) {
+      this.previewQueued = true;
+      this.dialog.querySelector('.hangarPreviewStatus').textContent = 'MATERIALIZING 3D HULL…';
+      // Let the modal paint first; slow GPU/context startup must never delay
+      // the title screen or make the ship button feel unresponsive.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!this.dialog.open) {
+          this.previewQueued = false;
+          return;
+        }
+        if (!this.renderer) this.createPreview();
+      }));
+    }
   }
 
   close() { if (this.dialog.open) this.dialog.close(); }
+
+  /** The selector owns a second WebGL context; flight must not carry it. */
+  releasePreview() {
+    this.previewQueued = false;
+    if (!this.renderer) return;
+    const canvas = this.renderer.domElement;
+    this.renderer.dispose();
+    this.renderer.forceContextLoss?.();
+    canvas.remove();
+    this.renderer = null;
+    this.scene = null;
+    this.camera = null;
+    this.models.clear();
+    const host = this.dialog.querySelector('.hangarCanvas');
+    host.classList.remove('ready');
+    host.querySelector('.hangarPreviewStatus').textContent = '3D HULL STANDBY';
+  }
 
   resize() {
     if (!this.renderer) return;

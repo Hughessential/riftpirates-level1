@@ -70,6 +70,7 @@ try {
       return { running: g.running, id: g.player.shipId, renderedId: g.player.hull.userData.shipId,
         radius: g.player.radius, stats: g.player.stats, hull: g.player.health,
         shield: g.player.shield, fireRate: g.player.fireRate,
+        hangarRendererReleased: g.hangar.renderer == null,
         cursorVisible: document.getElementById('menuCursorStar').classList.contains('visible') };
     });
     assert.equal(actual.running, true);
@@ -81,6 +82,7 @@ try {
     assert.equal(actual.hull, BASE_STATS().maxHealth);
     assert.equal(actual.shield, BASE_STATS().shieldMax);
     assert.equal(actual.fireRate, BASE_STATS().fireRate);
+    assert.equal(actual.hangarRendererReleased, true, 'Flight releases the optional hangar WebGL context');
     assert.equal(actual.cursorVisible, false, 'Decorative pointer disappears during gameplay');
 
     await page.keyboard.down('Space');
@@ -123,7 +125,15 @@ try {
         g.player.takeDamage = takeDamage;
         window.__shipTestRender(1 / 60);
       });
-      await page.waitForFunction(() => !document.getElementById('banner').classList.contains('show'), { timeout: 5000 });
+      // The test owns the simulation clock, so advance the simulation-owned
+      // HUD lifetime instead of waiting on unrelated wall time.
+      const bannerCleared = await page.evaluate(() => {
+        for (let i = 0; i < 180 && document.getElementById('banner').classList.contains('show'); i++) {
+          window.__shipTestUpdate(1 / 60);
+        }
+        return !document.getElementById('banner').classList.contains('show');
+      });
+      assert.equal(bannerCleared, true, 'Traversal banner clears on its simulation clock');
       await page.screenshot({ path: `${OUT}/selected-ship-flight.png` });
     }
     await titleFromRun();

@@ -142,23 +142,7 @@
     <div id="bootStatus" class="menuBoot" role="status"><span>ASSEMBLING THE ARMADA</span><progress id="bootProgress" max="1" value="0"></progress></div>
     <div class="menuSettingsBlock">
       <div id="titleStats" class="stat menuStat"></div>
-      <div class="menuAudio audioMixer" aria-label="Audio settings">
-        <div class="audioChannel" data-audio-channel="music">
-          <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl">MUSIC: ON</button><output for="musicVolume" id="musicVolumeValue">75%</output></div>
-          <label class="audioVolumeLabel" for="musicVolume">Music volume</label>
-          <input type="range" id="musicVolume" min="0" max="100" step="1" value="75" data-audio-volume="music">
-        </div>
-        <div class="audioChannel" data-audio-channel="sfx">
-          <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl">SFX: ON</button><output for="sfxVolume" id="sfxVolumeValue">75%</output></div>
-          <label class="audioVolumeLabel" for="sfxVolume">Sound effects volume</label>
-          <input type="range" id="sfxVolume" min="0" max="100" step="1" value="75" data-audio-volume="sfx">
-        </div>
-      </div>
-      <div class="uiScaleSetting" aria-label="Interface settings">
-        <div><label for="uiScale">UI SIZE</label><output for="uiScale" id="uiScaleValue">110%</output></div>
-        <input type="range" id="uiScale" min="80" max="140" step="5" value="110" data-ui-scale>
-        <button type="button" class="btnGhost tutorialReplayBtn">REPLAY TUTORIAL NEXT RUN</button>
-      </div>
+      <button type="button" class="menuOptions" id="optionsBtn" aria-haspopup="dialog" aria-controls="optionsDialog" aria-expanded="false">OPTIONS <span aria-hidden="true">&gt;</span></button>
     </div>
   </main>
 
@@ -174,6 +158,32 @@
     </div>
   </footer>
 </div>
+
+<!-- ======================= title options ======================= -->
+<dialog id="optionsDialog" class="optionsDialog" aria-labelledby="optionsTitle">
+  <header class="optionsHeader">
+    <div><span class="optionsEyebrow">TUNE YOUR TRANSMISSION</span><h2 id="optionsTitle">OPTIONS</h2></div>
+    <button type="button" class="optionsClose" data-options-close aria-label="Close options">×</button>
+  </header>
+  <div class="optionsAudio audioMixer" role="group" aria-label="Audio settings">
+    <div class="audioChannel" data-audio-channel="music">
+      <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl">MUSIC: ON</button><output for="musicVolume" id="musicVolumeValue">75%</output></div>
+      <label class="audioVolumeLabel" for="musicVolume">Music volume</label>
+      <input type="range" id="musicVolume" min="0" max="100" step="1" value="75" data-audio-volume="music">
+    </div>
+    <div class="audioChannel" data-audio-channel="sfx">
+      <div class="audioChannelHead"><button class="btnGhost on" id="sfxTgl">SFX: ON</button><output for="sfxVolume" id="sfxVolumeValue">75%</output></div>
+      <label class="audioVolumeLabel" for="sfxVolume">Sound effects volume</label>
+      <input type="range" id="sfxVolume" min="0" max="100" step="1" value="75" data-audio-volume="sfx">
+    </div>
+  </div>
+  <div class="uiScaleSetting" role="group" aria-label="Interface settings">
+    <div><label for="uiScale">UI SIZE</label><output for="uiScale" id="uiScaleValue">110%</output></div>
+    <input type="range" id="uiScale" min="80" max="140" step="5" value="110" data-ui-scale>
+    <button type="button" class="btnGhost tutorialReplayBtn">REPLAY TUTORIAL NEXT RUN</button>
+  </div>
+  <footer class="optionsFooter"><span>SAVED AUTOMATICALLY</span><button type="button" class="optionsDone" data-options-close>DONE <span aria-hidden="true">&gt;</span></button></footer>
+</dialog>
 
 <!-- ======================= pause ======================= -->
 <div id="pauseScreen" class="screen hidden riftPause">

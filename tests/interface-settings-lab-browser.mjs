@@ -42,6 +42,16 @@ try {
     titleScale: '110', pauseScale: '110', rootScale: '1.1', datasetScale: '1.1',
     min: '80', max: '140', step: '5',
   }, 'Fresh players receive 75% audio and the 110% saved UI-scale default');
+  const entry = await page.evaluate(() => {
+    const button = document.getElementById('optionsBtn'), stats = document.getElementById('titleStats');
+    return {
+      belowStats: button.getBoundingClientRect().top >= stats.getBoundingClientRect().bottom,
+      dialogOpen: document.getElementById('optionsDialog').open,
+      titleHasSliders: !!document.querySelector('#titleScreen input[type="range"]'),
+    };
+  });
+  assert.deepEqual(entry, { belowStats:true, dialogOpen:false, titleHasSliders:false },
+    'Options sits beneath the title stats and keeps settings out of the title layout');
 
   // Every supported desktop shape keeps the title essentials inside the CSS
   // viewport. This catches double-scaling and external-monitor distortion.
@@ -76,10 +86,11 @@ try {
     const rect = element.getBoundingClientRect();
     return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
   });
-  await page.$eval('#uiScale', slider => {
-    slider.value = '140';
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  await page.focus('#optionsBtn');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.$eval('#optionsDialog', el => el.open), true, 'Keyboard opens Options');
+  await page.focus('#uiScale');
+  await page.keyboard.press('End');
   const scaled = await page.evaluate(() => ({
     saved: RIFT.save.data.uiScale,
     root: getComputedStyle(document.documentElement).getPropertyValue('--ui-user-scale').trim(),
@@ -94,6 +105,35 @@ try {
     saved: 1.4, root: '1.4', title: '140', pause: '140', titleOutput: '140%', pauseOutput: '140%',
     canvas: canvasBefore, persisted: 1.4,
   }, 'Scale mirrors, persists and never resizes or offsets the WebGL surface');
+  // The settings remain usable at the maximum supported scale, including the
+  // constrained mobile viewport. Native dialog focus stays inside the panel.
+  for (const [width, height] of [[1920,1080], [1280,720], [390,844]]) {
+    await page.setViewport({ width, height });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const dialog = await page.$eval('#optionsDialog', el => {
+      const r = el.getBoundingClientRect();
+      return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height };
+    });
+    assert.ok(dialog.width > 0 && dialog.height > 0 && dialog.left >= -1 && dialog.top >= -1 && dialog.right <= width + 1 && dialog.bottom <= height + 1,
+      `Options fits ${width}×${height} at 140%: ${JSON.stringify(dialog)}`);
+    for (let i = 0; i < 10; i++) {
+      await page.keyboard.press('Tab');
+      // Chrome can temporarily move focus to its own chrome at the end of a
+      // native modal's tab cycle; the next Tab must return to the modal.
+      if (await page.evaluate(() => document.activeElement === document.body)) await page.keyboard.press('Tab');
+      assert.equal(await page.evaluate(() => !!document.activeElement.closest('#optionsDialog')), true,
+        'Tab focus stays within Options');
+    }
+    if (width === 1920) await page.screenshot({ path:'shots/title-options.png' });
+  }
+  await page.setViewport({ width:1920, height:1080 });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$eval('#optionsDialog', el => el.open), false, 'Escape closes Options');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'optionsBtn', 'Keyboard focus returns to Options');
+  await page.keyboard.press('Space');
+  assert.equal(await page.$eval('#optionsDialog', el => el.open), true, 'Space activates the Options button');
+  await page.keyboard.press('Escape');
   const enlargedTitle = await page.evaluate(() => {
     const rect = selector => {
       const r = document.querySelector(selector).getBoundingClientRect();
@@ -133,11 +173,14 @@ try {
   })), { music: .37, sfx: .61, scrap: 4321, musicSlider: '37', sfxSlider: '61' });
 
   // The replay setting is explicit and saved; it never silently clears loot or audio.
-  await page.evaluate(() => document.querySelector('.tutorialReplayBtn').click());
+  await page.click('#optionsBtn');
+  await page.click('#optionsDialog .tutorialReplayBtn');
   assert.deepEqual(await page.evaluate(() => {
     const disk = JSON.parse(localStorage.getItem('riftpirates-level1-v1'));
     return [RIFT.save.data.tutorialComplete, disk.tutorialComplete, disk.scrapBanked, disk.musicVolume, disk.sfxVolume];
   }), [false, false, 4321, .37, .61]);
+  await page.click('#optionsDialog [data-options-close]');
+  assert.equal(await page.$eval('#optionsDialog', el => el.open), false, 'Close button dismisses Options');
 
   // Production title: no visible lab entry and no raw shortcut backdoor.
   const productionLab = await page.evaluate(() => ({

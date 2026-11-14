@@ -68,6 +68,21 @@ try {
   await sweep(); s = await state();
   assert.equal(s.parent, 'shipHangarDialog'); assert.ok(s.visible && s.span > 400);
   assert.deepEqual([s.x, s.y, s.width, s.height], [0, 0, 1440, 900], 'Dialog trail stays in full viewport coordinates');
+  for (const scale of [.8, 1.4]) {
+    await page.evaluate(value => {
+      document.documentElement.style.setProperty('--ui-user-scale', String(value));
+      document.documentElement.dataset.uiScale = String(value);
+      dispatchEvent(new CustomEvent('rift-ui-scale', { detail: value }));
+    }, scale);
+    await sweep(); s = await state();
+    assert.deepEqual([s.x, s.y, s.width, s.height], [0, 0, 1440, 900],
+      `Dialog trail remains viewport-sized at ${Math.round(scale * 100)}% UI`);
+  }
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--ui-user-scale', '1.1');
+    document.documentElement.dataset.uiScale = '1.1';
+    dispatchEvent(new CustomEvent('rift-ui-scale', { detail: 1.1 }));
+  });
   await page.screenshot({ path: `${out}/hangar-trail.png` });
   await page.click('.hangarPilotIdentity');
   await sweep(); s = await state();

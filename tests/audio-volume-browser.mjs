@@ -17,6 +17,9 @@ try {
     await page.evaluate(() => { window.RIFT.renderFrame = () => {}; });
   };
   await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' }); await ready();
+  assert.equal(await page.$eval('#optionsDialog', e => e.open), false, 'Title settings start tucked away');
+  await page.click('#optionsBtn');
+  assert.equal(await page.$eval('#optionsDialog', e => e.open), true);
   assert.equal(await page.$eval('#musicVolume', e => e.value), '75');
   assert.equal(await page.$eval('#sfxVolume', e => e.value), '75');
   assert.equal(await page.$eval('#musicVolume', e => e.labels[0].textContent), 'Music volume');
@@ -49,7 +52,7 @@ try {
   });
   const faderHit = await page.evaluate(rect => document.elementFromPoint(
     rect.x + rect.width * .4, rect.y + rect.height * .5)?.id, rect);
-  assert.equal(faderHit, 'sfxVolume', 'The fixed route footer never covers the title SFX fader');
+  assert.equal(faderHit, 'sfxVolume', 'Options keeps the SFX fader clickable above the title');
   await page.mouse.click(rect.x + rect.width * .4, rect.y + rect.height * .5);
   const sfx = await page.evaluate(() => ({
     saved: window.RIFT.save.data.sfxVolume,
@@ -59,11 +62,14 @@ try {
   assert.ok(sfx.saved > .3 && sfx.saved < .5, `SFX fader pointer update: ${JSON.stringify({rect,sfx})}`); assert.equal(sfx.title, sfx.pause);
   assert.equal(Math.round(sfx.saved * 100), sfx.title);
   const bounds = await page.evaluate(() => {
-    const mixer = document.querySelector('.menuAudio').getBoundingClientRect();
-    return { bottom: mixer.bottom, footer: document.querySelector('.menuFooter').getBoundingClientRect().top, right: mixer.right };
+    const mixer = document.querySelector('#optionsDialog .audioMixer').getBoundingClientRect();
+    return { top: mixer.top, bottom: mixer.bottom, left: mixer.left, right: mixer.right };
   });
-  assert.ok(bounds.bottom < bounds.footer && bounds.right <= 1280,
-    `Title mixer fits above the route footer: ${JSON.stringify(bounds)}`);
+  assert.ok(bounds.top >= 0 && bounds.left >= 0 && bounds.bottom <= 800 && bounds.right <= 1280,
+    `Options mixer fits within the viewport: ${JSON.stringify(bounds)}`);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$eval('#optionsDialog', e => e.open), false);
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'optionsBtn', 'Escape restores focus to Options');
 
   await launchRun(page); await page.click('#pauseBtn');
   const paused = await page.evaluate(() => ({ time: window.RIFT.runTime, owner: window.RIFT.audio.musicOwner }));
@@ -87,6 +93,7 @@ try {
   assert.equal(await page.$eval('#musicVolume', e => e.value), '98');
   assert.equal(await page.$eval('#sfxVolume', e => Number(e.value)), sfx.title);
   assert.equal(await page.$eval('#sfxTgl', e => e.getAttribute('aria-pressed')), 'false');
+  await page.click('#optionsBtn');
   await page.click('#sfxTgl');
   assert.ok(Math.abs(await page.evaluate(() => window.RIFT.audio.sfxGain.gain.value) - sfx.saved) < 1e-6, 'Unmute restores the saved level after reload');
   assert.deepEqual(errors, []);

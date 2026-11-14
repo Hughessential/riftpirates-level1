@@ -1,0 +1,37 @@
+.menuOptions{display:flex;align-items:center;justify-content:space-between;gap:32px;
+  margin-top:calc(12px*var(--m,1));padding:calc(12px*var(--m,1)) calc(18px*var(--m,1));
+  min-height:44px;min-width:calc(155px*var(--m,1));font:inherit;font-size:calc(11px*var(--m,1));
+  letter-spacing:.12em;color:#40fff1;background:linear-gradient(110deg,#052126,#050710);
+  border:1px solid #27f5da80;border-bottom-color:#bb45ec;box-shadow:3px 3px 0 #731da733;
+  cursor:pointer;text-shadow:0 0 10px #00fff040}
+.menuOptions:hover{color:#e5fffd;border-color:#27f5da;box-shadow:0 0 18px #27f5da26,3px 3px 0 #731da766}
+.menuOptions:focus-visible{outline:2px solid #a7ff28;outline-offset:5px}
+.optionsDialog{--m:1;margin:auto;width:480px;padding:26px;background:linear-gradient(145deg,#061219,#05040d 65%,#11061d);
+  color:#c9f7ef;border:1px solid #27f5da88;border-bottom:2px solid #aa38ed;
+  box-shadow:0 0 38px #6d21b33b,0 0 15px #27f5da19;font:12px 'Rift Pixel',monospace;
+  overflow:auto;scrollbar-width:thin;scrollbar-color:#74458a #05040d}
+.optionsDialog::backdrop{background:#01030bdf}
+.optionsHeader{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:20px;
+  margin-bottom:18px;border-bottom:1px solid #27f5da33}
+.optionsEyebrow{color:#a7ff28;font-size:8px;letter-spacing:.1em;line-height:1.7}
+.optionsHeader h2{margin:10px 0 0;color:#40fff1;font-size:26px;letter-spacing:.09em;text-shadow:0 0 16px #27f5da55}
+.optionsClose,.optionsDone{font:inherit;color:#40fff1;background:#06131b;border:1px solid #27f5da66;cursor:pointer;min-height:44px}
+.optionsClose{width:44px;flex-shrink:0;font-size:22px}
+.optionsDone{display:flex;align-items:center;gap:24px;padding:12px 16px;border-bottom-color:#aa38ed}
+.optionsDialog button:focus-visible{outline:2px solid #a7ff28;outline-offset:3px}
+.optionsClose:hover,.optionsDone:hover{background:#0c2930;border-color:#40fff1}
+.optionsAudio{display:grid;grid-template-columns:1fr;gap:18px}
+.optionsAudio .btnGhost{font-size:11px;padding:10px 0;border:0;border-radius:0;box-shadow:none;text-align:left;color:#88978e}
+.optionsAudio .btnGhost.on{color:#a7ff28}
+.optionsAudio .btnGhost:hover{color:#fff}
+.optionsDialog .uiScaleSetting{width:100%;margin-top:20px;padding-top:10px;padding-bottom:6px}
+.optionsDialog .uiScaleSetting input{height:32px;cursor:pointer}
+.optionsDialog .tutorialReplayBtn{margin-top:5px;min-height:32px;line-height:1.6}
+.optionsFooter{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;
+  padding-top:18px;border-top:1px solid #b142e233}
+.optionsFooter>span{font-size:8px;line-height:1.7;color:#98b0aa;max-width:140px}
+@media(max-width:500px),(max-height:750px){
+  .optionsDialog{padding:16px}.optionsHeader{padding-bottom:12px;margin-bottom:12px}
+  .optionsHeader h2{font-size:22px}.optionsAudio{gap:8px}.optionsDialog .uiScaleSetting{margin-top:12px}
+  .optionsFooter{margin-top:12px;padding-top:12px;gap:10px}.optionsDone{padding:10px;gap:12px}
+}

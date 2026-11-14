@@ -145,6 +145,7 @@ export class ControllerMenus {
     if (this.game.pilotIdentity?.dialog.open) return this.game.pilotIdentity.dialog;
     if (this.game.testingPanel?.dialog.open) return this.game.testingPanel.dialog;
     if (this.game.hangar?.dialog.open) return this.game.hangar.dialog;
+    if (this.game.optionsMenu?.dialog.open) return this.game.optionsMenu.dialog;
     // The tutorial Skip is controller-accessible, but upgrade choices keep
     // priority while the final cache lesson and shop are both visible.
     for (const id of ['pauseScreen', 'resultsScreen', 'upgradeScreen', 'openingTutorial', 'titleScreen']) {
@@ -217,7 +218,7 @@ export class ControllerMenus {
         // Flight-stick movement must not pre-focus Skip: otherwise the A brake
         // lesson would also activate it. A deliberate D-pad move arms Skip.
         if (root.id !== 'openingTutorial') {
-          const preferred = root.querySelector('#victorySkip:not([hidden])') || root.querySelector('#launchBtn,#resumeBtn,#againBtn,#pilotNameInput,.shipOption[aria-pressed="true"],.upCard,[role="tab"][aria-selected="true"]');
+          const preferred = root.querySelector('#victorySkip:not([hidden])') || root.querySelector('#launchBtn,#resumeBtn,#againBtn,#pilotNameInput,#musicTgl,.shipOption[aria-pressed="true"],.upCard,[role="tab"][aria-selected="true"]');
           const items = [...root.querySelectorAll(controls)].filter(visible);
           this.focus(preferred && visible(preferred) ? preferred : items[0]);
         }
@@ -249,6 +250,7 @@ export class ControllerMenus {
       else if (root === this.game.pilotIdentity?.dialog) this.game.pilotIdentity.close();
       else if (root === this.game.testingPanel?.dialog) this.game.testingPanel.close();
       else if (root === this.game.hangar?.dialog) this.game.hangar.close();
+      else if (root === this.game.optionsMenu?.dialog) this.game.optionsMenu.close();
       else if (root.id === 'pauseScreen' || root.id === 'upgradeScreen' || (root.id === 'openingTutorial' && nav.pause)) this.game.togglePause();
       else if (root.id === 'resultsScreen') document.getElementById('toTitleBtn').click();
       this.consume(); return;

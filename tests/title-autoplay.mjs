@@ -11,7 +11,7 @@ for (const mode of ['allowed', 'blocked', 'muted']) {
   const browser = await puppeteer.launch(launchOptions(mode === 'blocked' ? 'document-user-activation-required' : 'no-user-gesture-required'));
   try {
     const page = await browser.newPage();
-    const errors = [], held = [], sfxRequests = [];
+    const errors = [], held = [], sfxRequests = [], musicRequests = [];
     let holdVoxels = true;
     page.on('pageerror', error => errors.push(error.message));
     await page.setViewport({ width: 1280, height: 800 });
@@ -34,11 +34,13 @@ for (const mode of ['allowed', 'blocked', 'muted']) {
     await page.setRequestInterception(true);
     page.on('request', req => {
       if (req.url().includes('/sfx/')) sfxRequests.push(req.url());
+      if (req.url().includes('/music/')) musicRequests.push(req.url());
       if (holdVoxels && req.url().endsWith('.vox')) held.push(req);
       else req.continue();
     });
     await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => __createdMusic.length === 1 && __createdMusic[0].readyState >= 2, { timeout: 30000 });
+    await page.waitForFunction(mode => __createdMusic.length === 1
+      && (mode === 'muted' || __createdMusic[0].readyState >= 2), { timeout: 30000 }, mode);
     assert.ok(held.length > 0, 'Voxel loading is actually delayed');
     assert.equal(await page.evaluate(() => Boolean(window.RIFT)), false, 'Music starts independently of game/ship initialization');
     assert.equal(sfxRequests.length, 0, 'First-load music does not compete with SFX decoding');
@@ -54,6 +56,7 @@ for (const mode of ['allowed', 'blocked', 'muted']) {
       assert.ok(sfxRequests.length > 0, 'The first genuine interaction starts deferred SFX loading');
     } else {
       assert.equal(snapshot.paused, true, 'Saved mute cannot be overridden by startup autoplay');
+      assert.equal(musicRequests.length, 0, 'Saved mute does not preload the title recording');
     }
     const earlyTime = await page.evaluate(() => __createdMusic[0].currentTime);
     holdVoxels = false;

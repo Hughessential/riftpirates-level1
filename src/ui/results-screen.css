@@ -1,5 +1,5 @@
 /* Endings share the real recorder, but the escaped ship owns the victory stage. */
-#resultsScreen{padding:clamp(16px,3.2vmin,34px);gap:0;justify-content:flex-start;background:#02030a;backdrop-filter:none;isolation:isolate;color:#cce8e7}
+#resultsScreen{width:calc(100vw / var(--ui-user-scale));height:calc(100vh / var(--ui-user-scale));padding:clamp(16px,3.2vmin,34px);gap:0;justify-content:flex-start;background:#02030a;backdrop-filter:none;isolation:isolate;color:#cce8e7}
 #resultsScreen::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 80% 18%,#36115b66,transparent 44%),radial-gradient(ellipse at 8% 78%,#005a5129,transparent 46%),linear-gradient(140deg,#030609,#060313 65%,#020306)}
 #victoryParticles{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;filter:none!important;transform:none!important}
 .resultsShell{position:relative;z-index:1;flex:none;width:min(1260px,100%);margin:auto;text-align:left}
@@ -70,6 +70,49 @@
 .calmVictory #resultsShipImage{animation:none}
 @keyframes escapedShipFloat{0%,100%{transform:translateY(-18px) scale(1.24)}50%{transform:translateY(-24px) scale(1.24)}}
 @media(min-width:1600px) and (min-height:950px){.resultsShell{width:min(1440px,92%)}.resultsHero{min-height:340px}.resultsShipStage{height:300px}#resultsShipImage{height:300px;width:460px}#resultsTitle svg{height:110px}.resultsReport{padding:26px 30px}.resultsActions{padding-top:24px}}
+/* Keep both exit actions above the fold on laptop-height and fullscreen browser
+   surfaces. The report remains complete; only ornamental air is condensed. */
+@media(min-width:721px) and (max-height:850px){
+  #resultsScreen{padding:12px 20px}
+  .resultsHeader{padding-bottom:8px}
+  .resultsHero{min-height:210px;padding:10px 12px 8px}
+  #resultsTitle svg{height:68px}
+  #resultsSubtitle{margin-top:8px}
+  #resultsScreen #deathLine{margin-top:9px}
+  .resultsShipStage{height:198px}
+  #resultsShipImage{height:205px;transform:translateY(-9px) scale(1.12)}
+  .resultsIdentity{padding:7px}
+  .resultsReport{padding:12px 18px;gap:20px}
+  #resultsScreen .grade{width:62px;height:64px;font-size:35px}
+  #resultsScreen #resultsGrid{margin-top:7px}
+  #resultsScreen .rrow{padding:3px 0}
+  .resultsBuildPanel{margin-top:9px;padding-bottom:8px}
+  .resultsBuildHeader{margin-bottom:6px}
+  #resultsScreen #resultsBuild{max-height:46px;padding-bottom:3px}
+  .resultsActions{padding-top:10px}
+  #resultsScreen .btnBig,#resultsScreen .btnGhost{padding-top:12px;padding-bottom:12px}
+}
+@media(min-width:721px) and (max-height:1100px){
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen{padding:10px 16px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsHeader{padding-bottom:7px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsHero{min-height:170px;padding:7px 10px 6px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsTitle svg{height:58px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsSubtitle{margin-top:6px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen #deathLine{margin-top:7px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsShipStage{height:160px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsShipImage{height:170px;transform:translateY(-6px) scale(1.08)}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsIdentity{padding:5px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsReport{padding:9px 14px;gap:14px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen .grade{width:54px;height:56px;font-size:31px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen #resultsGrid{margin-top:5px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen .rrow{padding:2px 0}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsBuildPanel{margin-top:7px;padding-bottom:6px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsBuildHeader{margin-bottom:5px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen #resultsBuild{max-height:32px;padding-bottom:2px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) .resultsActions{padding-top:7px}
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen .btnBig,
+  :is(html[data-ui-scale="1.2"],html[data-ui-scale="1.25"],html[data-ui-scale="1.3"],html[data-ui-scale="1.35"],html[data-ui-scale="1.4"]) #resultsScreen .btnGhost{padding-top:10px;padding-bottom:10px}
+}
 @media(max-width:1050px){.resultsReport{grid-template-columns:.75fr 1.25fr;padding:18px;gap:18px}#resultsScreen #scoreRow{gap:12px;flex-direction:column}#resultsScreen #scoreCol{text-align:center}.resultsRank{gap:5px}#resultsScreen .grade{height:58px;width:60px;font-size:32px}#resultsScreen .rrow{font-size:7px}#resultsScreen #scoreBig{font-size:34px}.resultsReviewHint{display:none}}
 @media(max-width:720px){#resultsScreen{padding:18px 14px}.resultsHeader{gap:10px}.resultsTransmission{display:none}#resultsEyebrow{font-size:8px}.resultsHero{grid-template-columns:1fr;gap:0;padding:23px 4px 14px}.resultsHeroCopy{text-align:center}#resultsTitle svg{height:65px}.resultsShipStage{height:200px}#resultsShipImage{height:210px;width:310px}.resultsIdentity{bottom:2px}#resultsSubtitle{font-size:8px;margin-top:12px}.resultsReport{grid-template-columns:1fr;gap:20px;padding:18px 13px}#resultsScreen #scoreRow{flex-direction:row;justify-content:center;gap:22px}#resultsScreen #scoreCol{text-align:left}#resultsScreen #scoreBig{font-size:35px}#resultsScreen #resultsGrid{gap:3px 14px}#resultsScreen .rrow{font-size:7px}#resultsScreen .rrow b{font-size:9px}.resultsSectionLabel span{display:none}#resultsScreen #resultsBuild{max-height:100px}.resultsActions{position:sticky;bottom:-18px;background:#02040bf5;padding:14px 0 12px;gap:10px;z-index:2}#resultsScreen .btnBig{min-width:0;flex:1;padding:14px;font-size:11px}#resultsScreen .btnGhost{padding:14px 12px;font-size:9px}#resultsScreen #victorySkip{width:100%;padding:10px}.resultsBuildPanel{margin-top:16px}.deathResults .resultsHero{min-height:0}}
 @media(max-width:390px){#resultsScreen #resultsGrid{grid-template-columns:1fr}#resultsTitle svg{height:56px}.buildLbl span{display:none}}
