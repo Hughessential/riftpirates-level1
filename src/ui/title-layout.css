@@ -1,0 +1,84 @@
+/* Reference composition: quiet masthead, left title/slogan/actions, right
+   globe and compact ship, with a clear gap above the route footer. */
+.menuMotto{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;
+  min-height:36px;padding:8px 12px;color:#39fff0;font-size:13px;font-style:italic;
+  line-height:1.35;text-align:center;letter-spacing:.01em;
+  background:linear-gradient(100deg,#16061eaa,#01060bbb 35%,#0b0319dd);
+  border-top:1px solid #b728ed;border-bottom:1px solid #25e9df;
+  box-shadow:0 6px 16px -10px #c126f5;text-shadow:0 0 9px #00eee942}
+.menuMotto::after{content:'';position:absolute;bottom:-3px;left:40%;width:20%;height:3px;
+  background:#d22eff;box-shadow:0 0 10px #c126f577;pointer-events:none}
+.menuMotto i{color:#f22ee3;letter-spacing:-.16em;font-size:20px;flex:none}
+.menuMotto span{transform:skewX(-8deg)}
+
+@media(min-width:901px){
+  #titleScreen{--t:var(--title-scale,1);--m:calc(var(--t)*var(--title-control-scale,1));
+    --title-edge:calc(var(--menu-left,0px) + var(--menu-stage,100vw)*.042)}
+  #titleScreen .menuMasthead,#titleScreen .menuFooter{left:var(--title-edge);right:var(--title-edge)}
+  #titleScreen .menuMasthead{top:calc(22px*var(--t));padding-bottom:calc(12px*var(--t))}
+  #titleScreen .menuBrand{font-size:calc(10px*var(--m));gap:calc(10px*var(--t));letter-spacing:.07em}
+  #titleScreen #voxelSkull{width:calc(30px*var(--t));height:calc(30px*var(--t));padding:calc(3px*var(--t))}
+  #titleScreen .menuEdition{font-size:calc(9px*var(--m));letter-spacing:.08em}
+  #titleScreen .menuMain{left:calc(var(--menu-left,0px) + var(--menu-stage,100vw)*.048);
+    top:16%;width:calc(690px*var(--t));margin:0;transform:none}
+  #titleScreen .menuMain:has(#titleStats:not(.hidden)){top:13%}
+  #titleScreen .menuKicker{font-size:calc(10px*var(--m));gap:calc(8px*var(--t));letter-spacing:.06em}
+  #titleScreen .menuKicker>i{font-size:calc(18px*var(--t));margin-right:calc(4px*var(--t))}
+  #titleScreen .voxelLogo{width:100%;margin:calc(12px*var(--t)) 0 calc(16px*var(--t))}
+  #titleScreen .menuMotto{min-height:calc(36px*var(--t));padding:calc(6px*var(--t)) calc(10px*var(--t));
+    font-size:calc(20px*var(--t));gap:calc(10px*var(--t))}
+  #titleScreen .menuMotto i{font-size:calc(20px*var(--t))}
+  #titleScreen .menuActions{margin-top:calc(28px*var(--t));gap:calc(26px*var(--t))}
+  #titleScreen .menuLaunch{width:calc(330px*var(--m));height:calc(68px*var(--m));
+    min-height:44px;padding:calc(14px*var(--m)) calc(22px*var(--m)) calc(18px*var(--m));gap:calc(20px*var(--m))}
+  #titleScreen .launchGlyph{width:calc(245px*var(--m));flex:1;min-width:0}
+  #titleScreen .launchArrow{font-size:calc(32px*var(--m))}
+  #titleScreen .menuLaunchNote{display:flex;max-width:calc(180px*var(--t));font-size:calc(9px*var(--m));
+    gap:calc(6px*var(--t));padding-left:calc(20px*var(--t));border-left:1px solid #27e9db;line-height:1.5}
+  #titleScreen .menuLaunchNote b{font-size:calc(10px*var(--m));letter-spacing:.05em}
+  #titleScreen .menuSettingsBlock{position:static;margin-top:calc(23px*var(--t));width:auto}
+  #titleScreen .menuStat{margin:0 0 calc(9px*var(--t));font-size:calc(9px*var(--m));line-height:1.5;letter-spacing:.04em}
+  #titleScreen .menuOptions{margin:0;min-width:0;width:calc(180px*var(--m));min-height:44px;
+    height:calc(40px*var(--m));padding:calc(10px*var(--m)) calc(20px*var(--m));font-size:calc(11px*var(--m))}
+  #titleScreen .menuBoot{margin-top:calc(14px*var(--t));font-size:calc(9px*var(--m))}
+  #titleScreen .menuFooter{bottom:calc(20px*var(--t))}
+  #titleScreen .menuRoute{font-size:calc(8px*var(--m));padding:calc(13px*var(--t)) 0;gap:calc(18px*var(--t))}
+  #titleScreen .menuRoute .routeOrigin{font-size:calc(10px*var(--m))}
+  #titleScreen .routeOrigin b{font-size:calc(11px*var(--m))}
+  #titleScreen .menuBottomline{margin-top:calc(12px*var(--t));gap:calc(16px*var(--t))}
+  #titleScreen .menuControls,#titleScreen .menuControls b{font-size:calc(7px*var(--m));gap:calc(4px*var(--t))}
+  #titleScreen .menuSignature{display:block;font-size:calc(7px*var(--m))}
+  #titleScreen .controllerEntry{font-size:calc(7px*var(--m))}
+  #titleScreen .shipHangarCard{right:var(--title-edge);bottom:16%;width:calc(350px*var(--m));
+    height:calc(74px*var(--m));padding:calc(7px*var(--m)) calc(16px*var(--m));gap:calc(10px*var(--m))}
+  #titleScreen .selectedShipThumb{width:calc(92px*var(--m));height:calc(60px*var(--m))}
+  #titleScreen .selectedShipText{gap:calc(5px*var(--m));min-width:0}
+  #titleScreen .selectedShipText small{font-size:calc(7px*var(--m));letter-spacing:.05em}
+  #titleScreen .selectedShipText strong{font-size:calc(12px*var(--m));letter-spacing:.05em}
+  #titleScreen .selectedShipText>span{font-size:calc(9px*var(--m))}
+  #titleScreen .pilotIdentityEntry{right:var(--title-edge);bottom:calc(16% + 74px*var(--m) + 6px*var(--t));
+    width:calc(350px*var(--m));min-height:0;height:calc(22px*var(--m));padding:calc(4px*var(--m)) calc(9px*var(--m))}
+  #titleScreen .pilotIdentityEntry>span{font-size:calc(6px*var(--m))}
+  #titleScreen .pilotIdentityEntry strong{font-size:calc(8px*var(--m))}
+  #titleScreen .labTitleEntry{right:var(--title-edge);bottom:calc(16% - 35px*var(--m));
+    font-size:calc(8px*var(--m));padding:calc(6px*var(--m))}
+  #titleScreen #labGlobeUnlock{left:calc(var(--menu-left,0px) + var(--menu-stage,100vw)*.76);top:40%;width:calc(470px*var(--t))}
+  #titleScreen .riftHalo,#titleScreen .riftOrbit{left:calc(var(--menu-left,0px) + var(--menu-stage,100vw)*.76);top:40%}
+  #titleScreen .riftHalo{width:calc(760px*var(--t));opacity:.45}
+  #titleScreen .riftOrbit{width:calc(450px*var(--t));opacity:.5}
+  #titleScreen .orbitB{width:calc(500px*var(--t));opacity:.35}
+  #titleScreen .orbitC{width:calc(570px*var(--t));opacity:.3}
+  #titleScreen .orbitD,#titleScreen .showcaseCoordinates{display:none}
+}
+@media(min-width:901px) and (max-height:760px){
+  #titleScreen .menuMain{top:14%}
+}
+@media(max-width:900px){
+  #titleScreen .menuMasthead{flex-wrap:wrap;row-gap:12px}
+  #titleScreen .menuEdition{margin-left:auto}
+  #titleScreen .menuMotto{margin:18px 0 24px;font-size:clamp(9px,1.7vw,13px)}
+  #titleScreen .menuMotto i{font-size:16px}
+  #titleScreen .menuSettingsBlock{margin-top:24px}
+  #titleScreen .menuStat{margin:0 0 12px}
+  #titleScreen .menuOptions{margin:0}
+}

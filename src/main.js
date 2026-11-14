@@ -14,6 +14,7 @@ import { applyUIScale, initUISettings } from './ui/UISettings.js';
 import { ControllerMenus } from './ui/ControllerMenus.js';
 import { PilotIdentity } from './ui/PilotIdentity.js';
 import { OptionsMenu } from './ui/OptionsMenu.js';
+import './ui/title-layout.css';
 
 // Start the official title recording before voxel loading. Saved mute/volume
 // still apply, and browsers which block autoplay unlock on the first gesture.
@@ -56,8 +57,9 @@ $('launchBtn').disabled = false;
 function paintTitle() {
   const d = Save.data;
   const line = $('titleStats');
+  line.classList.toggle('hidden', d.runs === 0);
   if (d.runs === 0) {
-    line.innerHTML = 'FIRST FLIGHT, CAPTAIN.';
+    line.textContent = '';
   } else {
     const best = d.bestScore.toLocaleString();
     line.innerHTML =

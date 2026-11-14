@@ -16,6 +16,11 @@ export function applyDisplayLayout(metrics) {
   const userScale = Math.max(.8, Math.min(1.4, Number(document.documentElement.dataset.uiScale) || 1.1));
   style.setProperty('--viewport-menu-scale', metrics.menuScale.toFixed(4));
   style.setProperty('--menu-scale', (metrics.menuScale * userScale).toFixed(4));
+  // The title artwork follows a fixed composition, not the accessibility
+  // scale. Only its controls/type grow with that preference.
+  const titleScale = Math.min(2.5, metrics.stageWidth / 1440, metrics.height / 800);
+  style.setProperty('--title-scale', titleScale.toFixed(4));
+  style.setProperty('--title-control-scale', (userScale / 1.1).toFixed(4));
   style.setProperty('--menu-stage', `${metrics.stageWidth}px`);
   style.setProperty('--menu-left', `${metrics.stageLeft}px`);
 }

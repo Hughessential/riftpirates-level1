@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { voxelWordSVG } from '../src/ui/VoxelTitle.js';
+
+assert.ok(voxelWordSVG('M', 'launch').includes('<rect '), 'Start Game has a visible M voxel glyph');
 
 const out = fileURLToPath(new URL('../shots/', import.meta.url));
 mkdirSync(out, { recursive: true });
@@ -29,8 +32,10 @@ try {
     g.renderFrame(1);
   });
 
-  for (const [width, height] of [[1440, 900], [1280, 800]]) {
+  for (const [width, height] of [[1440, 900], [1280, 800], [1280, 720], [1598, 802], [2560, 1296], [3440, 1440]]) {
     await page.setViewport({ width, height });
+    for (const scale of [.8, 1.1, 1.4]) {
+    await page.evaluate(async scale => (await import('/src/ui/UISettings.js')).applyUIScale(scale), scale);
     // A resize clears the drawing buffer. Wait for the browser's resize event
     // before drawing the frozen scene, otherwise a valid layout captures black.
     await page.evaluate(() => new Promise((resolve) => {
@@ -49,6 +54,9 @@ try {
         logo: rect('.voxelLogo'),
         footer: rect('.menuFooter'),
         main: rect('.menuMain'),
+        masthead: rect('.menuMasthead'),
+        options: rect('#optionsBtn'),
+        motto: rect('.menuMotto'),
         svgCount: document.querySelectorAll('[data-voxel-text] svg').length,
         label: document.querySelector('h1').getAttribute('aria-label'),
       };
@@ -57,16 +65,38 @@ try {
     assert.equal(layout.label, 'Rift Pirates');
     assert.ok(layout.launch.x >= 0 && layout.launch.right <= width, 'Launch stays horizontally visible');
     assert.ok(layout.launch.y >= 0 && layout.launch.bottom <= height, 'Launch stays vertically visible');
-    assert.ok(layout.main.bottom < layout.footer.y, 'Main content must not overlap the route footer');
-    assert.ok(layout.logo.y > 60, 'Logo must not overlap the masthead');
+    assert.ok(layout.main.bottom + 12 < layout.footer.y,
+      `Hero retains footer breathing room at ${width}×${height}/${scale}: ${JSON.stringify(layout)}`);
+    assert.ok(layout.main.y > layout.masthead.bottom + 16, 'Hero keeps a clear gap below the masthead');
+    assert.ok(layout.logo.width < Math.min(width, height * 1.9) * .51, 'Decorative title stays within the reference left column');
+    assert.ok(layout.motto.bottom < layout.launch.y && layout.launch.bottom < layout.options.y,
+      'Slogan, Start Game and Options retain their visual hierarchy');
+    assert.equal(await page.$eval('#launchBtn', el => el.getAttribute('aria-label')), 'Start game');
     const shipCard = await page.$eval('#shipSelectBtn', (el) => {
       const r = el.getBoundingClientRect();
       return { x: r.x, right: r.right, bottom: r.bottom };
     });
     assert.ok(shipCard.x >= 0 && shipCard.right <= width && shipCard.bottom < layout.footer.y, 'Ship picker fits above route footer');
-    await page.screenshot({ path: `${out}/menu-${width}.png` });
-    console.log(`${width}×${height}: menu content fits; custom voxel glyphs rendered`);
+    if (scale === 1.1) await page.screenshot({ path: `${out}/menu-${width}.png` });
+    }
+    // A returning player's real stats add a row above Options. Reserve space
+    // for long earned values at the largest scale, not just a fresh profile.
+    await page.evaluate(() => {
+      Object.assign(RIFT.save.data, { runs:4, bestScore:123456789, scrapBanked:1234567, clears:12 });
+      document.getElementById('toTitleBtn').click();
+    });
+    const statsLayout = await page.evaluate(() => {
+      const bounds = id => document.getElementById(id).getBoundingClientRect();
+      return { stats:bounds('titleStats').bottom, options:bounds('optionsBtn').top,
+        end:bounds('optionsBtn').bottom, footer:document.querySelector('.menuFooter').getBoundingClientRect().top };
+    });
+    assert.ok(statsLayout.options >= statsLayout.stats && statsLayout.end + 12 < statsLayout.footer,
+      `Saved stats and Options remain clear of the footer: ${JSON.stringify(statsLayout)}`);
+    await page.evaluate(() => { RIFT.save.data.runs = 0; document.getElementById('toTitleBtn').click(); });
+    console.log(`${width}×${height}: uncluttered title fits at 80%, 110% and 140% UI size`);
   }
+  await page.setViewport({ width:1440, height:900 });
+  await page.evaluate(async () => (await import('/src/ui/UISettings.js')).applyUIScale(1.1));
 
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   const animations = await page.evaluate(() => [...document.querySelectorAll('.menuSpectrum,.riftHalo,.riftOrbit,.riftShard')]
