@@ -101,6 +101,23 @@ try {
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   assert.ok((await step()).time <= 0, 'Losing focus clears an unconsumed keyboard roll');
   await page.keyboard.up('e');
+  await page.keyboard.press('p');
+  assert.deepEqual(await page.evaluate(() => ({
+    paused: RIFT.paused,
+    pauseMenuHidden: document.getElementById('pauseScreen').classList.contains('hidden'),
+  })), { paused: true, pauseMenuHidden: true }, 'P freezes gameplay without opening the pause menu');
+  await page.keyboard.press('p');
+  assert.deepEqual(await page.evaluate(() => ({
+    paused: RIFT.paused,
+    pauseMenuHidden: document.getElementById('pauseScreen').classList.contains('hidden'),
+  })), { paused: false, pauseMenuHidden: true }, 'A second P resumes gameplay without flashing the pause menu');
+  await page.keyboard.press('p');
+  await page.keyboard.press('Escape');
+  assert.deepEqual(await page.evaluate(() => ({
+    paused: RIFT.paused,
+    pauseMenuHidden: document.getElementById('pauseScreen').classList.contains('hidden'),
+  })), { paused: true, pauseMenuHidden: false }, 'Escape can reveal the full menu from a silent pause');
+  await page.keyboard.press('Escape');
   assert.deepEqual(errors, []);
-  console.log('PASS: real Q/E and released double-tap A/D/arrows, both roll directions, timeout/repeat/typing guards, cooldown/energy, pause and blur safety.');
+  console.log('PASS: real Q/E and released double-tap A/D/arrows, both roll directions, timeout/repeat/typing guards, cooldown/energy, silent P pause, and blur safety.');
 } finally { await browser.close(); }

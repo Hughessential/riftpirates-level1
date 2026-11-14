@@ -111,7 +111,7 @@ $('resumeBtn').addEventListener('click', () => game.togglePause());
 $('quitBtn').addEventListener('click', () => game.quitRun());
 
 Input.init(game.renderer.domElement, {
-  onPause: () => game.togglePause(),
+  onPause: ({ silent = false } = {}) => game.togglePause({ showMenu: !silent }),
 });
 
 initAudioSettings();

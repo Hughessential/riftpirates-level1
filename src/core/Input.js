@@ -196,8 +196,12 @@ class InputImpl {
       const wasDown = this._keys[e.code];
       this._keys[e.code] = true;
       if (e.code === 'Space') this._spacePhysicalHeld = true;
-      if (e.code === 'KeyP' || e.code === 'Escape') {
-        if (this._onPause) this._onPause();
+      if (!e.repeat && !isTextEntry(e.target)) {
+        if (e.code === 'KeyP') {
+          if (this._onPause) this._onPause({ silent: true });
+        } else if (e.code === 'Escape') {
+          if (this._onPause) this._onPause({ silent: false });
+        }
       }
       // Roll shortcuts and double taps are edge-triggered. Key repeat and text
       // entry never count, and Input.enabled is false while a menu owns input.

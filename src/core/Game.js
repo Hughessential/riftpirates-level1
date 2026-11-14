@@ -545,12 +545,20 @@ export class Game {
     this.syncMusicPause();
   }
 
-  togglePause() {
+  togglePause({ showMenu = true } = {}) {
     if (this.testing.active && this.testing.panelOpen) return;
     if (!this.running) return;
     if (this.director.state === STATE.DYING) return;
+    const pauseScreen = $('pauseScreen');
+    // Escape/Start/the pause button can reveal the normal pause console when
+    // P has already frozen the action silently. A second P still resumes.
+    if (this.paused && showMenu && pauseScreen.classList.contains('hidden')) {
+      pauseScreen.classList.remove('hidden');
+      Input.enabled = false;
+      return;
+    }
     this.paused = !this.paused;
-    $('pauseScreen').classList.toggle('hidden', !this.paused);
+    pauseScreen.classList.toggle('hidden', !this.paused || !showMenu);
     if (this.paused) this.upgradeScreen.cancelHoldForPause();
     Input.enabled = !this.paused && !this.director.inUpgrade && !this.director.intro.active && !this.testing?.panelOpen;
     if (this.paused) {
