@@ -702,6 +702,7 @@ body:has(#openingTutorial:not(.hidden)) .toast.instruction{top:calc(250px + env(
 
 @media (prefers-reduced-motion:reduce){
   #banner,.toast,.upCard{animation:none !important;transition:none !important}
+  #blackArmorHud.active #blackArmorFill{animation:none !important}
   #scrapPickup.pulse{animation:none;opacity:1;transform:none}
   canvas{filter:none;transform:none}
 }
@@ -717,6 +718,20 @@ body:has(#openingTutorial:not(.hidden)) .toast.instruction{top:calc(250px + env(
 #arsenalReadout strong{font-size:13px;letter-spacing:.12em;color:var(--reactor,#ff38c9);text-shadow:0 0 12px var(--reactor,#ff38c9)}
 #arsenalReadout .arsenalMods{color:#c6deea;font-size:7px}
 #arsenalReadout.installed{border-color:var(--installed);background:linear-gradient(90deg,#163035e8,#05051122);box-shadow:-5px 0 20px -14px var(--installed)}
+.blackArmorRow{margin-top:1px}
+#blackArmorBar{height:12px;border-color:#ff294f;background:#26030b;overflow:hidden;
+  box-shadow:0 0 5px #ff174dcc,0 0 13px #ff174d99,inset 0 0 7px #ff174d55}
+#blackArmorFill{height:100%;width:100%;background:linear-gradient(90deg,#b00020,#ff174d 48%,#ff657d);
+  box-shadow:0 0 7px #ff174d,0 0 16px #ff174d,0 0 26px #ff294f;transition:width .08s linear}
+.blackArmorReadout{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  padding:0 7px;color:#fff;font-size:6px;line-height:1;letter-spacing:.1em;white-space:nowrap;
+  text-shadow:0 0 3px #63000f,0 0 7px #ff174d}
+.blackArmorReadout strong{font-size:6px;letter-spacing:.13em}
+#blackArmorHud.active #blackArmorBar{border-color:#ff8b9d;box-shadow:0 0 7px #ff294f,0 0 18px #ff174d,0 0 30px #ff174d99}
+#blackArmorHud.active #blackArmorFill{background:linear-gradient(90deg,#d4002a,#ff174d 45%,#fff 100%);animation:blackArmorBarPulse .42s ease-in-out infinite alternate}
+#blackArmorHud.cooldown #blackArmorBar{border-color:#a40d29;box-shadow:0 0 5px #ff174d88,0 0 11px #ff174d55}
+#blackArmorHud.cooldown #blackArmorFill{background:linear-gradient(90deg,#790016,#dc1235,#ff4562);box-shadow:0 0 8px #ff174d}
+@keyframes blackArmorBarPulse{to{filter:brightness(1.55);box-shadow:0 0 11px #ff174d,0 0 24px #ff174d,0 0 34px #fff}}
 .upCard .upActualDelta{font-size:10px;line-height:1.6;color:#e5fffc;min-height:40px;margin:12px 0 0}
 @media(min-width:2100px) and (min-height:1100px){#arsenalReadout{left:24px;bottom:145px;width:420px;font-size:11px;padding:14px 16px}#arsenalReadout small,#arsenalReadout .arsenalMods{font-size:9px}#arsenalReadout strong{font-size:18px}}
 @media(max-width:900px){#arsenalReadout{bottom:140px;max-width:240px;font-size:7px}#arsenalReadout strong{font-size:10px}.arsenalMods{display:none}}

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
 import { PLAYER_SHIPS } from '../src/render/PlayerFleet.js';
 import { UPGRADES } from '../src/systems/UpgradeSystem.js';
+import { TUNING_SCHEMA } from '../src/core/TuningRegistry.js';
 
 const out = fileURLToPath(new URL('../shots/', import.meta.url));
 mkdirSync(out, { recursive: true });
@@ -67,7 +68,8 @@ try {
   assert.equal(await page.evaluate(() => window.RIFT.testing.panelOpen), true, 'F2 reopens the same test session');
 
   await page.click('#labTab-tuning');
-  assert.equal(await page.$$eval('[data-tuning-row]', rows => rows.length), 42, 'All connected tuning parameters render from the registry');
+  assert.equal(await page.$$eval('[data-tuning-row]', rows => rows.length), TUNING_SCHEMA.length,
+    'All connected tuning parameters render from the registry');
   await page.type('#labTuningSearch', 'critical');
   assert.deepEqual(await page.$$eval('[data-tuning-row]:not([hidden])', rows => rows.map(row => row.dataset.tuningRow).sort()),
     ['criticalChance', 'criticalDamage']);

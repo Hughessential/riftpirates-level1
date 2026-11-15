@@ -50,6 +50,7 @@ class InputImpl {
 
     // one-shot barrel-roll requests, drained by the player each frame
     this._rollQueue = 0; // -1 = left, +1 = right, 0 = none
+    this._blackArmorQueued = false;
     this._rollTapTimes = new Map();
     this._rollStickDir = 0;
 
@@ -206,7 +207,8 @@ class InputImpl {
       // Roll shortcuts and double taps are edge-triggered. Key repeat and text
       // entry never count, and Input.enabled is false while a menu owns input.
       if (!wasDown && !e.repeat && this.enabled && !isTextEntry(e.target)) {
-        if (e.code === 'KeyQ') this._rollQueue = -1;
+        if (e.code === 'Digit1') this._blackArmorQueued = true;
+        else if (e.code === 'KeyQ') this._rollQueue = -1;
         else if (e.code === 'KeyE') this._rollQueue = 1;
         else if (e.code === 'KeyA' || e.code === 'ArrowLeft') this._recordRollTap(`key:${e.code}`, -1);
         else if (e.code === 'KeyD' || e.code === 'ArrowRight') this._recordRollTap(`key:${e.code}`, 1);
@@ -227,6 +229,7 @@ class InputImpl {
       this._spacePhysicalHeld = false;
       this._blockKeyboardFireUntilRelease = false;
       this._rollQueue = 0;
+      this._blackArmorQueued = false;
       this._resetRollTaps();
       this.boost = false;
       fOff();
@@ -378,6 +381,7 @@ class InputImpl {
     this._padFire = false;
     this.menuConfirmHeld = false;
     this._rollQueue = 0;
+    this._blackArmorQueued = false;
     this._resetRollTaps();
   }
 
@@ -424,6 +428,13 @@ class InputImpl {
     const r = this._rollQueue;
     this._rollQueue = 0;
     return r;
+  }
+
+  /** Drain the edge-triggered keyboard request for Black Armor. */
+  consumeBlackArmor() {
+    const queued = this._blackArmorQueued;
+    this._blackArmorQueued = false;
+    return queued;
   }
 
   /** Drain the one-shot gamepad connect/disconnect notice. */
@@ -508,6 +519,7 @@ class InputImpl {
     this._padAim = false;
     this.menuConfirmHeld = false;
     this._rollQueue = 0;
+    this._blackArmorQueued = false;
     this._resetRollTaps();
   }
 }

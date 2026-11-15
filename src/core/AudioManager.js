@@ -39,6 +39,7 @@ const SFX_FILES = {
   overload: 'overload.wav',
   shield_break: 'shield_break.wav',
   boost: 'boost.wav',
+  black_armor: 'shield_charge_sfx.wav',
   boss_taunt: 'boss_taunt.wav',
 };
 
@@ -228,7 +229,7 @@ export class AudioManagerImpl {
     const now = this.ctx.currentTime;
     if (this._lastPlay[name] && now - this._lastPlay[name] < 0.03) return;
     this._lastPlay[name] = now;
-    if (this.weaponGain && ['laser_warning', 'low_health', 'player_hurt', 'shield_break', 'phase_change'].includes(name)) {
+    if (this.weaponGain && ['laser_warning', 'low_health', 'player_hurt', 'shield_break', 'phase_change', 'black_armor'].includes(name)) {
       const gain = this.weaponGain.gain;
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(gain.value, now);

@@ -81,6 +81,13 @@ export class HUD {
       stats: this.arsenal.querySelector('.arsenalStats'),
       mods: this.arsenal.querySelector('.arsenalMods'),
     };
+    this.blackArmor = document.createElement('div');
+    this.blackArmor.id = 'blackArmorHud';
+    this.blackArmor.className = 'barRow blackArmorRow ready';
+    this.blackArmor.innerHTML = '<div class="bar thin" id="blackArmorBar"><div id="blackArmorFill"></div><span class="blackArmorReadout"><strong>BLACK ARMOR</strong><span>1 / READY</span></span></div>';
+    this.el.boost.closest('.barRow').after(this.blackArmor);
+    this.blackArmorLabel = this.blackArmor.querySelector('.blackArmorReadout span');
+    this.blackArmorFill = this.blackArmor.querySelector('#blackArmorFill');
     this.augmentFlash = 0;
   }
 
@@ -392,6 +399,24 @@ export class HUD {
     this.el.boost.style.width = `${clamp(p.boost / boostMax, 0, 1) * 100}%`;
     this.el.boost.classList.toggle('spent', p.boost < 15);
     this.el.boost.classList.toggle('braking', p.braking);
+
+    // Black Armor uses a dedicated compact lane so the five-second state and
+    // post-effect cooldown remain legible without competing with objectives.
+    const armorActive = p.blackArmorActive;
+    const armorCooling = !armorActive && p.blackArmorCooldown > 0;
+    this.blackArmor.classList.toggle('active', armorActive);
+    this.blackArmor.classList.toggle('cooldown', armorCooling);
+    this.blackArmor.classList.toggle('ready', !armorActive && !armorCooling);
+    if (armorActive) {
+      writeText(this.blackArmorLabel, `${p.blackArmorTime.toFixed(1)}S / INVULNERABLE`);
+      this.blackArmorFill.style.width = `${clamp(p.blackArmorTime / Math.max(.001, p.blackArmorDuration), 0, 1) * 100}%`;
+    } else if (armorCooling) {
+      writeText(this.blackArmorLabel, `${p.blackArmorCooldown.toFixed(1)}S / RECHARGING`);
+      this.blackArmorFill.style.width = `${(1 - clamp(p.blackArmorCooldown / Math.max(.001, p.blackArmorCooldownDuration), 0, 1)) * 100}%`;
+    } else {
+      writeText(this.blackArmorLabel, '1 / READY');
+      this.blackArmorFill.style.width = '100%';
+    }
 
     // rift heat
     const heat = g.heat;

@@ -280,7 +280,8 @@ export class Game {
     this.voidFill.color.copy(mood.color);
     const authoredBloom = this.testing?.active && this.testing.settings.bloom !== null
       ? this.testing.settings.bloom : mood.bloom;
-    this.presentation.setBloom(authoredBloom * (this.testing?.getTuning('bloom') ?? 1));
+    this.presentation.setBloom(authoredBloom * (this.testing?.getTuning('bloom') ?? 1)
+      + (this.player?.blackArmorBloom || 0));
   }
 
   // ------------------------------------------------------------------ helpers
@@ -364,6 +365,7 @@ export class Game {
     this.clearHazards();
     this.projectiles.reset();
     this.player.frozen = true;
+    this.player.resetBlackArmor();
     Audio2.playVictory();
     this.director.go(STATE.VICTORY);
     // Settle immediately; decorative staging must never hold up saving.
@@ -519,6 +521,7 @@ export class Game {
   _onPlayerDeath(source) {
     if (!this.running || this.player.alive || this._terminalOutcome || this._resultsFinalized || this.death.active) return;
     this._terminalOutcome = 'defeat';
+    this.player.resetBlackArmor();
     Audio2.playDeath();
     this.director.clearPresentation();
     this.escape.dispose();

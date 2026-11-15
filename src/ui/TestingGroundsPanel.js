@@ -96,7 +96,7 @@ export class TestingGroundsPanel {
           <section class="labPage" id="labPage-effects" role="tabpanel" aria-labelledby="labTab-effects" hidden>
             <div class="labSectionHead"><div><span class="labEyebrow">MAKE THE VOID SING</span><h3>LIGHT + SOUND LAB</h3></div><span class="labPill">18 WEAPON SOUNDS</span></div>
             <div class="labEffectCard"><div><h4>CINEMATIC BLOOM</h4><p>Dial in the neon glow. The scene default follows each encounter.</p></div><label class="labRange"><span id="labBloomValue">SCENE DEFAULT</span><input id="labBloom" type="range" min="0" max="1.5" step="0.05" value="0.8" aria-label="Bloom strength"></label><button type="button" data-action="bloomReset">SCENE DEFAULT</button></div>
-            <div class="labActionGrid"><button type="button" data-action="fx">VOXEL EXPLOSION BURST</button><button type="button" data-action="dodge">PERFECT-DODGE EFFECTS</button></div>
+            <div class="labActionGrid"><button type="button" data-action="fx">VOXEL EXPLOSION BURST</button><button type="button" data-action="dodge">PERFECT-DODGE EFFECTS</button><button type="button" data-action="blackArmor">ACTIVATE BLACK ARMOR</button><button type="button" data-action="blackArmorReset">RESET BLACK ARMOR</button></div>
             <p class="labHint">Close the console to watch particle effects and fly through the exhaust trail. The simulation is held while you configure it.</p>
             <div class="labSectionHead labSubhead"><h3>WEAPON SOUND BOARD</h3><span>CLICK TO AUDITION</span></div>
             <div class="labSoundGrid">${Object.keys(WEAPON_AUDIO).map((kind, index) => `<button type="button" data-sound="${kind}"><small>${String(index + 1).padStart(2, '0')}</small><span>${kind.replaceAll('_', ' ').toUpperCase()}</span><b aria-hidden="true">▷</b></button>`).join('')}</div>
@@ -385,6 +385,8 @@ export class TestingGroundsPanel {
       heat: [() => t.setHeat(Number(value('labHeat'))), `RIFT HEAT SET TO ${value('labHeat')}.`],
       bloomReset: [() => t.setBloom(null), 'BLOOM FOLLOWS THE SCENE AGAIN.'],
       fx: [() => t.burstFX(), 'VOXEL BURST READY. CLOSE THE CONSOLE TO WATCH.'],
+      blackArmor: [() => t.activateBlackArmor(), 'BLACK ARMOR ACTIVE. CLOSE THE CONSOLE TO FLY.'],
+      blackArmorReset: [() => t.resetBlackArmor(), 'BLACK ARMOR AND COOLDOWN RESET.'],
       tuningReset: [() => t.resetTuning(), 'ALL LIVE TUNING RESET TO AUTHORED BASELINES.'],
       saveTuning: [() => t.saveTuningPreset(value('labPresetName')), 'TUNING PRESET SAVED EXPLICITLY.'],
       loadTuning: [() => t.loadTuningPreset(value('labTuningPreset')), 'TUNING PRESET LOADED.'],

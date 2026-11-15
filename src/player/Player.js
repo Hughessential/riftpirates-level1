@@ -5,6 +5,7 @@ import { hopperVoxels } from '../render/Models.js';
 import { createPlayerShip, isPlayerShipId, PLAYER_SHIPS } from '../render/PlayerFleet.js';
 import { Input } from '../core/Input.js';
 import { EngineTrail } from '../effects/EngineTrail.js';
+import { BlackArmorEffect } from '../effects/BlackArmorEffect.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { clamp, lerp, rand, damp, TAU } from '../core/Utils.js';
 
@@ -55,6 +56,34 @@ const NORMAL_ENGINE = new THREE.Color('#43eaff');
 const BOOST_ENGINE = new THREE.Color('#ff6a22');
 const BRAKE_ENGINE = new THREE.Color('#55108f');
 const BOOST_FLARE = new THREE.Color('#ffd34f');
+
+export const BLACK_ARMOR_DEFAULTS = Object.freeze({
+  duration: 5,
+  cooldown: 60,
+  glow: 2.8,
+  bloom: 0.42,
+  gloss: 0.94,
+  specular: 1.45,
+  lightningFrequency: 18,
+  arcCount: 10,
+  lightningLength: 1.05,
+  lightningThickness: 0.055,
+  lightningBrightness: 2.2,
+  redBalance: 0.5,
+  particles: 1.25,
+  shimmer: 1.6,
+  soundVolume: 0.82,
+});
+
+const BLACK_ARMOR_TUNING = Object.freeze({
+  duration: 'blackArmorDuration', cooldown: 'blackArmorCooldown', glow: 'blackArmorGlow',
+  bloom: 'blackArmorBloom', gloss: 'blackArmorGloss', specular: 'blackArmorSpecular',
+  lightningFrequency: 'blackArmorLightningFrequency', arcCount: 'blackArmorArcCount',
+  lightningLength: 'blackArmorLightningLength', lightningThickness: 'blackArmorLightningThickness',
+  lightningBrightness: 'blackArmorLightningBrightness', redBalance: 'blackArmorRedBalance',
+  particles: 'blackArmorParticles', shimmer: 'blackArmorShimmer', soundVolume: 'blackArmorSoundVolume',
+});
+const BLACK_ARMOR_TUNING_ENTRIES = Object.entries(BLACK_ARMOR_TUNING);
 
 export class Player {
   constructor(scene, fx) {
@@ -134,12 +163,16 @@ export class Player {
 
     scene.add(this.group);
     this.exhaust = new EngineTrail(scene);
+    this.blackArmorEffect = new BlackArmorEffect(this, fx);
+    this._blackArmorValues = { ...BLACK_ARMOR_DEFAULTS };
     this.radius = 1.35;
     this.reset(BASE_STATS());
   }
 
   /** Hull selection only changes render geometry. Collision and weapons stay identical. */
   setShip(id) {
+    const armorActive = this.blackArmorActive;
+    this.blackArmorEffect.restoreHull();
     const shipId = isPlayerShipId(id) ? id : PLAYER_SHIPS[0].id;
     if (!this.shipHulls.has(shipId)) {
       const model = createPlayerShip(shipId, { size: 5.8 });
@@ -158,9 +191,11 @@ export class Player {
     for (const engine of this.engines) engine.position.z = rear;
     this.trail.position.z = rear + 1.4;
     this.exhaust.reset();
+    if (armorActive) this.blackArmorEffect.coatHull();
   }
 
   reset(stats) {
+    this.blackArmorEffect.cancel();
     this.exhaust.reset();
     this.stats = stats;
     this.x = 0;
@@ -181,6 +216,10 @@ export class Player {
     this.rollCd = 0; // roll cooldown remaining
     this.rollDir = 0; // -1 left, +1 right
     this.invuln = 0;
+    this.blackArmorTime = 0;
+    this.blackArmorCooldown = 0;
+    this.blackArmorDuration = BLACK_ARMOR_DEFAULTS.duration;
+    this.blackArmorCooldownDuration = BLACK_ARMOR_DEFAULTS.cooldown;
     this.noDamageT = 0;
     this.buffT = 0; // dodge-drive speed/fire buff
     this.critBuffT = 0; // perfect-dodge weapon-power buff
@@ -237,6 +276,45 @@ export class Player {
     return Math.max(0, Number(this.stats.secondWind) - this.secondWindUsed);
   }
 
+  get blackArmorActive() {
+    return this.blackArmorTime > 0;
+  }
+
+  get blackArmorReady() {
+    return this.alive && !this.blackArmorActive && this.blackArmorCooldown <= 0;
+  }
+
+  get blackArmorBloom() {
+    return (this.blackArmorEffect?.fade || 0)
+      * (this.testing?.getTuning('blackArmorBloom', BLACK_ARMOR_DEFAULTS.bloom) ?? BLACK_ARMOR_DEFAULTS.bloom);
+  }
+
+  _blackArmorTuning() {
+    for (const [name, key] of BLACK_ARMOR_TUNING_ENTRIES) {
+      this._blackArmorValues[name] = this.testing?.getTuning(key, BLACK_ARMOR_DEFAULTS[name]) ?? BLACK_ARMOR_DEFAULTS[name];
+    }
+    return this._blackArmorValues;
+  }
+
+  activateBlackArmor() {
+    if (!this.blackArmorReady) return false;
+    const tuning = this._blackArmorTuning();
+    this.blackArmorDuration = tuning.duration;
+    this.blackArmorCooldownDuration = tuning.cooldown;
+    this.blackArmorTime = tuning.duration;
+    this.blackArmorEffect.activate(tuning);
+    Audio2.play('black_armor', tuning.soundVolume, 1, 0);
+    return true;
+  }
+
+  resetBlackArmor({ cancel = true } = {}) {
+    if (cancel) {
+      this.blackArmorTime = 0;
+      this.blackArmorEffect.cancel();
+    }
+    this.blackArmorCooldown = 0;
+  }
+
   setReticleActive(active) {
     this.reticle.visible = Boolean(active && this.alive && this.group.visible);
   }
@@ -249,6 +327,23 @@ export class Player {
     const shieldMax = this.stats.shieldMax * tune('shieldCapacity');
 
     const inp = this.frozen ? { x: 0, y: 0, boost: false } : Input.read();
+
+    // ---- Black Armor ----
+    // Edge-triggered and completely orthogonal to steering, weapons, boost and
+    // rolls. Its own flag protects the full five-second window without
+    // overwriting shorter dodge/impact invulnerability timers.
+    if (!this.frozen && Input.consumeBlackArmor()) this.activateBlackArmor();
+    const armorWasActive = this.blackArmorActive;
+    if (armorWasActive) {
+      this.blackArmorTime = Math.max(0, this.blackArmorTime - dt);
+      if (!this.blackArmorActive) {
+        this.blackArmorEffect.expire();
+        this.blackArmorCooldown = this.blackArmorCooldownDuration;
+      }
+    } else if (this.blackArmorCooldown > 0) {
+      this.blackArmorCooldown = Math.max(0, this.blackArmorCooldown - dt);
+    }
+    this.blackArmorEffect.update(dt, ctx.time, this._blackArmorTuning());
 
     // ---- boost ----
     const wantBoost = inp.boost && this.boost > 2;
@@ -430,7 +525,7 @@ export class Player {
 
   /** @returns {boolean} true if damage actually landed. */
   takeDamage(amount, source = 'UNKNOWN') {
-    if (!this.alive || this.invuln > 0 || !(amount > 0)) return false;
+    if (!this.alive || this.blackArmorActive || this.invuln > 0 || !(amount > 0)) return false;
 
     // Armor Plating grants a free block per encounter
     if (this.blocksLeft > 0) {

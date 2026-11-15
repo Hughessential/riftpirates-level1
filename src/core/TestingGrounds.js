@@ -350,6 +350,7 @@ export class TestingGrounds {
     p.alive = true; p.frozen = false; p.x = 0; p.y = 1; p.vx = p.vy = p.kx = p.ky = 0;
     p.group.position.set(0, 1, 0); p.group.rotation.set(0, 0, 0); p.group.visible = p.hull.visible = true;
     p.rollT = p.rollCd = p.invuln = p.dodgeT = p.buffT = p.critBuffT = 0;
+    p.resetBlackArmor();
     p.boosting = false; p.exhaust.reset();
     g.camera3.reset(); g.hud.reset(); g.hud.show();
     $('boostBtn').classList.remove('hidden'); $('fireBtn').classList.remove('hidden');
@@ -535,6 +536,18 @@ export class TestingGrounds {
     this.game.heat.onPerfectDodge();
     this.game.hud.flashDodge();
     this.changed();
+  }
+
+  activateBlackArmor() {
+    if (!this.active || !this.game.player.alive) return false;
+    return this.game.player.activateBlackArmor();
+  }
+
+  resetBlackArmor() {
+    if (!this.active) return false;
+    this.game.player.resetBlackArmor();
+    this.changed();
+    return true;
   }
 
   setHeat(multiplier) {

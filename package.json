@@ -36,6 +36,7 @@
     "test:cosmic": "node tests/cosmic-augments.mjs && node tests/cosmic-effects.mjs",
     "test:endgame": "node tests/run-results.mjs && node tests/pilot-identity.mjs && node tests/endgame-music.mjs && node tests/pilot-identity-browser.mjs && node tests/victory-presentation.mjs",
     "test:keyboard": "node tests/keyboard-roll.mjs",
+    "test:black-armor": "node tests/black-armor.mjs",
     "test:cursor": "node tests/menu-cursor-trail.mjs",
     "test:autoplay": "node tests/title-autoplay.mjs",
     "test:audio-integrity": "node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/audio-mix.mjs && node tests/title-autoplay.mjs && node tests/audio-volume-browser.mjs && node tests/battle-soundtrack.mjs && node tests/endgame-music.mjs",
