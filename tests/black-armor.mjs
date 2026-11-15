@@ -49,7 +49,7 @@ try {
   });
   assert.equal(activated.active, true, '1 activates Black Armor on the next gameplay frame');
   assert.equal(activated.duration, 5, 'Production duration is exactly five seconds');
-  assert.equal(activated.cooldownDuration, 60, 'Production cooldown is 60 seconds after expiration');
+  assert.equal(activated.cooldownDuration, 20, 'Production cooldown is 20 seconds after expiration');
   assert.ok(activated.time < 5 && activated.time > 4.9);
   assert.ok(activated.root && activated.coated > 0 && activated.aura > 0 && activated.arcs > 0,
     `The coating, aura and pooled lightning activate together: ${JSON.stringify(activated)}`);
@@ -118,7 +118,7 @@ try {
     };
   });
   assert.equal(expired.active, false);
-  assert.ok(expired.cooldown > 59.99 && expired.cooldown <= 60, `Cooldown begins after expiration: ${expired.cooldown}`);
+  assert.ok(expired.cooldown > 19.99 && expired.cooldown <= 20, `Cooldown begins after expiration: ${expired.cooldown}`);
   assert.ok(expired.restored && expired.hudCooldown, 'Original hull materials and cooldown HUD are restored');
   assert.equal(expired.damageLands, true, 'Damage immunity ends immediately with the five-second effect');
 
@@ -141,7 +141,7 @@ try {
   });
   assert.ok(ships.every(ship => ship.started && ship.coated > 0), `All playable hulls accept and restore the coating: ${JSON.stringify(ships)}`);
   assert.deepEqual(errors, [], `No browser/runtime errors: ${errors.join('\n')}`);
-  console.log('PASS: Black Armor input, exact duration, 60s post-effect cooldown, total immunity, movement, visuals, HUD, restoration and all six hulls.');
+  console.log('PASS: Black Armor input, exact duration, 20s post-effect cooldown, total immunity, movement, visuals, HUD, restoration and all six hulls.');
 } finally {
   await browser.close();
 }

@@ -60,7 +60,7 @@ export const TUNING_SCHEMA = Object.freeze([
   entry('visual', 'renderScale', 'Render scale', 'Scales the adaptive renderer resolution while testing.', .5, 1.5, .05),
 
   entry('ability', 'blackArmorDuration', 'Ability duration', 'Seconds of complete Black Armor invulnerability.', .25, 30, .25, 5, 'sec'),
-  entry('ability', 'blackArmorCooldown', 'Cooldown duration', 'Seconds after expiration before Black Armor is ready again.', 0, 120, 1, 60, 'sec'),
+  entry('ability', 'blackArmorCooldown', 'Cooldown duration', 'Seconds after expiration before Black Armor is ready again.', 0, 120, 1, 20, 'sec'),
   entry('ability', 'blackArmorGlow', 'Purple glow intensity', 'Strength of the pulsing supernatural aura and ship light.', 0, 6, .1, 2.8, '×'),
   entry('ability', 'blackArmorBloom', 'Armor bloom intensity', 'Additional scene bloom while Black Armor is active.', 0, 1.5, .01, .42, '+'),
   entry('ability', 'blackArmorGloss', 'Armor glossiness', 'Polish of the obsidian coating; one is liquid-black glass.', 0, 1, .01, .94, 'ratio'),

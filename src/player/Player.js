@@ -59,7 +59,7 @@ const BOOST_FLARE = new THREE.Color('#ffd34f');
 
 export const BLACK_ARMOR_DEFAULTS = Object.freeze({
   duration: 5,
-  cooldown: 60,
+  cooldown: 20,
   glow: 2.8,
   bloom: 0.42,
   gloss: 0.94,
