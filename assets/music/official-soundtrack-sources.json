@@ -26,8 +26,9 @@
       "sha256": "f21cbfc329162710055540199d93b85d2840bf30ef78898ab80daa20f5b8ca94"
     },
     "pixelatedvoid.mp3": {
-      "bytes": 7907643,
-      "sha256": "3592fff8bc577ec5139a8ef2209db5420ba1d2254aa8d8fb6115db5edc3a9e03"
+      "source": "User-provided fixed recording, 2026-11-15",
+      "bytes": 4765216,
+      "sha256": "bd140a27fb160197d262f6b51c6fcaa370fa32927f599d5c4763711a0bcba1d8"
     },
     "thepirateking.mp3": {
       "bytes": 4238599,
