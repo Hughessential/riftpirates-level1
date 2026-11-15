@@ -18,16 +18,17 @@
   <div id="playerPanel">
     <div id="levelRing"><div id="levelBadge">1</div></div>
     <div id="bars">
+      <div id="pilotHudName" class="pilotNameText">PIRATE</div>
       <div class="barRow">
         <div class="bar" id="hpBar"><div id="hpFill"></div><span id="hpText">160/160</span></div>
       </div>
       <div class="barRow" id="shieldRow">
-        <div class="bar thin" id="shieldBar"><div id="shieldFill"></div></div>
+        <div class="bar thin" id="shieldBar"><div id="shieldFill"></div><span class="hudBarLabel">SHIELD</span></div>
       </div>
       <div class="barRow">
-        <div class="bar thin" id="boostBar"><div id="boostFill"></div></div>
+        <div class="bar thin" id="boostBar"><div id="boostFill"></div><span class="hudBarLabel">BOOST</span></div>
       </div>
-      <span id="shieldStatus" class="shieldStatus">SHIELD READY</span>
+      <span id="shieldStatus" class="shieldStatus hidden"></span>
     </div>
   </div>
 
@@ -61,7 +62,7 @@
       <span class="cube"></span>
       <b id="scrapVal">0</b>
     </div>
-    <button id="pauseBtn" aria-label="Pause">II</button>
+    <button id="pauseBtn" aria-label="Pause game" aria-pressed="false"><span class="pauseIcon" aria-hidden="true"></span></button>
   </div>
 
   <!-- bottom-left: rift heat -->
@@ -165,6 +166,11 @@
     <button type="button" class="optionsClose" data-options-close aria-label="Close options">×</button>
   </header>
   <div class="optionsAudio audioMixer" role="group" aria-label="Audio settings">
+    <div class="audioChannel" data-audio-channel="master">
+      <div class="audioChannelHead"><span class="audioChannelLabel">MASTER</span><output for="masterVolume" id="masterVolumeValue">100%</output></div>
+      <label class="audioVolumeLabel" for="masterVolume">Master volume</label>
+      <input type="range" id="masterVolume" min="0" max="100" step="1" value="100" data-audio-volume="master">
+    </div>
     <div class="audioChannel" data-audio-channel="music">
       <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl">MUSIC: ON</button><output for="musicVolume" id="musicVolumeValue">75%</output></div>
       <label class="audioVolumeLabel" for="musicVolume">Music volume</label>
@@ -198,6 +204,11 @@
     <p class="pauseMessage">CATCH YOUR BREATH, CAPTAIN.</p>
     <button class="btnBig pauseResume" id="resumeBtn">RESUME THE RAID <span aria-hidden="true">&gt;</span></button>
     <div class="pauseAudio audioMixer" aria-label="Audio settings">
+      <div class="audioChannel audioChannelMaster" data-audio-channel="master">
+        <div class="audioChannelHead"><span class="audioChannelLabel">MASTER</span><output for="masterVolume2" id="masterVolume2Value">100%</output></div>
+        <label class="audioVolumeLabel" for="masterVolume2">Master volume</label>
+        <input type="range" id="masterVolume2" min="0" max="100" step="1" value="100" data-audio-volume="master">
+      </div>
       <div class="audioChannel" data-audio-channel="music">
         <div class="audioChannelHead"><button class="btnGhost on" id="musicTgl2">MUSIC: ON</button><output for="musicVolume2" id="musicVolume2Value">75%</output></div>
         <label class="audioVolumeLabel" for="musicVolume2">Music volume</label>

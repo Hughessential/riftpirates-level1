@@ -8,7 +8,7 @@ export class OptionsMenu {
     this.game = game;
     this.dialog = document.getElementById('optionsDialog');
     this.button = document.getElementById('optionsBtn');
-    this.button.addEventListener('click', () => this.open());
+    this.button.addEventListener('click', event => this.open({ focusFirst: event.detail === 0 }));
     this.dialog.querySelectorAll('[data-options-close]').forEach(button => {
       button.addEventListener('click', () => this.close());
     });
@@ -24,11 +24,14 @@ export class OptionsMenu {
     });
   }
 
-  open() {
+  open({ focusFirst = false } = {}) {
     if (this.dialog.open || document.getElementById('titleScreen').classList.contains('hidden')) return;
     this.dialog.showModal();
     this.button.setAttribute('aria-expanded', 'true');
-    document.getElementById('musicTgl').focus({ preventScroll: true });
+    // Pointer users already have a clear target and should not get a persistent
+    // keyboard-focus box around Music. Keyboard/controller activation has a
+    // zero-detail click, so it still receives an explicit, visible focus target.
+    if (focusFirst) document.getElementById('musicTgl').focus({ preventScroll: true });
     Input.blockMenuCarryover();
     Audio2.play('ui_select', .5, 1);
   }

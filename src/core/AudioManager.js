@@ -75,12 +75,21 @@ export const MUSIC_FILES = Object.freeze({
   neondrift: 'neondrift.mp3',
   pixelatedvoid: 'pixelatedvoid.mp3',
   thepirateking: 'thepirateking.mp3',
-  defeat: 'sorryyoudied.mp3',
+  fallen: 'sorryyoudied.mp3',
+  defeat: 'DAMNYOUDEAD.mp3',
   victory: 'Afterthefinalescape.mp3',
 });
-export const GAMEPLAY_MUSIC = Object.freeze(['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking']);
+export const GAMEPLAY_MUSIC = Object.freeze(['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking', 'fallen']);
 const THEME_TAIL = 1.4; // Deliberate end fade, not a claimed seamless musical loop.
-export const AUDIO_OUTPUT = Object.freeze({ threshold: -3, ratio: 20, headroom: .95, musicSmoothing: .012 });
+export const AUDIO_OUTPUT = Object.freeze({
+  threshold: -3,
+  ratio: 20,
+  headroom: .95,
+  musicTrim: .75,
+  musicSmoothing: .012,
+});
+/** Map the familiar 0-100% control to a curve with finer quiet-end control. */
+export const volumeToGain = volume => volume * volume;
 const ASSET_BASE = import.meta.env?.BASE_URL || './';
 
 export class AudioManagerImpl {
@@ -90,6 +99,7 @@ export class AudioManagerImpl {
     this.buffers = {};
     this.music = {};
     this.currentMusic = null;
+    this.masterVol = clampAudioVolume(Save.data.masterVolume, AUDIO_DEFAULTS.masterVolume);
     this.musicVol = clampAudioVolume(Save.data.musicVolume, AUDIO_DEFAULTS.musicVolume);
     this.sfxVol = clampAudioVolume(Save.data.sfxVolume, AUDIO_DEFAULTS.sfxVolume);
     this._fades = [];
@@ -120,6 +130,7 @@ export class AudioManagerImpl {
     try { this.ctx = new AC(); } catch { return; }
     // Save.load runs after this singleton is constructed. Read the persisted
     // mixer at audio unlock, including edits made before the first gesture.
+    this.masterVol = clampAudioVolume(Save.data.masterVolume, AUDIO_DEFAULTS.masterVolume);
     this.musicVol = clampAudioVolume(Save.data.musicVolume, AUDIO_DEFAULTS.musicVolume);
     this.sfxVol = clampAudioVolume(Save.data.sfxVolume, AUDIO_DEFAULTS.sfxVolume);
 
@@ -137,7 +148,7 @@ export class AudioManagerImpl {
     this.mixLimiter.attack.value = .003;
     this.mixLimiter.release.value = .08;
     this.outputGain = this.ctx.createGain();
-    this.outputGain.gain.value = AUDIO_OUTPUT.headroom;
+    this.outputGain.gain.value = AUDIO_OUTPUT.headroom * volumeToGain(this.masterVol);
     this.mixBus.connect(this.mixLimiter);
     this.mixLimiter.connect(this.outputGain);
     this.outputGain.connect(this.ctx.destination);
@@ -151,7 +162,7 @@ export class AudioManagerImpl {
     this.warpFilter.connect(this.mixBus);
 
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.value = Save.data.sfx ? this.sfxVol : 0;
+    this.sfxGain.gain.value = Save.data.sfx ? volumeToGain(this.sfxVol) : 0;
     this.sfxLimiter = this.ctx.createDynamicsCompressor();
     this.sfxLimiter.threshold.value = -14;
     this.sfxLimiter.knee.value = 12;
@@ -165,7 +176,9 @@ export class AudioManagerImpl {
     this.weaponGain.connect(this.sfxGain);
 
     this.musicGain = this.ctx.createGain();
-    this.musicGain.gain.value = Save.data.music ? this.musicVol : 0;
+    this.musicGain.gain.value = Save.data.music
+      ? volumeToGain(this.musicVol) * AUDIO_OUTPUT.musicTrim
+      : 0;
     this.musicGain.connect(this.mixBus);
 
     this.ready = true;
@@ -339,7 +352,9 @@ export class AudioManagerImpl {
         param.value = volume;
       }
     }
-    else entry.el.volume = Save.data.music ? volume * this.musicVol : 0;
+    else entry.el.volume = Save.data.music
+      ? volume * volumeToGain(this.musicVol) * volumeToGain(this.masterVol) * AUDIO_OUTPUT.musicTrim
+      : 0;
   }
 
   _playEntry(entry) {
@@ -544,7 +559,9 @@ export class AudioManagerImpl {
   setMusicEnabled(on) {
     Save.data.music = on ? 1 : 0;
     Save.save();
-    if (this.musicGain) this.musicGain.gain.value = on ? this.musicVol : 0;
+    if (this.musicGain) this.musicGain.gain.value = on
+      ? volumeToGain(this.musicVol) * AUDIO_OUTPUT.musicTrim
+      : 0;
     for (const entry of Object.values(this.music)) {
       entry.el.preload = on ? 'auto' : 'none';
       this._applyLevel(entry);
@@ -556,14 +573,25 @@ export class AudioManagerImpl {
   setSfxEnabled(on) {
     Save.data.sfx = on ? 1 : 0;
     Save.save();
-    if (this.sfxGain) this.sfxGain.gain.value = on ? this.sfxVol : 0;
+    if (this.sfxGain) this.sfxGain.gain.value = on ? volumeToGain(this.sfxVol) : 0;
+  }
+
+  setMasterVolume(value) {
+    this.masterVol = clampAudioVolume(value, AUDIO_DEFAULTS.masterVolume);
+    Save.data.masterVolume = this.masterVol;
+    Save.save();
+    if (this.outputGain) this.outputGain.gain.value = AUDIO_OUTPUT.headroom * volumeToGain(this.masterVol);
+    // Media-element fallback music does not pass through the WebAudio output bus.
+    for (const entry of Object.values(this.music)) this._applyLevel(entry);
   }
 
   setMusicVolume(value) {
     this.musicVol = clampAudioVolume(value, AUDIO_DEFAULTS.musicVolume);
     Save.data.musicVolume = this.musicVol;
     Save.save();
-    if (this.musicGain) this.musicGain.gain.value = Save.data.music ? this.musicVol : 0;
+    if (this.musicGain) this.musicGain.gain.value = Save.data.music
+      ? volumeToGain(this.musicVol) * AUDIO_OUTPUT.musicTrim
+      : 0;
     for (const entry of Object.values(this.music)) this._applyLevel(entry);
   }
 
@@ -571,7 +599,7 @@ export class AudioManagerImpl {
     this.sfxVol = clampAudioVolume(value, AUDIO_DEFAULTS.sfxVolume);
     Save.data.sfxVolume = this.sfxVol;
     Save.save();
-    if (this.sfxGain) this.sfxGain.gain.value = Save.data.sfx ? this.sfxVol : 0;
+    if (this.sfxGain) this.sfxGain.gain.value = Save.data.sfx ? volumeToGain(this.sfxVol) : 0;
   }
 
   setMusicPaused(reason, paused) {
@@ -594,4 +622,18 @@ export class AudioManagerImpl {
   resumeMusic() { this.setMusicPaused('game', false); }
 }
 
-export const Audio2 = new AudioManagerImpl();
+// A second evaluation of this module (for example after a dev-server hot
+// update or through a cache-busted import) must not create another soundtrack
+// player. An orphaned manager would keep its own <audio> element and WebAudio
+// graph alive, so the title theme could overlap while the options menu only
+// controlled the newest graph. Symbol.for keeps the one exported mixer shared
+// across equivalent module URLs without changing the independently
+// constructible AudioManagerImpl used by focused tests and tools.
+const AUDIO_SINGLETON_KEY = Symbol.for('riftpirates.audio-manager');
+const existingAudioManager = globalThis[AUDIO_SINGLETON_KEY];
+export const Audio2 = existingAudioManager || new AudioManagerImpl();
+if (existingAudioManager) Object.setPrototypeOf(Audio2, AudioManagerImpl.prototype);
+else Object.defineProperty(globalThis, AUDIO_SINGLETON_KEY, {
+  value: Audio2,
+  configurable: true,
+});

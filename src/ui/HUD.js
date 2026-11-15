@@ -9,14 +9,16 @@ function writeText(element, value) {
   if (element.textContent !== text) element.textContent = text;
 }
 
-export const HUD_NOTICE_DURATIONS = Object.freeze({ brief: 1.8, instruction: 5 });
+// Four seconds suits short combat notices; tutorial copy gets a full 7.5-second
+// reading window. Explicit durations cannot undercut these accessibility floors.
+export const HUD_NOTICE_DURATIONS = Object.freeze({ brief: 4, instruction: 7.5 });
 const noticeOptions = (options, fallback = HUD_NOTICE_DURATIONS.brief) => {
   if (typeof options === 'number') options = { duration: options };
   const category = options?.category === 'instruction' ? 'instruction' : 'brief';
   const requested = Number(options?.duration);
+  const minimum = category === 'instruction' ? HUD_NOTICE_DURATIONS.instruction : fallback;
   return { ...(options || {}), category,
-    duration: Number.isFinite(requested) ? Math.max(.25,requested)
-      : category === 'instruction' ? HUD_NOTICE_DURATIONS.instruction : fallback };
+    duration: Number.isFinite(requested) ? Math.max(minimum,requested) : minimum };
 };
 
 /**
@@ -205,7 +207,7 @@ export class HUD {
   // --- notifications -------------------------------------------------------
 
   banner(text, color = P.magenta, options = {}) {
-    const opts = noticeOptions(options, 1.9);
+    const opts = noticeOptions(options);
     const b = this.el.banner;
     b.textContent = text;
     // Boss taunts are whole sentences; objective names are two or three words.
@@ -255,11 +257,15 @@ export class HUD {
       const index = this._toastItems.indexOf(item);
       if (index >= 0) this._toastItems.splice(index,1);
     },opts.duration*1000);
-    // never let toasts stack into a wall
-    while (this.el.toasts.children.length > 4) {
-      const oldest = this.el.toasts.firstChild;
+    // The top-center instructional lane replaces its own step above. Keep the
+    // left comms rail to three separated cards so it cannot collide with the
+    // encounter identity zone on shorter displays.
+    while (this._toastItems.filter(item => item.category === 'brief').length > 3) {
+      const oldestItem = this._toastItems.find(item => item.category === 'brief');
+      const oldest = oldestItem?.el;
+      if (!oldest) break;
       oldest.remove();
-      clearTimeout(this._toastItems.find(item => item.el === oldest)?.wallTimer);
+      clearTimeout(oldestItem.wallTimer);
       this._toastItems = this._toastItems.filter(item => item.el !== oldest);
     }
   }
@@ -354,32 +360,38 @@ export class HUD {
     const s = p.stats;
 
     // health + shield + level badge
-    const hpPct = clamp(p.health / s.maxHealth, 0, 1) * 100;
+    const hpMax = s.maxHealth * (g.testing?.getTuning('maxHealth') ?? 1);
+    const shieldMax = s.shieldMax * (g.testing?.getTuning('shieldCapacity') ?? 1);
+    const boostMax = s.boostCapacity * (g.testing?.getTuning('boostCapacity') ?? 1);
+    const hpPct = clamp(p.health / hpMax, 0, 1) * 100;
     this.el.hp.style.width = `${hpPct}%`;
-    writeText(this.el.hpText, `${Math.ceil(p.health)}/${Math.round(s.maxHealth)}`);
+    writeText(this.el.hpText, `${Math.ceil(p.health)}/${Math.round(hpMax)}`);
     this.el.hp.classList.toggle('low', hpPct < 30);
 
-    if (s.shieldMax > 0) {
-      this.el.shield.style.width = `${clamp(p.shield / s.shieldMax, 0, 1) * 100}%`;
+    if (shieldMax > 0) {
+      this.el.shield.style.width = `${clamp(p.shield / shieldMax, 0, 1) * 100}%`;
       this.el.shield.parentElement.classList.remove('hidden');
-      const recovering = p.shield < s.shieldMax;
+      const recovering = p.shield < shieldMax;
       const delay = p.shieldRecoveryRemaining || 0;
+      this.el.shieldStatus.classList.toggle('hidden', !recovering);
       writeText(this.el.shieldStatus, p.shieldBroken
         ? `SHIELD BROKEN / ${delay.toFixed(1)}S`
         : recovering && delay > 0 ? `SHIELD RECOVERY / ${delay.toFixed(1)}S`
         : recovering ? 'SHIELD RECHARGING'
-        : `SHIELD ${Math.ceil(p.shield)} / ${Math.round(s.shieldMax)}`);
+        : '');
       this.el.shieldStatus.classList.toggle('broken', p.shieldBroken);
     } else {
       this.el.shield.parentElement.classList.add('hidden');
+      this.el.shieldStatus.classList.add('hidden');
     }
 
     writeText(this.el.level, g.xp.level);
     this.el.levelRing.style.background = `conic-gradient(${P.gold} ${g.xp.progress * 360}deg, rgba(255,255,255,.08) 0deg)`;
 
     // boost
-    this.el.boost.style.width = `${clamp(p.boost / s.boostCapacity, 0, 1) * 100}%`;
+    this.el.boost.style.width = `${clamp(p.boost / boostMax, 0, 1) * 100}%`;
     this.el.boost.classList.toggle('spent', p.boost < 15);
+    this.el.boost.classList.toggle('braking', p.braking);
 
     // rift heat
     const heat = g.heat;

@@ -80,7 +80,7 @@ export class ScrapSystem {
   }
   /** Replayed source IDs and exhausted source budgets reject BEFORE authorization. */
   burst(x,y,z,value,spread=1,meta={}) {
-    const amount = Math.max(0,Math.min(1e9,Math.round(Number(value)||0)));
+    const amount = Math.max(0,Math.min(1e9,Math.round((Number(value)||0)*(this.game.testing?.getTuning('lootValue')??1))));
     if (!amount) return false;
     const sourceId = meta.sourceId || `drop:${++this.burstSerial}`, group = meta.budgetGroup;
     if (this.sources.has(sourceId) || this.sources.size >= MAX_RUN_REWARDS ||
@@ -134,7 +134,7 @@ export class ScrapSystem {
     }
   }
   update(dt,worldSpeed) {
-    const g = this.game, p = g.player, radius = Math.max(5,p.stats.scrapRadius);
+    const g = this.game, p = g.player, radius = Math.max(5,p.stats.scrapRadius) * (g.testing?.getTuning('pickupRadius') ?? 1);
     let picked = 0, haloCount = 0; this._flushPending();
     for (const o of this.pool) {
       if (!o.active) continue;

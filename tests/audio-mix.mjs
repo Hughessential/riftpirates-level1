@@ -19,7 +19,7 @@ try {
   await page.evaluateOnNewDocument(() => {
     window.WebSocket = class extends EventTarget { send() {} close() {} };
   });
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   const report = await page.evaluate(async () => {
     const { AudioManagerImpl } = await import('/src/core/AudioManager.js');
     const { Save } = await import('/src/core/SaveSystem.js');

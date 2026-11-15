@@ -7,6 +7,8 @@ const BOOST_RED = new THREE.Color('#ff302f');
 const BOOST_ORANGE = new THREE.Color('#ff7a20');
 const BOOST_GOLD = new THREE.Color('#ffd34f');
 const BOOST_HOT = new THREE.Color('#fff2b5');
+const BRAKE_PINK = new THREE.Color('#ff38c9');
+const BRAKE_HOT = new THREE.Color('#ff9bea');
 
 export const ENGINE_TRAIL_PROFILE = Object.freeze({
   normal: Object.freeze({ emission: 72, lifeMin: .58, lifeMax: .82, velocity: 3.6, sizeMin: .05, sizeMax: .095 }),
@@ -50,6 +52,7 @@ export class EngineTrail {
     this._transform = new THREE.Object3D();
     this._color = new THREE.Color();
     this._boostColor = new THREE.Color();
+    this._brakeColor = new THREE.Color();
     this._zero = new THREE.Matrix4().makeScale(0, 0, 0);
     // Allocate instance color buffers once, including for an initially empty plume.
     for (let i = 0; i < CAPACITY; i++) {
@@ -68,6 +71,7 @@ export class EngineTrail {
     this.activeCount = 0;
     this.primed = false;
     this.boostMix = 0;
+    this.brakeMix = 0;
     for (let i = 0; i < CAPACITY; i++) {
       this.particles[i].life = 0;
       this.core.setMatrixAt(i, this._zero);
@@ -83,6 +87,7 @@ export class EngineTrail {
     dt = Math.min(dt, .1);
     this.time += dt;
     const emitting = emit && player.alive && player.group.visible;
+    this.brakeMix = THREE.MathUtils.damp(this.brakeMix, emitting && player.braking ? 1 : 0, 22, dt);
     if (emitting) {
       player.group.updateWorldMatrix(true, true);
       player.engines.forEach((engine, i) => {
@@ -95,7 +100,8 @@ export class EngineTrail {
       // in world space and continue aft while the new compact plume takes over.
       this.boostMix = THREE.MathUtils.damp(this.boostMix, player.boosting ? 1 : 0, 18, dt);
       const profile = ENGINE_TRAIL_PROFILE;
-      const emission = THREE.MathUtils.lerp(profile.normal.emission, profile.boost.emission, this.boostMix);
+      const emission = THREE.MathUtils.lerp(profile.normal.emission, profile.boost.emission, this.boostMix)
+        * (this.testing?.getTuning('trailDensity') ?? 1);
       this.carry += dt * emission;
       const count = Math.floor(this.carry);
       this.carry -= count;
@@ -165,15 +171,19 @@ export class EngineTrail {
       this.halo.setMatrixAt(i, d.matrix);
 
       // Normal thrust stays compact cyan/blue. Boost has its own unmistakable
-      // hot-gold ignition, orange body and red cooling wake.
+      // hot-gold ignition, orange body and red cooling wake. Cutting thrust
+      // recolors the live plume pink so its feedback is visible behind the ship.
       const normal = this._color.lerpColors(CYAN, BLUE, Math.min(1, age * 1.4));
       const boost = this._boostColor;
       if (age < .18) boost.lerpColors(BOOST_HOT, BOOST_GOLD, age / .18);
       else if (age < .55) boost.lerpColors(BOOST_GOLD, BOOST_ORANGE, (age - .18) / .37);
       else boost.lerpColors(BOOST_ORANGE, BOOST_RED, (age - .55) / .45);
       normal.lerp(boost, p.boostMix);
+      const brake = this._brakeColor.lerpColors(BRAKE_HOT, BRAKE_PINK, Math.min(1, age * 1.5));
+      normal.lerp(brake, this.brakeMix);
       const shimmer = .85 + .15 * Math.sin(this.time * 7 + p.phase);
-      this._color.multiplyScalar(THREE.MathUtils.lerp(1.45, 2.25, p.boostMix) * fade * shimmer);
+      const intensity = THREE.MathUtils.lerp(THREE.MathUtils.lerp(1.45, 2.25, p.boostMix), 1.9, this.brakeMix);
+      this._color.multiplyScalar(intensity * fade * shimmer);
       this.core.setColorAt(i, this._color);
       this.halo.setColorAt(i, this._color);
     }

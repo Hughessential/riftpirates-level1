@@ -44,7 +44,7 @@ export class RiftHeatSystem {
   }
 
   _bump(amount) {
-    this.heat = clamp(this.heat + amount, 0, 1);
+    this.heat = clamp(this.heat + amount * (this.game.testing?.getTuning('heatGain') ?? 1), 0, 1);
     this.maxMultiplier = Math.max(this.maxMultiplier, this.multiplier);
     this.idleT = 0;
   }
@@ -109,7 +109,7 @@ export class RiftHeatSystem {
     const decayDelay = 1.2 + rank;
     if (this.idleT > decayDelay && this.heat > 0) {
       const rate = 0.09 / (1 + .8 * rank);
-      this.heat = clamp(this.heat - rate * dt, 0, 1);
+      this.heat = clamp(this.heat - rate * (this.game.testing?.getTuning('heatDecay') ?? 1) * dt, 0, 1);
     }
   }
 }

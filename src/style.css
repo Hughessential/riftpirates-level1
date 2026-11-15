@@ -61,10 +61,14 @@ b{font-weight:900}
 #levelRing.up{transform:scale(1.25)}
 #bars{display:flex;flex-direction:column;gap:3px;margin-left:-8px;padding-left:14px;
   min-width:230px}
+#pilotHudName{height:12px;padding-left:2px;color:#bafff3;font-size:9px;line-height:12px;
+  letter-spacing:.12em;text-shadow:0 0 8px #27ffe171;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .barRow{display:flex}
 .bar{position:relative;height:17px;flex:1;background:#1a0e33;
   border:1px solid #3b2a63;border-radius:3px;overflow:hidden}
-.bar.thin{height:7px}
+.bar.thin{height:10px}
+.hudBarLabel{position:absolute;inset:0;display:grid;place-items:center;z-index:2;color:#fff;
+  font-size:6px;line-height:1;letter-spacing:.14em;text-shadow:0 1px 2px #000,0 0 5px #020207}
 #hpFill{height:100%;width:100%;background:linear-gradient(90deg,#2FCE58,#8ef2a8);
   box-shadow:0 0 10px rgba(47,206,88,.6);transition:width .12s linear}
 #hpFill.low{background:linear-gradient(90deg,#E11D48,#ff7396);
@@ -77,6 +81,7 @@ b{font-weight:900}
 #boostFill{height:100%;width:100%;background:linear-gradient(90deg,#7C3AED,#c9a8ff);
   box-shadow:0 0 8px var(--purple);transition:width .08s linear}
 #boostFill.spent{background:#4a3a7a;box-shadow:none}
+#boostFill.braking{background:linear-gradient(90deg,#25033f,#68139f);box-shadow:0 0 11px #55108f,0 0 18px #3a075f}
 
 /* --- objective bar --- */
 #approachPanel{position:absolute;top:calc(15px + env(safe-area-inset-top));left:50%;
@@ -133,9 +138,24 @@ b{font-weight:900}
   pointer-events:none;opacity:1;transform-origin:top right}
 #scrapPickup.pulse{animation:scrapPickup .9s ease-out forwards}
 @keyframes scrapPickup{0%{transform:translateY(-4px) scale(.85);filter:brightness(1.8)}18%,70%{transform:none;filter:brightness(1)}100%{transform:translateY(8px);filter:brightness(.8)}}
-#pauseBtn{width:42px;height:42px;border-radius:50%;border:2px solid var(--magenta);
-  background:rgba(10,5,30,.6);color:var(--magenta);font-size:15px;font-weight:900;
-  pointer-events:auto;cursor:pointer;box-shadow:0 0 12px rgba(255,46,210,.5)}
+#pauseBtn{position:relative;width:42px;height:42px;border-radius:50%;border:2px solid #a855f7;
+  background:radial-gradient(circle at 35% 30%,rgba(124,58,237,.35),rgba(12,5,30,.88));
+  color:#c084fc;pointer-events:auto;cursor:pointer;box-shadow:0 0 14px rgba(168,85,247,.58),inset 0 0 10px rgba(124,58,237,.28);
+  transition:transform .15s,filter .15s,background .15s}
+#pauseBtn:hover{filter:brightness(1.25)}#pauseBtn:active{transform:scale(.94)}
+.pauseIcon{position:absolute;inset:0;display:block}
+.pauseIcon::before,.pauseIcon::after{content:'';position:absolute;top:11px;width:5px;height:16px;
+  border-radius:1px;background:#c084fc;box-shadow:0 0 8px #a855f7}
+.pauseIcon::before{left:12px}.pauseIcon::after{right:12px}
+#pauseBtn.isPaused{background:radial-gradient(circle at 35% 30%,rgba(168,85,247,.48),rgba(12,5,30,.9))}
+#pauseBtn.isPaused .pauseIcon::before{left:14px;top:10px;width:0;height:0;border-radius:0;background:transparent;
+  border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:14px solid #c084fc;
+  box-shadow:none;filter:drop-shadow(0 0 5px #a855f7)}
+#pauseBtn.isPaused .pauseIcon::after{display:none}
+/* Keep only the resume control above the pause console; gameplay readouts stay
+   hidden until the run resumes. */
+#hud.paused{z-index:41}
+#hud.paused>div:not(#rightPanel),#hud.paused #rightPanel>*:not(#pauseBtn){visibility:hidden}
 
 /* --- rift heat --- */
 #heatPanel{position:absolute;left:calc(16px + env(safe-area-inset-left));
@@ -182,6 +202,9 @@ b{font-weight:900}
   box-shadow:0 0 16px rgba(255,46,210,.6), inset 0 0 14px rgba(255,46,210,.25)}
 #fireBtn span{font-size:26px;font-weight:900;line-height:.8;text-shadow:0 0 10px var(--magenta)}
 #fireBtn.on{background:rgba(255,46,210,.35);transform:scale(.95)}
+/* Touch controls are useful on phones/tablets, but duplicate keyboard/mouse
+   controls and obscure the desktop combat view. */
+@media (hover:hover) and (pointer:fine){#boostBtn,#fireBtn{display:none!important}}
 
 /* ===================== overlays ===================== */
 #dmgLayer{position:fixed;inset:0;z-index:9;pointer-events:none;overflow:hidden}
@@ -192,23 +215,30 @@ b{font-weight:900}
 .dmg.blocked{font-size:11px;color:var(--violet);letter-spacing:.1em;
   text-shadow:0 0 6px var(--violet)}
 
-/* Explicit width: at left:50% a shrink-to-fit box only gets the right half of
-   the viewport, which wraps long titles into the toast column below. */
-#banner{position:fixed;top:20%;left:50%;transform:translateX(-50%) scale(.92);
-  width:min(94vw,1100px);
-  font-weight:900;font-size:clamp(18px,3.6vw,38px);letter-spacing:.16em;
-  color:var(--magenta);opacity:0;z-index:14;text-align:center;pointer-events:none;
+/* Standard gameplay announcements live in a left-side comms rail, keeping the
+   flight lane and crosshair clear. Tutorial/instruction notices retain their
+   dedicated top-center placement below. */
+#banner{position:fixed;top:22%;left:calc(18px + env(safe-area-inset-left));
+  transform:translateX(-12px) scale(.96);width:min(390px,32vw);
+  font-weight:900;font-size:clamp(16px,2.5vw,30px);letter-spacing:.12em;
+  padding:10px 12px;color:var(--magenta);opacity:0;z-index:14;text-align:left;pointer-events:none;
+  background:linear-gradient(90deg,rgba(5,3,18,.94),rgba(5,3,18,.48));border-left:3px solid currentColor;
   transition:opacity .25s, transform .25s}
-#banner.show{opacity:1;transform:translateX(-50%) scale(1)}
+#banner.show{opacity:1;transform:none}
 
-/* Below the encounter title card (centred on 38%) so the two never collide.
-   Above .screen (20) so "controller connected" is visible on the title menu. */
-#toasts{position:fixed;top:47%;left:50%;transform:translateX(-50%);display:flex;
-  flex-direction:column;gap:5px;align-items:center;z-index:30;pointer-events:none}
+/* Above .screen (20) so controller notices remain visible on the title menu. */
+#toasts{position:fixed;top:calc(22% + clamp(78px,10vh,102px));left:calc(18px + env(safe-area-inset-left));
+  width:min(390px,32vw);display:flex;flex-direction:column;gap:12px;align-items:flex-start;
+  z-index:30;pointer-events:none}
 .toast{display:flex;flex-direction:column;align-items:center;line-height:1.15;
-  animation:toastUp var(--toast-duration,1.8s) ease forwards}
-.toast.instruction{animation:none;max-width:min(720px,88vw);padding:7px 12px;
+  animation:toastUp var(--toast-duration,4s) ease forwards}
+.toast.brief{position:relative;top:auto;width:min(390px,32vw);align-items:flex-start;text-align:left;
+  min-height:48px;padding:10px 12px;background:linear-gradient(90deg,rgba(5,3,18,.95),rgba(5,3,18,.48));
+  border:1px solid color-mix(in srgb,currentColor,transparent 70%);border-left:3px solid currentColor}
+.toast.instruction{position:fixed;top:calc(140px + env(safe-area-inset-top));left:50%;
+  transform:translateX(-50%);width:max-content;animation:none;max-width:min(720px,88vw);padding:7px 12px;
   background:rgba(5,3,18,.82);border:1px solid currentColor;box-shadow:0 0 18px rgba(39,245,218,.16)}
+body:has(#openingTutorial:not(.hidden)) .toast.instruction{top:calc(250px + env(safe-area-inset-top))}
 .toast b{font-weight:900;letter-spacing:.14em;font-size:16px}
 .toast span{font-size:10px;letter-spacing:.16em;opacity:.75}
 @keyframes toastUp{
@@ -236,21 +266,23 @@ b{font-weight:900}
 
 #nexusFade{position:fixed;inset:0;pointer-events:none;z-index:15;opacity:0;
   background:radial-gradient(ellipse at center,rgba(255,46,210,.55) 0%,rgba(76,29,149,.95) 60%,#0a0320 100%)}
-#skipHint{position:fixed;bottom:8%;left:50%;transform:translateX(-50%);z-index:17;
+#skipHint{position:fixed;bottom:8%;left:calc(18px + env(safe-area-inset-left));z-index:17;
   font-size:11px;letter-spacing:.24em;color:#fff;opacity:.65;
   animation:blink 1.4s infinite}
 @keyframes blink{50%{opacity:.2}}
 
-/* encounter title card */
-#titleCard{position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);z-index:14;
-  width:min(94vw,1000px);
-  text-align:center;pointer-events:none;opacity:0;--tc:var(--cyan);
+/* Encounter identity shares the left comms rail instead of covering targets. */
+#titleCard{position:fixed;top:48%;left:calc(18px + env(safe-area-inset-left));
+  top:auto;bottom:clamp(155px,21vh,220px);padding:11px 13px;
+  transform:translateX(-12px) scale(.96);z-index:14;width:min(390px,32vw);
+  text-align:left;pointer-events:none;opacity:0;--tc:var(--cyan);
+  background:linear-gradient(90deg,rgba(5,3,18,.94),rgba(5,3,18,.42));border-left:3px solid var(--tc);
   transition:opacity .4s, transform .4s}
-#titleCard.in{opacity:1;transform:translate(-50%,-50%) scale(1)}
-#titleCard:not(.in){transform:translate(-50%,-50%) scale(.94)}
+#titleCard.in{opacity:1;transform:translateX(0) scale(1)}
+#titleCard:not(.in){transform:translateX(-12px) scale(.94)}
 #tcNum{font-size:11px;font-weight:900;letter-spacing:.44em;color:var(--tc);
   text-shadow:0 0 12px var(--tc)}
-#tcName{font-size:clamp(26px,5.6vw,52px);font-weight:900;letter-spacing:.06em;color:#fff;
+#tcName{font-size:clamp(22px,3vw,36px);font-weight:900;letter-spacing:.06em;color:#fff;
   margin:6px 0 2px;text-shadow:0 0 20px var(--tc),0 0 50px var(--tc)}
 #tcSub{font-size:clamp(12px,2vw,17px);font-style:italic;letter-spacing:.14em;
   color:var(--tc);opacity:.9}
@@ -464,7 +496,7 @@ b{font-weight:900}
   box-shadow:inset 0 0 28px #27f5da0a}
 #labGlobeUnlock.labUnlocked{pointer-events:none}
 
-#openingTutorial{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));
+#openingTutorial{position:fixed;left:50%;top:calc(140px + env(safe-area-inset-top));
   width:min(620px,calc(92vw / var(--ui-user-scale)));transform:translateX(-50%);z-index:64;
   padding:16px 54px 14px 18px;border:1px solid #27f5da;background:linear-gradient(105deg,#020812f2,#110624ee);
   box-shadow:0 0 28px #27f5da20,6px 7px 0 #791ca733;color:#e9ffff;zoom:var(--ui-user-scale)}
@@ -475,10 +507,24 @@ b{font-weight:900}
 #openingTutorial>div i{display:block;width:0;height:100%;background:#27f5da;box-shadow:0 0 10px #27f5da;transition:width .2s}
 #openingTutorial button{position:absolute;right:10px;top:10px;padding:6px;border:1px solid #745482;
   background:#07030d;color:#a88eb6;font-size:7px}
-#openingTutorial.cacheLesson{bottom:20px;border-color:#ffc53d;box-shadow:0 0 28px #ffc53d22,6px 7px 0 #791ca733}
-#openingTutorial.cacheLesson small,#openingTutorial.cacheLesson strong{color:#ffc53d;text-shadow:0 0 9px #ffc53d}
-#openingTutorial.cacheLesson>div i{background:#ffc53d}
+#openingTutorial.cacheLesson{top:calc(8px + env(safe-area-inset-top));left:50%;bottom:auto;
+  width:min(760px,calc(88vw / var(--ui-user-scale)));transform:translateX(-50%);padding:10px 142px 9px 20px;
+  border-color:#ffc53d;box-shadow:0 0 24px #ffc53d24,6px 7px 0 #791ca72b}
+#openingTutorial.cacheLesson small,#openingTutorial.cacheLesson>div{display:none}
+#openingTutorial.cacheLesson strong{margin:0 0 2px;color:#ffc53d;font-size:15px;line-height:1.2;text-shadow:0 0 9px #ffc53d}
+#openingTutorial.cacheLesson p{margin:0;font-size:10px;line-height:1.35}
+#openingTutorial.cacheLesson button{top:50%;right:14px;transform:translateY(-50%);padding:9px 10px;font-size:7px}
+@media(max-width:1050px){
+  #openingTutorial,.toast.instruction{top:calc(205px + env(safe-area-inset-top))}
+  body:has(#openingTutorial:not(.hidden)) .toast.instruction{top:calc(320px + env(safe-area-inset-top))}
+}
 @media(max-width:700px){#openingTutorial{padding:12px 42px 11px 12px}#openingTutorial strong{font-size:11px}#openingTutorial p{font-size:8px}}
+@media(max-width:700px){
+  #openingTutorial.cacheLesson{top:calc(10px + env(safe-area-inset-top));width:min(560px,94vw);
+    padding:12px 96px 12px 14px}
+  #openingTutorial.cacheLesson strong{font-size:12px}
+  #openingTutorial.cacheLesson p{font-size:9px}
+}
 @media(prefers-reduced-motion:reduce){#openingTutorial>div i{transition:none}}
 
 /* Pausing opens a suspended rift instrument: rings turn while the raid is held. */
@@ -648,6 +694,9 @@ b{font-weight:900}
   #heatPanel{transform:scale(.9);transform-origin:bottom left;width:200px}
   #rightPanel{transform:scale(.9);transform-origin:top right}
   #objectiveName{display:none}
+  #banner,.toast.brief,#titleCard{width:min(48vw,330px)}
+  #banner{font-size:clamp(14px,3.2vw,23px)}
+  #tcName{font-size:clamp(18px,4vw,28px)}
   #resultsGrid{grid-template-columns:1fr}
 }
 
@@ -675,8 +724,11 @@ b{font-weight:900}
 /* Shared saved audio mixer: square neon faders in Options and pause. */
 .audioMixer.pauseAudio{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(20px*var(--m,1))}
 .audioMixer .audioChannel{--mixer-accent:#00fff0;min-width:0;padding:4px 9px 0;border-left:1px solid #00fff04d;background:linear-gradient(90deg,#00fff007,transparent)}
+.audioMixer [data-audio-channel="master"]{--mixer-accent:#ffd34a;border-left-color:#ffd34a4d;background:linear-gradient(90deg,#ffd34a08,transparent)}
+.audioMixer.pauseAudio .audioChannelMaster{grid-column:1/-1}
 .audioMixer [data-audio-channel="sfx"]{--mixer-accent:#d84fff;border-left-color:#d84fff4d;background:linear-gradient(90deg,#d84fff07,transparent)}
 .audioMixer .audioChannelHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.audioMixer .audioChannelLabel{color:var(--mixer-accent);font-size:calc(10px*var(--m,1));letter-spacing:.05em}
 .audioMixer output{font-size:calc(10px*var(--m,1));color:var(--mixer-accent);letter-spacing:.05em;font-variant-numeric:tabular-nums;text-shadow:0 0 8px color-mix(in srgb,var(--mixer-accent) 35%,transparent)}
 .audioMixer .audioVolumeLabel{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .audioMixer input[type="range"]{display:block;width:100%;height:24px;margin:0;appearance:none;-webkit-appearance:none;background:transparent;cursor:pointer;accent-color:var(--mixer-accent);touch-action:pan-y}

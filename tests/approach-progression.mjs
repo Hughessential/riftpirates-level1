@@ -25,7 +25,7 @@ try {
   page.on('console', (m) => {
     if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(m.text());
   });
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.RIFT));
   await launchRun(page);
   await page.evaluate(() => {

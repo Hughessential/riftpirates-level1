@@ -40,6 +40,16 @@ Target dummies measure direct damage and hit effects. Use enemy ships to test ki
 Preview all **18 weapon/effect sounds**, adjust bloom or restore each scene's lighting default, and queue a voxel explosion. Audio follows the game's SFX switch. Close the console to watch queued particles animate.
 Music and SFX levels can be adjusted separately from the title or pause menus and persist across visits.
 
+## Tuning and debug
+
+The Tuning tab exposes live, validated controls for player movement/survivability, weapons, enemies, graphics, and gameplay rewards. Search works across names, systems, and descriptions. Every parameter has an individual reset; each category and the complete panel can also reset to authored baselines.
+
+Named presets persist only when **Save** is pressed and live in a Testing Grounds-specific storage record. JSON export/import is portable and validated. **Apply to Game Defaults / Review** creates a non-destructive source-owner and suggested-code artifact for review; it never rewrites production configuration.
+
+The Debug tab can draw pooled hitboxes, projectile volumes, targeting/velocity paths, pickup range, formation spawn markers, arena bounds, and color-coded enemy state markers. It also provides deterministic attack, projectile-clear, enemy-destroy, restore, barrage, and explosion actions. These overlays are render-only and never enter collision, target, reward, or save systems.
+
+The desktop console can be dragged, resized, or collapsed. Double-click its header to restore automatic centering. Use arrow keys/Home/End between tabs and Ctrl/Command+K to jump to tuning search. See [the extension guide](docs/testing-grounds-tuning.md) for wiring and safety details.
+
 ## Validation
 
-`npm run test:lab` checks UI entry/search/ranks, god-mode toggling, all six hulls, all 75 augments, reversible XP/stat rebuilding, actual damage to targets, spawns, slow motion, input isolation, scene/phase jumps, cleanup, save isolation and return to normal play.
+`npm run test:lab` checks registry validation, UI entry/search/ranks, god-mode toggling, all six hulls, all 75 augments, reversible XP/stat rebuilding, live tuning behavior, actual damage to targets, debug overlays, presets/import/export, spawns, slow motion, input isolation, scene/phase jumps, cleanup, save isolation and return to normal play.

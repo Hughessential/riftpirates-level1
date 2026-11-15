@@ -13,7 +13,7 @@ try {
   await page.evaluateOnNewDocument(() => localStorage.setItem('riftpirates-level1-v1', JSON.stringify({
     pilotName:'CACHE TEST', pilotNameConfirmed:true, tutorialComplete:true, musicVolume:0, sfxVolume:0,
   })));
-  await page.goto('http://localhost:8000/', { waitUntil:'domcontentloaded', timeout:120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil:'domcontentloaded', timeout:120000 });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout:120000 });
 
   const pooled = await page.evaluate(() => {

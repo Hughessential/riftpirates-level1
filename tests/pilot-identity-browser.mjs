@@ -19,7 +19,8 @@ try {
     });
   };
   const enter = async name => page.$eval('#pilotNameInput', (el, text) => { el.value = text; el.dispatchEvent(new Event('input', { bubbles: true })); }, name);
-  await page.goto('http://localhost:8000/?lab=unlock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(new URL('?lab=unlock', process.env.RIFT_TEST_URL || 'http://localhost:8000/').href,
+    { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready();
   await page.click('#launchBtn');
   assert.equal(await page.evaluate(() => RIFT.running), false, 'Launch waits for first identity confirmation');
@@ -41,35 +42,24 @@ try {
   assert.equal(await page.evaluate(() => RIFT.running), true);
   assert.equal(await page.evaluate(() => __input.firing), false, 'Confirmation does not fire into the new run');
 
-  // The tag follows position, not cosmetic roll/size, for all six authored hulls.
-  const tags = await page.evaluate(() => {
-    const g = RIFT, original = g.player.shipId;
-    g.player.group.position.set(0, 1, 0);
-    g.camera.position.set(0, 4.6, 11); g.camera.lookAt(0, 3, -24); g.camera.updateMatrixWorld();
-    const results = [...g.hangar.models.keys()].map((id, i) => {
-      g.player.setShip(id); g.player.group.rotation.z = i; g.pilotIdentity.updateTag(g.camera, g.renderer.domElement);
-      const el = document.getElementById('playerNameTag'), rect = el.getBoundingClientRect();
-      return { id, hidden: el.hidden, text: el.textContent, x: rect.x, y: rect.y, width: rect.width, height: rect.height, pointer: getComputedStyle(el).pointerEvents };
-    });
-    g.player.setShip(original); g.player.group.rotation.z = 0;
-    return results;
+  // Identity is fixed to the stats HUD and never follows the ship through play.
+  const hudName = await page.$eval('#pilotHudName', el => {
+    const rect = el.getBoundingClientRect();
+    return { text: el.textContent, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   });
-  assert.equal(tags.length, 6);
-  for (const tag of tags) {
-    assert.equal(tag.hidden, false, tag.id); assert.match(tag.text, /José 海賊/);
-    assert.equal(tag.pointer, 'none'); assert.ok(tag.width <= 201 && tag.height <= 40);
-    assert.equal(tag.x, tags[0].x); assert.equal(tag.y, tags[0].y);
-  }
-  await page.evaluate(() => { RIFT.player.group.position.x = 10000; RIFT.pilotIdentity.updateTag(RIFT.camera, RIFT.renderer.domElement); });
-  assert.equal(await page.$eval('#playerNameTag', el => el.hidden), true, 'Offscreen ships never leave detached tags');
-  await page.evaluate(() => { RIFT.player.group.position.x = 0; RIFT.player.alive = false; RIFT.pilotIdentity.updateTag(RIFT.camera, RIFT.renderer.domElement); });
-  assert.equal(await page.$eval('#playerNameTag', el => el.hidden), true, 'Dead ship hides its tag');
-  await page.evaluate(() => { RIFT.player.alive = true; RIFT.quitRun(); });
+  assert.match(hudName.text, /José 海賊/); assert.ok(hudName.width > 0 && hudName.height > 0);
+  assert.deepEqual(await page.$$eval('.hudBarLabel', labels => labels.map(label => label.textContent)),
+    ['SHIELD', 'BOOST'], 'Secondary stats identify both compact bars');
+  await page.evaluate(() => { RIFT.player.group.position.x = 10000; });
+  assert.equal(await page.$eval('#pilotHudName', el => el.textContent), 'José 海賊',
+    'HUD identity remains readable when the ship leaves the viewport');
+  assert.equal(await page.$('#playerNameTag'), null, 'No detached world-space name tag remains');
+  assert.equal(await page.$('#pilotNameTagVisible'), null, 'Name-tag visibility setting is removed');
+  await page.evaluate(() => RIFT.quitRun());
   await page.click('#toTitleBtn');
   await page.click('#shipSelectBtn');
   await page.click('#hangarPilotName');
   await enter('NEW CAPTAIN');
-  await page.click('#pilotNameTagVisible');
   await page.click('#pilotNameConfirm');
   assert.equal(await page.evaluate(() => RIFT.runPilotName), 'José 海賊', 'Editing never rewrites the completed run identity');
   await page.click('#hangarConfirm');
@@ -77,7 +67,7 @@ try {
   await ready();
   await page.click('#pilotIdentityBtn');
   assert.equal(await page.$eval('#pilotNameInput', el => el.value), 'NEW CAPTAIN');
-  assert.equal(await page.$eval('#pilotNameTagVisible', el => el.checked), false);
+  assert.equal(await page.$('#pilotNameTagVisible'), null);
   await page.keyboard.press('Escape');
   assert.equal(await page.$eval('#pilotIdentityDialog', el => el.open), false);
   assert.equal(await page.evaluate(() => RIFT.running), false, 'Cancel never launches');
@@ -91,19 +81,19 @@ try {
   await page.click('#testingGroundsBtn');
   await page.click('[data-action="identity"]');
   await enter('LAB GHOST');
-  await page.click('#pilotNameTagVisible');
   await page.click('#pilotNameConfirm');
   assert.equal(await page.evaluate(() => RIFT.runPilotName), 'LAB GHOST');
   assert.equal(await page.evaluate(() => localStorage.getItem('riftpirates-level1-v1')), saved, 'Lab identity and visibility never persist');
   await page.click('#labExit');
   assert.equal(await page.evaluate(() => RIFT.pilotIdentity.currentName()), 'NEW CAPTAIN');
-  assert.equal(await page.evaluate(() => RIFT.pilotIdentity.tagVisible()), false);
 
-  // A touch user can recover an empty name using the explicit default choice.
+  // There is no separate bypass; players confirm the default name in the field.
   await page.click('#pilotIdentityBtn'); await enter('');
-  const point = await page.$eval('#pilotNameDefault', el => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
-  await page.touchscreen.tap(point.x, point.y);
+  await page.click('#pilotNameConfirm');
+  assert.equal(await page.$eval('#pilotIdentityDialog', el => el.open), true, 'Empty names remain invalid');
+  assert.equal(await page.$('#pilotNameDefault'), null, 'Fly as Pirate shortcut is removed');
+  await enter('PIRATE'); await page.click('#pilotNameConfirm');
   assert.equal(await page.evaluate(() => RIFT.save.data.pilotName), 'PIRATE');
   assert.deepEqual(errors, []);
-  console.log('PASS: first-use flow, safe Unicode live preview, keyboard isolation, six stable hull tags, frustum/death cleanup, hangar edit, reload, snapshots, cancellation, touch default and lab isolation.');
+  console.log('PASS: first-use flow, safe Unicode live preview, keyboard isolation, fixed HUD identity, hangar edit, reload, snapshots, cancellation, direct default confirmation and lab isolation.');
 } finally { await browser.close(); }

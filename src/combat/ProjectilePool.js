@@ -64,7 +64,11 @@ export class ProjectilePool {
     weapon = 'pulse', color, pierce = 0, splash = 0, homing = 0, target = null,
     procDepth = 0, ricochetsRemaining = 0, life = 2.6, radius, visual = null, rank = 1, power = 0 } = {}) {
     const style = WEAPON_STYLES[weapon] || WEAPON_STYLES.pulse;
-    visual ||= projectileAppearance(weapon, { rank, power, crit });
+    const speedScale = this.testing?.getTuning('playerProjectileSpeed') ?? 1;
+    const lifeScale = this.testing?.getTuning('playerProjectileLife') ?? 1;
+    const sizeScale = this.testing?.getTuning('playerProjectileSize') ?? 1;
+    speed *= speedScale; life *= lifeScale;
+    const appearance = visual || projectileAppearance(weapon, { rank, power, crit });
     const o = this._free('player');
     if (!o) {
       // A pathological build keeps its power without unbounded GPU allocation.
@@ -77,11 +81,16 @@ export class ProjectilePool {
     tz = Math.min(tz, z - .5);
     const dx = tx - x, dy = ty - y, dz = tz - z;
     const d = Math.hypot(dx, dy, dz) || 1;
+    const scaledAppearance = sizeScale === 1 ? appearance : {
+      ...appearance,
+      width: appearance.width * sizeScale,
+      length: appearance.length * Math.max(.5, sizeScale),
+    };
     Object.assign(o, { active: true, x, y, z, px: x, py: y, pz: z,
       vx: dx / d * speed, vy: dy / d * speed, vz: dz / d * speed,
-      speed, damage, crit, life, weapon, color: color || visual.color || style.color,
-      radius: radius ?? visual.radius ?? style.radius, pierce, splash, homing, target,
-      searchT: 0, procDepth, ricochetsRemaining, augmentTimeScale: 1, age: 0, visual, onEnd: null });
+      speed, damage, crit, life, weapon, color: color || scaledAppearance.color || style.color,
+      radius: (radius ?? scaledAppearance.radius ?? style.radius) * sizeScale, pierce, splash, homing, target,
+      searchT: 0, procDepth, ricochetsRemaining, augmentTimeScale: 1, age: 0, visual: scaledAppearance, onEnd: null });
     o.hitTargets.clear();
     o.mesh.visible = true; o.mesh.material.color.set(o.color);
     this._write(o);
@@ -92,6 +101,8 @@ export class ProjectilePool {
     label = 'ENEMY FIRE', heavy = false }) {
     const o = this._free('enemy');
     if (!o) return null;
+    speed *= this.testing?.getTuning('enemyProjectileSpeed') ?? 1;
+    damage *= this.testing?.getTuning('enemyDamage') ?? 1;
     const dx = tx - x, dy = ty - y, dz = tz - z;
     const d = Math.hypot(dx, dy, dz) || 1;
     Object.assign(o, { active: true, x, y, z, px: x, py: y, pz: z,

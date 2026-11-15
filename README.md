@@ -22,8 +22,10 @@ npm start          # Vite dev server on port 8000
 Then open **http://localhost:8000/index.html** and press **LAUNCH RUN**.
 For the developer sandbox, open **http://localhost:8000/?lab=1**, click **TESTING GROUNDS**, or press **F2**.
 It includes god mode, all ships, editable ranks for all 75 augments, enemy/target spawning,
-every encounter and boss phase, slow motion, and lighting/sound previews. Test progress is never banked.
-See [the Testing Grounds guide](TESTING_GROUNDS.md); run its checks with `npm run test:lab`.
+every encounter and boss phase, slow motion, live developer tuning, debug gizmos, presets,
+and lighting/sound previews. Test progress is never banked.
+See [the Testing Grounds guide](TESTING_GROUNDS.md) and [tuning extension guide](docs/testing-grounds-tuning.md);
+run its checks with `npm run test:lab`.
 
 Use **CHANGE SHIP** on the title screen to browse the six supplied voxel hulls.
 The hangar shows their actual recolored geometry; all ships share identical
@@ -187,7 +189,8 @@ The escape now escalates through five assault stages: up to 40 live attackers,
 reinforcing formations, a surrounding capital fleet breaking apart, expanding
 blast rings and dense glowing wreckage. Required cyan openings remain visible
 as the armada and destruction intensify toward the final rift.
-Music and SFX both start at 75%. Separate volume sliders and mute controls on
+Master volume starts at 100%; music and SFX both start at 75%. Shared master plus
+separate channel sliders and mute controls on
 the title and pause menus save your preferred mix across visits.
 
 Imported models are loaded before launch, share cached geometry, and fall back

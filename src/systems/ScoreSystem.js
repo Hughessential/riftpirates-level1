@@ -39,7 +39,7 @@ export class ScoreSystem {
   /** Base value in, multiplied value out. */
   add(base, reason = 'SCORE') {
     const mult = this.game.heat.multiplier;
-    const awarded = Math.round(base * mult);
+    const awarded = Math.round(base * mult * (this.game.testing?.getTuning('scoreGain') ?? 1));
     this.total += awarded;
     this.breakdown[reason] = (this.breakdown[reason] || 0) + awarded;
     return awarded;
@@ -47,9 +47,10 @@ export class ScoreSystem {
 
   /** Bypasses the multiplier — used for end-of-run bonuses. */
   addFlat(amount, reason = 'BONUS') {
-    this.total += Math.round(amount);
-    this.breakdown[reason] = (this.breakdown[reason] || 0) + Math.round(amount);
-    return amount;
+    const awarded = Math.round(amount * (this.game.testing?.getTuning('scoreGain') ?? 1));
+    this.total += awarded;
+    this.breakdown[reason] = (this.breakdown[reason] || 0) + awarded;
+    return awarded;
   }
 
   grade() {

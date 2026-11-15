@@ -16,15 +16,13 @@ try {
   const page = await browser.newPage();
   await page.setViewport({ width:1280, height:800 });
   await page.evaluateOnNewDocument(() => localStorage.setItem('riftpirates-level1-v1', JSON.stringify({
-    pilotName:'SCALE TEST', pilotNameConfirmed:true, nameTagVisible:true, tutorialComplete:true,
+    pilotName:'SCALE TEST', pilotNameConfirmed:true, tutorialComplete:true,
     uiScale:.8, musicVolume:0, sfxVolume:0,
   })));
-  await page.goto('http://localhost:8000/', { waitUntil:'domcontentloaded', timeout:120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil:'domcontentloaded', timeout:120000 });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout:120000 });
 
   const sample = () => page.evaluate(() => {
-    const tag = document.getElementById('playerNameTag');
-    tag.hidden = false; tag.style.transform = 'translate3d(640px,360px,0) translateX(-50%)';
     RIFT.controllerMenus.hint.hidden = false;
     RIFT.controllerMenus.audioHint.hidden = false;
     const rect = selector => {
@@ -34,7 +32,7 @@ try {
     return {
       main:rect('.menuMain'), launch:rect('#launchBtn'), footer:rect('.menuFooter'),
       boss:rect('#bossIntro'), bossTitle:rect('#bossIntroTitle'),
-      pilot:rect('#playerNameTag'), controller:rect('.controllerHint'), audio:rect('.controllerAudioHint'),
+      pilot:rect('#pilotHudName'), controller:rect('.controllerHint'), audio:rect('.controllerAudioHint'),
     };
   });
   await page.evaluate(() => {
@@ -42,9 +40,8 @@ try {
     boss.hidden = false;
     boss.style.setProperty('--intro-in','1'); boss.style.setProperty('--intro-title','1');
     document.getElementById('bossIntroTitle').innerHTML = '<span>NEXUS</span><span>ADMIRAL</span>';
-    const tag = document.getElementById('playerNameTag');
-    tag.hidden = false; tag.querySelector('strong').textContent = 'SCALE TEST';
-    tag.style.transform = 'translate3d(640px,360px,0) translateX(-50%)';
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('pilotHudName').textContent = 'SCALE TEST';
     RIFT.controllerMenus.hint.hidden = false;
     RIFT.controllerMenus.audioHint.hidden = false;
   });
@@ -66,7 +63,7 @@ try {
   assert.ok(Math.abs(large.boss.width - 1280) < 1 && Math.abs(large.boss.height - 800) < 1,
     'Scaled boss cinematic still covers exactly one viewport');
   assert.ok(large.bossTitle.height > small.bossTitle.height * 1.6, 'Boss cinematic typography honors UI scale');
-  assert.ok(large.pilot.width > small.pilot.width * 1.45, 'Standalone pilot tag honors UI scale');
+  assert.ok(large.pilot.width > small.pilot.width * 1.45, 'Stats-HUD pilot name honors UI scale');
   assert.ok(large.controller.width > small.controller.width * 1.45, 'Controller hint honors UI scale');
   assert.ok(large.audio.width > small.audio.width * 1.45, 'Controller audio hint honors UI scale');
 

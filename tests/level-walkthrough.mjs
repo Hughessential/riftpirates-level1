@@ -24,7 +24,7 @@ await page.setViewport({ width: 1440, height: 900 });
 page.on('pageerror', (e) => errors.push(`${e.message} :: ${(e.stack || '').split('\n')[1]?.trim()}`));
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(`console: ${m.text()}`); });
 
-await page.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
+await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => Boolean(window.RIFT));
 await launchRun(page);
 

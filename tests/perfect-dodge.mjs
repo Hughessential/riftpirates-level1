@@ -13,7 +13,7 @@ try {
   await page.setViewport({ width: 1280, height: 800 });
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   await launchRun(page);
 

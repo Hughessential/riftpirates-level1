@@ -3,6 +3,8 @@ import { P } from '../core/Palette.js';
 import { buildVoxels, box, dedupe, glowSprite } from './VoxelBuilder.js';
 import { clamp, TAU } from '../core/Utils.js';
 
+export const LANE_GUIDE_COLOR = '#ff6a18';
+
 const noise = (x, y = 0, z = 0) => {
   const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
   return n - Math.floor(n);
@@ -264,7 +266,14 @@ export class ApproachScenery {
     box(beacon, 0, 0, 5, 7, 0, 0, P.steel);
     const prototype = buildVoxels(beacon, 0.9, { outline: 1, castShadow: false, receiveShadow: false });
     const lampGeometry = new THREE.BoxGeometry(1.05, 2.5, 1.05);
-    const lamp = new THREE.Mesh(lampGeometry, this.energyMaterial);
+    // Navigation fixtures keep a dedicated orange identity. They must never
+    // inherit the cyan/encounter color used by loot, objectives and the distant
+    // fortress, or the lane becomes visually ambiguous at combat speed.
+    this.guideMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(LANE_GUIDE_COLOR).multiplyScalar(2.6),
+      fog: false,
+    });
+    const lamp = new THREE.Mesh(lampGeometry, this.guideMaterial);
     lamp.position.y = 5.5;
     prototype.add(lamp);
     this.beaconRows = [];
@@ -273,7 +282,7 @@ export class ApproachScenery {
       for (const side of [-1, 1]) {
         const pylon = prototype.clone();
         pylon.position.set(side * 30, -8, 0);
-        const flare = glowSprite(P.cyan, 5, 0.3);
+        const flare = glowSprite(LANE_GUIDE_COLOR, 5, 0.34);
         flare.position.set(side * 30, -2.5, 0.7);
         pair.add(pylon, flare);
       }
@@ -293,11 +302,6 @@ export class ApproachScenery {
     this.color.set(color);
     this.energyMaterial.color.copy(this.color).multiplyScalar(2.4);
     this.halo.material.color.copy(this.color);
-    for (const pair of this.beaconRows) {
-      for (const child of pair.children) {
-        if (child.isSprite) child.material.color.copy(this.color);
-      }
-    }
     // Destination grows naturally in perspective as the three caches are won.
     this.fortress.position.set(0, -16, -245 + this.progress * 122);
   }

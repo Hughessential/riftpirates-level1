@@ -21,7 +21,7 @@ try {
   await page.setViewport({ width: 1440, height: 900 });
   page.on('pageerror', e => errors.push(e.message));
   await page.evaluateOnNewDocument(data => localStorage.setItem('riftpirates-level1-v1', JSON.stringify(data)), legacy);
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   assert.deepEqual(await page.evaluate(() => window.RIFT.save.data), migratedLegacy, 'Existing progress and mute settings survive; new volume controls receive defaults');
   await launchRun(page);
@@ -309,7 +309,9 @@ try {
     if (decodeURIComponent(req.url()).endsWith('/music/The Very Very End.mp3')) { blockedFinale++; req.abort(); }
     else req.continue();
   });
-  await silentPage.goto('http://localhost:8000/?lab=unlock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  const silentURL = new URL(process.env.RIFT_TEST_URL || 'http://localhost:8000/');
+  silentURL.searchParams.set('lab', 'unlock');
+  await silentPage.goto(silentURL.href, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await silentPage.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled,
     { timeout: 120000 });
   await silentPage.click('#testingGroundsBtn');

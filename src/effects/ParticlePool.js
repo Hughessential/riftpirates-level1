@@ -135,12 +135,17 @@ export class ParticlePool {
    *  arcColor- lightning tint
    */
   explode(x, y, z, o = {}) {
-    const count = o.count ?? 16;
+    const countScale = this.testing?.getTuning('particleCount') ?? 1;
+    const sizeScale = this.testing?.getTuning('particleSize') ?? 1;
+    const speedScale = this.testing?.getTuning('particleSpeed') ?? 1;
+    const lifeScale = this.testing?.getTuning('particleLifetime') ?? 1;
+    const count = Math.round((o.count ?? 16) * countScale);
     const colors = o.colors ?? [P.orange, P.gold, '#FFE8A3', P.red];
-    const power = o.power ?? 11;
+    const power = (o.power ?? 11) * speedScale;
     const gravity = o.gravity ?? 1;
     const spread = o.spread ?? 0.5;
-    const scale = o.scale ?? 1;
+    const scale = (o.scale ?? 1) * sizeScale;
+    this.sparkPts.material.size = .55 * sizeScale;
 
     const col = this.chunkMesh.instanceColor.array;
     const n = Math.min(count, CHUNKS);
@@ -153,7 +158,7 @@ export class ParticlePool {
       ids.push(i);
       b.on = true;
       b.t = 0;
-      b.T = rand(0.5, 1.2) * (o.life ?? 1);
+      b.T = rand(0.5, 1.2) * (o.life ?? 1) * lifeScale;
       b.px = x + rand(-spread, spread);
       b.py = y + rand(-spread, spread);
       b.pz = z + rand(-spread, spread);
@@ -182,7 +187,7 @@ export class ParticlePool {
     this.chunkMesh.instanceColor.needsUpdate = true;
 
     // sparks
-    const sN = Math.min(Math.round(n * 1.4) + 6, 60);
+    const sN = countScale > 0 ? Math.min(Math.round(n * 1.4) + 6, 60) : 0;
     const spa = this.sparkPts.geometry.attributes.position.array;
     for (let s = 0; s < sN; s++) {
       const si = this.sparkCursor;
@@ -197,7 +202,7 @@ export class ParticlePool {
       spa[si * 3] = x;
       spa[si * 3 + 1] = y;
       spa[si * 3 + 2] = z;
-      this.sparkLife[si] = this.sparkMax[si] = rand(0.5, 1.1);
+      this.sparkLife[si] = this.sparkMax[si] = rand(0.5, 1.1) * lifeScale;
       this._c.set(pick(o.sparkColors ?? this.SPARK_COLS));
       this.sparkBase[si * 3] = this._c.r;
       this.sparkBase[si * 3 + 1] = this._c.g;
@@ -215,8 +220,8 @@ export class ParticlePool {
     this.flashCursor = (this.flashCursor + 1) % this.flashes.length;
     f.on = true;
     f.t = 0;
-    f.T = o.flashTime ?? 0.22;
-    f.scale = o.flashScale ?? 1;
+    f.T = (o.flashTime ?? 0.22) * lifeScale;
+    f.scale = (o.flashScale ?? 1) * sizeScale;
     f.sp.visible = true;
     f.sp.material.color.set(o.flashColor ?? 0xffffff);
     f.sp.position.set(x, y, z);

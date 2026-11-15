@@ -110,14 +110,14 @@ export class PlayerWeapon {
     this.cooldown += 1 / output.fireRate;
     // Overcharge removes the ordinary weapon cadence, retaining a 45Hz spawn
     // ceiling. A slow frame carries the missing emissions as damage instead.
-    let damage = output.damage * (p.cosmicEffects?.directDamageMultiplier() || 1)
+    let damage = output.damage * (ctx.testing?.getTuning('playerDamage') ?? 1) * (p.cosmicEffects?.directDamageMultiplier() || 1)
       * (absolute ? Math.max(1,45*dt) : 1);
     this.signature = weaponPowerSignature(s, { heatMultiplier: ctx.heat.multiplier,
       shield: p.shield, treasureCharge: p.treasureCharge, shot: this.shots });
     p.treasureCharge = 0;
     const mark = p.cosmicEffects?.critBonus(target) || { chance: 0, multiplier: 0 };
-    const crit = chance(Math.min(1,s.criticalChance + mark.chance));
-    if (crit) damage *= s.criticalMultiplier + mark.multiplier;
+    const crit = chance(Math.min(1,s.criticalChance + mark.chance + (ctx.testing?.getTuning('criticalChance', 0) ?? 0)));
+    if (crit) damage *= (s.criticalMultiplier + mark.multiplier) * (ctx.testing?.getTuning('criticalDamage') ?? 1);
     const t = target?.pos && target.pos.z < -2 ? target.pos : { x: p.x, y: p.y + .05, z: -90 };
     this.muzzle *= -1; this.shots++;
     const showcase = this.pendingShowcase;

@@ -15,7 +15,7 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
 
   const started = performance.now();
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT?.hangar && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   const readyMs = performance.now() - started;
   const startup = await page.evaluate(() => ({

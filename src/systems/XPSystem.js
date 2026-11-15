@@ -24,7 +24,7 @@ export class XPSystem {
 
   add(amount) {
     if (this.level >= MAX_LEVEL) return;
-    this.xp += amount;
+    this.xp += amount * (this.game.testing?.getTuning('xpGain') ?? 1);
     while (this.xp >= this.next && this.level < MAX_LEVEL) {
       this.xp -= this.next;
       this.level += 1;

@@ -3,8 +3,9 @@ import * as THREE from 'three';
 import { EngineTrail, ENGINE_TRAIL_PROFILE } from '../src/effects/EngineTrail.js';
 import { Player } from '../src/player/Player.js';
 import { P } from '../src/core/Palette.js';
+import { ApproachScenery, LANE_GUIDE_COLOR } from '../src/render/ApproachScenery.js';
 
-const makeTrailFixture = boosting => {
+const makeTrailFixture = (boosting, braking = false) => {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, .1, 200);
   camera.position.set(0, 4.6, 11);
@@ -18,7 +19,7 @@ const makeTrailFixture = boosting => {
     return engine;
   });
   scene.add(group);
-  const player = { alive: true, boosting, vx: 0, vy: 0, group, engines };
+  const player = { alive: true, boosting, braking, vx: 0, vy: 0, group, engines };
   const trail = new EngineTrail(scene);
   for (let i = 0; i < 60; i++) trail.update(1 / 60, player, camera);
   const active = trail.particles.filter(p => p.life > 0);
@@ -39,11 +40,32 @@ assert.ok(ENGINE_TRAIL_PROFILE.normal.velocity < ENGINE_TRAIL_PROFILE.boost.velo
 
 const normal = makeTrailFixture(false);
 const boost = makeTrailFixture(true);
+const brake = makeTrailFixture(false, true);
 assert.ok(normal.active.length > 0 && boost.active.length > normal.active.length * 4,
   'The pooled boost plume is visibly denser than normal thrust');
 assert.ok(boost.length > normal.length * 2.5, 'Boost produces a much longer world-space trail');
 assert.ok(normal.meanMix < .05 && boost.meanMix > .8, 'New particles retain their correct cyan or ignition palette state');
 assert.equal(normal.trail.particles.length, boost.trail.particles.length, 'Both states retain the fixed particle budget');
+const brakeIndex = brake.trail.particles.findIndex(p => p.life > 0);
+const brakeColor = new THREE.Color();
+brake.trail.core.getColorAt(brakeIndex, brakeColor);
+assert.ok(brake.trail.brakeMix > .9 && brakeColor.r > brakeColor.b && brakeColor.b > brakeColor.g * 2,
+  'Cut thrust recolors the live particle plume pink');
+
+const approach = new ApproachScenery(new THREE.Scene());
+const guideBefore = approach.guideMaterial.color.toArray();
+const flare = approach.beaconRows[0].children.find(child => child.isSprite);
+assert.equal(flare.material.color.getHex(), new THREE.Color(LANE_GUIDE_COLOR).getHex(),
+  'Lane guide flares use the dedicated neon-orange palette');
+assert.ok(guideBefore[0] > guideBefore[1] * 2 && guideBefore[1] > guideBefore[2] * 2,
+  'Lane guide lamps read as orange rather than cyan or loot gold');
+approach.setProgress(.5, P.violet);
+assert.deepEqual(approach.guideMaterial.color.toArray(), guideBefore,
+  'Encounter progress cannot recolor the lane guide lamps');
+assert.equal(flare.material.color.getHex(), new THREE.Color(LANE_GUIDE_COLOR).getHex(),
+  'Encounter progress cannot recolor the lane guide flares');
+assert.notDeepEqual(approach.energyMaterial.color.toArray(), guideBefore,
+  'Destination lighting remains independent from navigation beacons');
 
 const fx = { explode() {}, jet() {} };
 const player = new Player(new THREE.Scene(), fx);
@@ -63,4 +85,4 @@ assert.equal(player.reticleRing.material.color.getHex(), new THREE.Color(P.gold)
 player.setReticleActive(false);
 assert.equal(player.reticle.visible, false, 'Non-flight screens can hide the reticle immediately');
 
-console.log('PASS: compact cyan normal exhaust, long hot boost wake, bounded pooling, and an always-ready flat reticle.');
+console.log('PASS: compact cyan normal exhaust, long hot boost wake, pink cut-thrust plume, orange lane guides, bounded pooling, and an always-ready flat reticle.');

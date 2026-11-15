@@ -15,7 +15,7 @@ const ready = page => page.waitForFunction(
 );
 const confirmLaunch = async page => {
   await page.click('#launchBtn');
-  if (await page.$('#pilotIdentityDialog[open]')) await page.click('#pilotNameDefault');
+  if (await page.$('#pilotIdentityDialog[open]')) await page.click('#pilotNameConfirm');
   await page.waitForFunction(() => RIFT.running, { timeout: 30000 });
 };
 
@@ -31,7 +31,7 @@ try {
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   await page.setViewport({ width: 1440, height: 900 });
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready(page);
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -66,6 +66,20 @@ try {
   assert.match(initial.title, /1\/9.*TAKE THE HELM/);
   assert.match(initial.copy, /WASD|ARROW/);
   assert.equal(initial.transition, '0s', 'Tutorial presentation honors reduced motion');
+
+  const tutorialLayout = await page.evaluate(() => {
+    const route = document.getElementById('approachPanel').getBoundingClientRect();
+    const panel = document.getElementById('openingTutorial').getBoundingClientRect();
+    const instruction = document.querySelector('.toast.instruction').getBoundingClientRect();
+    return { routeBottom: route.bottom, panelTop: panel.top, panelBottom: panel.bottom,
+      instructionTop: instruction.top, viewportHeight: innerHeight };
+  });
+  assert.ok(tutorialLayout.panelTop >= tutorialLayout.routeBottom,
+    `First-flight panel sits beneath the route HUD: ${JSON.stringify(tutorialLayout)}`);
+  assert.ok(tutorialLayout.instructionTop >= tutorialLayout.panelBottom,
+    `Instructional popup stacks beneath the first-flight panel: ${JSON.stringify(tutorialLayout)}`);
+  assert.ok(tutorialLayout.instructionTop < tutorialLayout.viewportHeight / 2,
+    `Instructional messages stay in the top-center reading lane: ${JSON.stringify(tutorialLayout)}`);
 
   const controllerCopy = await page.evaluate(() => {
     window.__tutorialPad = { id:'Tutorial Controller',index:0,connected:true,mapping:'standard',axes:[0,0,0,0],
@@ -196,6 +210,26 @@ try {
   assert.deepEqual([cache.open, cache.offers, cache.saw], [true, 3, true], 'Tutorial uses the normal three-card cache');
   assert.match(cache.title, /9\/9.*INSTALL AN AUGMENT/);
   assert.match(cache.copy, /HOLD SPACE/);
+  const cacheLayout = await page.evaluate(() => {
+    const panel = document.getElementById('openingTutorial').getBoundingClientRect();
+    const title = document.querySelector('#openingTutorial strong');
+    const copy = document.querySelector('#openingTutorial p');
+    const cards = [...document.querySelectorAll('#upgradeCards .upCard')].map(card => card.getBoundingClientRect());
+    const overlap = cards.some(card => panel.left < card.right && panel.right > card.left &&
+      panel.top < card.bottom && panel.bottom > card.top);
+    return { overlap, viewportWidth: innerWidth, center: panel.left + panel.width / 2,
+      titleSize: parseFloat(getComputedStyle(title).fontSize), copySize: parseFloat(getComputedStyle(copy).fontSize),
+      panel: { left: panel.left, top: panel.top, right: panel.right, bottom: panel.bottom, width: panel.width },
+      cards: cards.map(card => ({ left: card.left, top: card.top, right: card.right, bottom: card.bottom })) };
+  });
+  assert.equal(cacheLayout.overlap, false,
+    `Augment lesson must not cover any offer card: ${JSON.stringify(cacheLayout)}`);
+  assert.ok(Math.abs(cacheLayout.center - cacheLayout.viewportWidth / 2) <= 2,
+    `Augment lesson stays centered at the top of the viewport: ${JSON.stringify(cacheLayout)}`);
+  assert.ok(cacheLayout.panel.width >= Math.min(700, cacheLayout.viewportWidth * .8),
+    `Augment lesson is wide enough to read comfortably: ${JSON.stringify(cacheLayout)}`);
+  assert.ok(cacheLayout.titleSize >= 14 && cacheLayout.copySize >= 9,
+    `Augment lesson uses readable title and body text: ${JSON.stringify(cacheLayout)}`);
   await page.evaluate(() => document.querySelector('#upgradeCards .upCard').click());
   await page.evaluate(() => __tutorialUpdate(.3));
   const complete = await page.evaluate(() => ({
@@ -216,7 +250,7 @@ try {
   // Automation/screenshot runs can bypass onboarding without mutating the save.
   const autoPage = await browser.newPage();
   autoPage.on('pageerror', error => errors.push(error.message));
-  await autoPage.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await autoPage.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready(autoPage);
   await autoPage.evaluate(() => localStorage.clear());
   await autoPage.reload({ waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -238,7 +272,8 @@ try {
   // Explicit QA force still wins over both webdriver bypass and a completed save.
   const forcedPage = await browser.newPage();
   forcedPage.on('pageerror', error => errors.push(error.message));
-  await forcedPage.goto('http://localhost:8000/?tutorial=1', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await forcedPage.goto(new URL('?tutorial=1', process.env.RIFT_TEST_URL || 'http://localhost:8000/').href,
+    { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready(forcedPage);
   await forcedPage.evaluate(() => {
     RIFT.save.data.tutorialComplete = true;

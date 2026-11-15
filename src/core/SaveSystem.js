@@ -7,7 +7,7 @@ import { PILOT_IDENTITY_DEFAULTS, validatePilotName } from './PilotName.js';
 
 const KEY = 'riftpirates-level1-v1';
 
-export const AUDIO_DEFAULTS = { musicVolume: .75, sfxVolume: .75 };
+export const AUDIO_DEFAULTS = { masterVolume: 1, musicVolume: .75, sfxVolume: .75 };
 export const clampAudioVolume = (value, fallback) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
 export const UI_SCALE_DEFAULT = 1.1;
@@ -79,7 +79,6 @@ export const Save = {
     const pilot = validatePilotName(this.data.pilotName);
     this.data.pilotName = pilot.valid ? pilot.name : PILOT_IDENTITY_DEFAULTS.pilotName;
     this.data.pilotNameConfirmed = pilot.valid && this.data.pilotNameConfirmed === true;
-    this.data.nameTagVisible = this.data.nameTagVisible !== false;
     return this.data;
   },
 

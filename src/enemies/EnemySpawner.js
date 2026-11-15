@@ -39,7 +39,8 @@ class Enemy {
     this.vx = 0;
     this.vy = 0;
     this.radius = t.radius;
-    this.contactDamage = t.contactDamage;
+    const tune = key => game.testing?.getTuning(key) ?? 1;
+    this.contactDamage = t.contactDamage * tune('enemyDamage');
     this.sector = enemySector(game.director?.state);
     this.hpScale = (opts.hpScale ?? 1) * (1 + this.sector * .12);
     this.damagePressure = 1 + this.sector * .08;
@@ -86,7 +87,7 @@ class Enemy {
 
     this.target = new Target({
       object3D: this.mesh,
-      hp: t.hp * this.hpScale,
+      hp: t.hp * this.hpScale * tune('enemyHealth'),
       radius: t.radius,
       priority: t.highPriority ? PRIORITY.ENEMY - 4 : PRIORITY.ENEMY,
       kind: 'enemy',
@@ -173,6 +174,9 @@ class Enemy {
     this.augmentSlowT = Math.max(0, this.augmentSlowT - dt);
     if (!this.augmentSlowT) this.augmentSlowFactor = 1;
     dt *= slow;
+    const moveScale = game.testing?.getTuning('enemySpeed') ?? 1;
+    const actionDt = dt;
+    dt *= moveScale;
     this.phase += dt;
 
     // --- movement ---
@@ -274,6 +278,8 @@ class Enemy {
 
     this.mesh.position.set(this.x, this.y, this.z);
 
+    // Movement and firing have independent tuning clocks.
+    dt = actionDt;
     // --- firing ---
     if (t.projectileDamage > 0 && this.special?.phase !== 'windup') {
       if (this.burstLeft > 0) {
@@ -294,11 +300,15 @@ class Enemy {
       } else {
         this.fireT -= dt;
         if (this.fireT <= 0) {
-          this.fireT = t.fireInterval * this.firePressure * rand(0.85, 1.2) * (game.difficulty?.fireScale ?? 1);
+          this.fireT = t.fireInterval * this.firePressure * rand(0.85, 1.2) * (game.difficulty?.fireScale ?? 1)
+            / (game.testing?.getTuning('enemyFireRate') ?? 1);
           this.burstLeft = t.burst;
           // Snapshot the aim, then give the player a visible charge window.
           // A burst never tracks their dodge after the warning has started.
-          this.burstAim = { x: p.x + p.vx * 0.12, y: p.y + p.vy * 0.12 };
+          const accuracy = game.testing?.getTuning('enemyAccuracy') ?? 1;
+          const miss = Math.max(0, 1 - accuracy) * 8;
+          this.burstAim = { x: p.x + p.vx * 0.12 * accuracy + rand(-miss, miss),
+            y: p.y + p.vy * 0.12 * accuracy + rand(-miss, miss) };
           this.burstT = 0.32;
         }
       }

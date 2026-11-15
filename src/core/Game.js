@@ -181,6 +181,7 @@ export class Game {
     this.player.takeDamage = (amount, source) => {
       if (this._terminalOutcome) return false;
       if (this.testing.active && this.testing.settings.godMode && !this.testing.bypassGod) return false;
+      if (this.testing.active) amount *= this.testing.getTuning('damageTaken');
       const before = this.player.health;
       const hit = takeDamage(amount, source);
       if (hit) {
@@ -227,13 +228,22 @@ export class Game {
     applyDisplayLayout(this.display);
     this.camera.aspect = this.display.aspect;
     this.camera.updateProjectionMatrix();
-    this.renderer.setPixelRatio(this.display.pixelRatio * this.adaptiveResolution.scale);
-    this.renderer.setSize(this.display.width, this.display.height);
-    this.presentation.setSize(this.display.width, this.display.height);
+    this._syncRenderResolution(true);
     this.worldShowcase.resize(this.camera.aspect);
     // A viewport resize may arrive before the media-query change event when
     // moving between displays. Rebind immediately so a rapid return is caught.
     if (this._watchedDensity !== (devicePixelRatio || 1)) this._watchDisplayDensity();
+  }
+
+  /** Keep renderer and post-processing resolution on one canonical scale. */
+  _syncRenderResolution(resizeRenderer = false) {
+    const testingScale = this.testing?.getTuning('renderScale') ?? 1;
+    const textureLimit = this.renderer.capabilities.maxTextureSize / Math.max(this.display.width, this.display.height);
+    const pixelRatio = Math.min(textureLimit,
+      this.display.pixelRatio * this.adaptiveResolution.scale * testingScale);
+    this.renderer.setPixelRatio(pixelRatio);
+    if (resizeRenderer) this.renderer.setSize(this.display.width, this.display.height);
+    this.presentation?.setSize(this.display.width, this.display.height);
   }
 
   _watchDisplayDensity() {
@@ -250,7 +260,6 @@ export class Game {
     if (this._watchedDensity !== (devicePixelRatio || 1)) this._resize();
     this._updateLighting(dt);
     this.presentation.render(dt);
-    this.pilotIdentity?.updateTag(this.camera, this.renderer.domElement);
   }
 
   /** Cross-fades the whole arena into each objective's identity color. */
@@ -269,8 +278,9 @@ export class Game {
     this.riftPool.color.copy(mood.color);
     this.riftPool.intensity = mood.energy;
     this.voidFill.color.copy(mood.color);
-    this.presentation.setBloom(this.testing?.active && this.testing.settings.bloom !== null
-      ? this.testing.settings.bloom : mood.bloom);
+    const authoredBloom = this.testing?.active && this.testing.settings.bloom !== null
+      ? this.testing.settings.bloom : mood.bloom;
+    this.presentation.setBloom(authoredBloom * (this.testing?.getTuning('bloom') ?? 1));
   }
 
   // ------------------------------------------------------------------ helpers
@@ -354,7 +364,6 @@ export class Game {
     this.clearHazards();
     this.projectiles.reset();
     this.player.frozen = true;
-    this.pilotIdentity?.hideTag();
     Audio2.playVictory();
     this.director.go(STATE.VICTORY);
     // Settle immediately; decorative staging must never hold up saving.
@@ -381,6 +390,14 @@ export class Game {
     if (this.director.state === STATE.ESCAPE) Audio2.syncEscapeTime(this.escape.elapsed);
   }
 
+  _syncPauseControl() {
+    const button = $('pauseBtn');
+    button.classList.toggle('isPaused', this.paused);
+    button.setAttribute('aria-label', this.paused ? 'Resume game' : 'Pause game');
+    button.setAttribute('aria-pressed', String(this.paused));
+    this.hud.el.hud.classList.toggle('paused', this.paused);
+  }
+
   // ------------------------------------------------------------------- run flow
 
   prepareTitle() {
@@ -392,12 +409,12 @@ export class Game {
     this.resultsScreen.hide();
     this.death.end();
     this.pilotIdentity?.resetSession();
-    this.pilotIdentity?.hideTag();
     this._terminalOutcome = null;
     this.testRun = false;
     this.running = false;
     this.titleMode = true;
     this.paused = false;
+    this._syncPauseControl();
     this.scheduler.clear();
     this.upgradeScreen.hide();
     this.enemies.clear();
@@ -442,6 +459,7 @@ export class Game {
     this.time = 0;
     this.runTime = 0;
     this.paused = false;
+    this._syncPauseControl();
     this.running = true;
     this.titleMode = false;
     this.env.livingDebris.group.visible = true;
@@ -501,7 +519,6 @@ export class Game {
   _onPlayerDeath(source) {
     if (!this.running || this.player.alive || this._terminalOutcome || this._resultsFinalized || this.death.active) return;
     this._terminalOutcome = 'defeat';
-    this.pilotIdentity?.hideTag();
     Audio2.playDeath();
     this.director.clearPresentation();
     this.escape.dispose();
@@ -529,12 +546,12 @@ export class Game {
     this.enemies.clear();
     this.clearHazards();
     this.projectiles.reset();
-    this.pilotIdentity?.hideTag();
     this._resultsFinalized = true;
     this.escape.dispose();
     this.player.exhaust.reset();
     this.running = false;
     this.paused = false;
+    this._syncPauseControl();
     $('pauseScreen').classList.add('hidden');
     Input.enabled = false;
     this.upgradeScreen.hide();
@@ -558,6 +575,7 @@ export class Game {
       return;
     }
     this.paused = !this.paused;
+    this._syncPauseControl();
     pauseScreen.classList.toggle('hidden', !this.paused || !showMenu);
     if (this.paused) this.upgradeScreen.cancelHoldForPause();
     Input.enabled = !this.paused && !this.director.inUpgrade && !this.director.intro.active && !this.testing?.panelOpen;
@@ -572,6 +590,7 @@ export class Game {
 
   quitRun() {
     this.paused = false;
+    this._syncPauseControl();
     $('pauseScreen').classList.add('hidden');
     this.running = false;
     Input.enabled = false;
@@ -611,8 +630,7 @@ export class Game {
       !this.director.intro.active && !this.director.inUpgrade && !this.upgradeScreen.open &&
       !this.upgradeScreen.closing && !this.death.active;
     if (this.adaptiveResolution.update(rawDt, qualityEligible)) {
-      this.renderer.setPixelRatio(this.display.pixelRatio * this.adaptiveResolution.scale);
-      this.presentation.setSize(this.display.width, this.display.height);
+      this._syncRenderResolution();
     }
 
     // connect/disconnect notice — #toasts sits outside the HUD, so this is

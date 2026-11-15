@@ -16,7 +16,7 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 page.on('pageerror', (e) => errors.push(`${e.message} :: ${(e.stack || '').split('\n')[1]?.trim()}`));
 
-await page.goto('http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
+await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/index.html', { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled);
 await new Promise((r) => setTimeout(r, 700));
 await launchRun(page);

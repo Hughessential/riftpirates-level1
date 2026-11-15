@@ -22,16 +22,26 @@ hud.el={hud:element(),banner:element(),toasts:container,scrap:element()}; hud.sc
 
 hud.banner('LEARN TO MOVE','#27f5da',{category:'instruction'});
 assert.equal(hud._bannerLife,HUD_NOTICE_DURATIONS.instruction);
-hud._updateNotices(4.9); assert.equal(hud.el.banner.classList.contains('show'),true,'Instruction remains after brief notices expire');
+hud._updateNotices(7.4); assert.equal(hud.el.banner.classList.contains('show'),true,'Instruction remains after brief notices expire');
 hud._updateNotices(.11); assert.equal(hud.el.banner.classList.contains('show'),false,'Instruction expires on game time');
+
+hud.banner('SECTOR SECURED','#27f5da');
+assert.equal(hud._bannerLife,HUD_NOTICE_DURATIONS.brief);
 
 hud.toast('MOVE','WASD OR LEFT STICK','#27f5da',{category:'instruction'});
 const first=container.firstChild;
 hud.toast('FIRE','SPACE OR RT','#27f5da',{category:'instruction',duration:6});
 assert.equal(first.parentElement,null,'New tutorial step predictably replaces the old instruction');
-assert.equal(container.children.length,1); assert.equal(hud._toastItems[0].remaining,6);
-hud._updateNotices(5.9); assert.equal(container.children.length,1);
+assert.equal(container.children.length,1); assert.equal(hud._toastItems[0].remaining,HUD_NOTICE_DURATIONS.instruction);
+hud._updateNotices(7.4); assert.equal(container.children.length,1);
 hud._updateNotices(.11); assert.equal(container.children.length,0);
+
+const briefCards=[];
+for(let i=1;i<=4;i++){hud.toast(`NOTICE ${i}`,'READABLE CARD','#ffd34f');briefCards.push(container.children.at(-1));}
+assert.equal(container.children.length,3,'Left comms rail keeps at most three standard cards');
+assert.equal(briefCards[0].parentElement,null,'The oldest standard card retires before the rail can become a wall');
+hud.clearNotices();
+container.children.length=0; // the minimal DOM stub does not implement innerHTML removal
 
 // Title/results do not tick HUD game time. Their instructional notices get a
 // bounded wall fallback instead of remaining over the menu indefinitely.
@@ -41,7 +51,7 @@ global.setTimeout=(callback,delay)=>{wallCallback=callback;wallDelay=delay;retur
 global.clearTimeout=()=>{};
 hud.game.running=false;
 hud.toast('FIRST FLIGHT ARMED','Begins next run','#27f5da',{category:'instruction',duration:4.2});
-assert.equal(wallDelay,4200); assert.equal(container.children.length,1);
+assert.equal(wallDelay,HUD_NOTICE_DURATIONS.instruction*1000); assert.equal(container.children.length,1);
 wallCallback(); assert.equal(container.children.length,0); assert.equal(hud._toastItems.length,0);
 global.setTimeout=nativeSetTimeout; global.clearTimeout=nativeClearTimeout; hud.game.running=true;
 

@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 8000",
     "test": "node tests/adaptive-resolution.mjs && node tests/asset-loading.mjs && node tests/escape-armada.mjs && node tests/escape-carnage-pool.mjs && node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/settings-migration.mjs && node tests/imported-assets.mjs && node tests/player-fleet.mjs && node tests/augments.mjs && node tests/arsenal.mjs && node tests/weapon-feedback.mjs && node tests/enemy-abilities.mjs && node tests/enemy-loot.mjs && node tests/hud-feedback.mjs && node tests/flight-visuals.mjs && node tests/augment-effects.mjs && node tests/shield-pressure.mjs && node tests/keyboard-roll.mjs && node tests/approach-progression.mjs && node tests/level-walkthrough.mjs && node tests/combat-integrity.mjs && node tests/perfect-dodge.mjs && node tests/battle-soundtrack.mjs && node tests/final-escape.mjs",
     "test:mayhem": "node tests/mayhem-browser.mjs",
-    "test:lab": "node tests/testing-grounds.mjs",
+    "test:lab": "node tests/tuning-registry.mjs && node tests/testing-grounds.mjs",
     "test:menu": "node tests/menu-layout.mjs",
     "test:ships": "node tests/ship-selection.mjs",
     "test:startup": "node tests/startup-performance.mjs",

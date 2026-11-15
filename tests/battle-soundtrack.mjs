@@ -16,7 +16,7 @@ try {
     pilotName: 'AUDIO TEST', pilotNameConfirmed: true,
   })));
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled);
   const fleet = await page.evaluate(() => {
     // Inspect the active game instance, including during Vite's versioned HMR.

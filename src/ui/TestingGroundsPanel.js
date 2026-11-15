@@ -2,6 +2,7 @@ import { UPGRADES, AUGMENT_CATEGORIES } from '../systems/UpgradeSystem.js';
 import { PLAYER_SHIPS } from '../render/PlayerFleet.js';
 import { WEAPON_AUDIO } from '../core/AudioManager.js';
 import { Input } from '../core/Input.js';
+import { TUNING_SCHEMA, TUNING_CATEGORIES } from '../core/TuningRegistry.js';
 import './testing-grounds.css';
 
 const SCENES = [
@@ -49,12 +50,12 @@ export class TestingGroundsPanel {
       <header class="labHeader">
         <div class="labHeaderMark" aria-hidden="true">[+]</div>
         <div><span class="labEyebrow">RIFT PIRATES / DEVELOPER ACCESS</span><h2 id="labTitle">THE TESTING GROUNDS</h2><p>BREAK THE BUILD. FIND THE MAGIC.</p></div>
-        <button type="button" class="labClose" id="labClose" aria-label="Close console and fly">×</button>
+        <div class="labWindowActions"><button type="button" id="labCollapse" aria-label="Collapse console" title="Collapse console">—</button><button type="button" class="labClose" id="labClose" aria-label="Close console and fly">×</button></div>
       </header>
       <div class="labSafety"><span class="labLiveDot"></span> ISOLATED TEST RUN <span>Scores, scrap and clears from this session are never banked.</span></div>
       <div class="labWorkspace">
         <nav class="labNav" aria-label="Testing tools" role="tablist">
-          ${[['pilot', '01', 'PILOT', 'Ships & survival'], ['augments', '02', 'AUGMENTS', 'Build anything'], ['arena', '03', 'ARENA', 'Spawn & challenge'], ['effects', '04', 'EFFECTS', 'Light & sound']].map(([id, n, name, hint]) => `
+          ${[['pilot', '01', 'PILOT', 'Ships & survival'], ['augments', '02', 'AUGMENTS', 'Build anything'], ['arena', '03', 'ARENA', 'Spawn & challenge'], ['effects', '04', 'EFFECTS', 'Light & sound'], ['tuning', '05', 'TUNING', 'Live parameters'], ['debug', '06', 'DEBUG', 'Gizmos & tools']].map(([id, n, name, hint]) => `
             <button type="button" class="labTab" id="labTab-${id}" role="tab" data-tab="${id}" aria-controls="labPage-${id}" aria-selected="false"><small>${n}</small><strong>${name}</strong><span>${hint}</span></button>`).join('')}
           <div class="labReadout" aria-label="Live test telemetry"><span>RANGE TELEMETRY</span><dl>
             <div><dt>HULL</dt><dd data-readout="hull">—</dd></div><div><dt>SHIELD</dt><dd data-readout="shield">—</dd></div>
@@ -71,7 +72,7 @@ export class TestingGroundsPanel {
             <div class="labControlRow"><label>SIMULATION SPEED<select id="labTimeScale">${[[.25, '0.25× / FRAME STUDY'], [.5, '0.5× / SLOW MOTION'], [1, '1× / REAL TIME'], [2, '2× / FAST FORWARD']].map(option).join('')}</select></label><label>PLAYER LEVEL<select id="labXPLevel">${Array.from({ length: 18 }, (_, i) => option([i + 1, `LEVEL ${i + 1}`])).join('')}</select></label><button type="button" data-action="xp">SET LEVEL</button></div>
             <div class="labActionGrid"><button type="button" data-action="restore">RESTORE HULL + SHIELD</button><button type="button" data-action="damage">TAKE 40 DAMAGE</button><button type="button" data-action="shield">BREAK SHIELD</button><button type="button" data-action="dodge">TRIGGER PERFECT DODGE</button></div>
             <p class="labHint">Damage controls deliberately bypass god mode so you can test shield-break and low-health effects.</p>
-            <div class="labActionGrid"><button type="button" data-action="identity">EDIT TEST PILOT / NAME TAG</button></div>
+            <div class="labActionGrid"><button type="button" data-action="identity">EDIT TEST PILOT NAME</button></div>
           </section>
           <section class="labPage" id="labPage-augments" role="tabpanel" aria-labelledby="labTab-augments" hidden>
             <div class="labSectionHead"><div><span class="labEyebrow">${Object.keys(UPGRADES).length} AUGMENTS / EVERY COMBINATION</span><h3>BUILD A MONSTER</h3></div><span class="labPill" id="labBuildCount">0 STACKS</span></div>
@@ -101,6 +102,28 @@ export class TestingGroundsPanel {
             <div class="labSoundGrid">${Object.keys(WEAPON_AUDIO).map((kind, index) => `<button type="button" data-sound="${kind}"><small>${String(index + 1).padStart(2, '0')}</small><span>${kind.replaceAll('_', ' ').toUpperCase()}</span><b aria-hidden="true">▷</b></button>`).join('')}</div>
             <p class="labHint">Sound previews follow the game's SFX switch. If silent, enable SFX in the pause menu.</p>
           </section>
+          <section class="labPage" id="labPage-tuning" role="tabpanel" aria-labelledby="labTab-tuning" hidden>
+            <div class="labSectionHead"><div><span class="labEyebrow">LIVE / VALIDATED / SESSION ISOLATED</span><h3>DEVELOPER TUNING</h3></div><button type="button" data-action="tuningReset" class="labDanger">RESET ALL</button></div>
+            <label class="labSearch labTuningSearch"><span class="labVisuallyHidden">Search tuning parameters</span><input id="labTuningSearch" type="search" placeholder="SEARCH PARAMETER, SYSTEM OR DESCRIPTION…" autocomplete="off"></label>
+            <div class="labPresetManager"><input id="labPresetName" maxlength="48" placeholder="PRESET NAME" aria-label="Tuning preset name"><button type="button" data-action="saveTuning">SAVE</button><select id="labTuningPreset" aria-label="Saved tuning presets"><option value="">SAVED PRESETS</option></select><button type="button" data-action="loadTuning">LOAD</button><button type="button" data-action="deleteTuning" class="labDanger">DELETE</button></div>
+            <div id="labTuningCategories" class="labTuningCategories"></div>
+            <div class="labSectionHead labSubhead"><h3>PORTABLE CONFIGURATION</h3><span>JSON / REVIEW BEFORE COMMIT</span></div>
+            <textarea id="labTuningTransfer" class="labTransfer" spellcheck="false" placeholder="Exported tuning JSON or import payload…" aria-label="Tuning import export data"></textarea>
+            <div class="labActionGrid"><button type="button" data-action="exportTuning">EXPORT JSON</button><button type="button" data-action="importTuning">IMPORT JSON</button><button type="button" data-action="reviewTuning" class="labPrimary">APPLY TO GAME DEFAULTS / REVIEW</button><button type="button" data-action="copyTuning">COPY TEXT</button></div>
+            <p class="labHint">APPLY TO GAME DEFAULTS generates a source-owner and code review artifact. It never edits normal game configuration or player saves.</p>
+          </section>
+          <section class="labPage" id="labPage-debug" role="tabpanel" aria-labelledby="labTab-debug" hidden>
+            <div class="labSectionHead"><div><span class="labEyebrow">RENDER-ONLY OVERLAYS / NO COLLISION SIDE EFFECTS</span><h3>DEBUG VISUALIZATION</h3></div><span class="labPill">BOUNDED POOLS</span></div>
+            <div class="labToggleGrid">${[
+              ['hitboxes','HITBOXES','Player and target collision volumes.'],['projectiles','PROJECTILES','Projectile collision volumes.'],
+              ['targeting','TARGETING PATHS','Lock ray and projectile velocity vectors.'],['ranges','PICKUP RANGE','Live player scrap-attraction radius.'],
+              ['spawns','SPAWN POINTS','Enemy formation destination markers.'],['bounds','ARENA BOUNDS','Playable movement boundary.'],
+              ['ai','AI STATE','Enemy state color and formation path.'],
+            ].map(([id,label,desc]) => `<label class="labToggle"><input type="checkbox" data-setting="${id}"><span class="labSwitch" aria-hidden="true"></span><span><strong>${label}</strong><small>${desc}</small></span></label>`).join('')}</div>
+            <div class="labSectionHead labSubhead"><h3>TEST ACTIONS</h3><span>DETERMINISTIC / REVERSIBLE</span></div>
+            <div class="labActionGrid"><button type="button" data-action="forceAttack">FORCE ENEMY ATTACKS</button><button type="button" data-action="clearProjectiles">CLEAR PROJECTILES</button><button type="button" data-action="destroyEnemies">DESTROY ALL ENEMIES</button><button type="button" data-action="restore">RESTORE PLAYER</button><button type="button" data-action="bullets">TRIGGER BULLET FAN</button><button type="button" data-action="fx">TRIGGER EXPLOSION</button></div>
+            <p class="labHint">Telemetry in the left rail stays live while flying. Close the console to inspect gizmos, then press F2 to adjust them again.</p>
+          </section>
         </div>
       </div>
       <footer class="labFooter"><p id="labStatus" role="status" aria-live="polite"></p><div><button type="button" id="labExit" class="labDanger">EXIT TEST LAB</button><button type="button" id="labFly" class="labPrimary">CLOSE + FLY <span>F2 / ESC</span></button></div></footer>`;
@@ -116,6 +139,7 @@ export class TestingGroundsPanel {
 
     this._addEntrances();
     this._buildAugments();
+    this._buildTuning();
     this._wire();
     testing.onChange = () => this.renderState();
     this.renderState();
@@ -189,11 +213,36 @@ export class TestingGroundsPanel {
     }
   }
 
+  _buildTuning() {
+    const host = this.dialog.querySelector('#labTuningCategories');
+    this.tuningRows = new Map();
+    for (const [category, label, description] of TUNING_CATEGORIES) {
+      const details = document.createElement('details');
+      details.className = 'labTuningCategory'; details.dataset.tuningCategory = category; details.open = true;
+      details.innerHTML = `<summary><span><strong>${label}</strong><small>${description}</small></span><button type="button" data-reset-category="${category}">RESET CATEGORY</button></summary><div class="labTuningGrid"></div>`;
+      const grid = details.querySelector('.labTuningGrid');
+      for (const item of TUNING_SCHEMA.filter(entry => entry.category === category)) {
+        const row = document.createElement('div');
+        row.className = 'labTuningRow'; row.dataset.tuningRow = item.key;
+        row.dataset.search = `${item.label} ${item.description} ${label}`.toLowerCase();
+        row.title = item.description;
+        row.innerHTML = `<div class="labTuningCopy"><strong>${item.label}</strong><small>${item.description}</small></div><input type="range" min="${item.min}" max="${item.max}" step="${item.step}" value="${item.default}" data-tuning-range="${item.key}" aria-label="${item.label}"><label><input type="number" min="${item.min}" max="${item.max}" step="${item.step}" value="${item.default}" data-tuning-number="${item.key}" aria-label="${item.label} numeric value"><span>${item.unit}</span></label><button type="button" data-reset-tuning="${item.key}" aria-label="Reset ${item.label}" title="Reset to ${item.default}">↺</button>`;
+        grid.append(row); this.tuningRows.set(item.key, row);
+      }
+      host.append(details);
+    }
+  }
+
   _wire() {
     const $ = selector => this.dialog.querySelector(selector);
     $('#labClose').addEventListener('click', () => this.close());
     $('#labFly').addEventListener('click', () => this.close());
     $('#labExit').addEventListener('click', () => this.run(() => this.testing.exit()));
+    $('#labCollapse').addEventListener('click', () => {
+      const collapsed = this.dialog.classList.toggle('labCollapsed');
+      $('#labCollapse').textContent = collapsed ? '□' : '—';
+      $('#labCollapse').setAttribute('aria-label', collapsed ? 'Expand console' : 'Collapse console');
+    });
     this.dialog.addEventListener('cancel', event => { event.preventDefault(); this.close(); });
     this.dialog.addEventListener('click', event => {
       const tab = event.target.closest('[data-tab]');
@@ -206,6 +255,10 @@ export class TestingGroundsPanel {
       if (sound) this.run(() => this.testing.playWeaponSound(sound.dataset.sound), `AUDITION / ${sound.dataset.sound.toUpperCase()}`);
       const action = event.target.closest('[data-action]')?.dataset.action;
       if (action) this._action(action);
+      const resetCategory = event.target.closest('[data-reset-category]')?.dataset.resetCategory;
+      if (resetCategory) { event.preventDefault(); this.run(() => this.testing.resetTuning(resetCategory), `${resetCategory.toUpperCase()} TUNING RESET.`); }
+      const resetTuning = event.target.closest('[data-reset-tuning]')?.dataset.resetTuning;
+      if (resetTuning) this.run(() => this.testing.setTuning(resetTuning, TUNING_SCHEMA.find(item => item.key === resetTuning).default), `${resetTuning} RESET.`);
     });
     this.dialog.querySelectorAll('[data-setting]').forEach(input => {
       input.addEventListener('change', () => this.run(() => this.testing.setSetting(input.dataset.setting, input.checked)));
@@ -215,6 +268,15 @@ export class TestingGroundsPanel {
     $('#labAugmentSearch').addEventListener('input', event => { this.search = event.target.value.toLowerCase().trim(); this._filterAugments(); });
     $('#labAugmentRarity').addEventListener('change', event => { this.rarity = event.target.value; this._filterAugments(); });
     $('#labAugmentCategory').addEventListener('change', event => { this.category = event.target.value; this._filterAugments(); });
+    $('#labTuningSearch').addEventListener('input', event => this._filterTuning(event.target.value));
+    this.dialog.querySelectorAll('[data-tuning-range],[data-tuning-number]').forEach(input => {
+      input.addEventListener('input', event => {
+        const key = event.target.dataset.tuningRange || event.target.dataset.tuningNumber;
+        this.testing.setTuning(key, Number(event.target.value));
+      });
+      input.addEventListener('change', () => this.renderState());
+    });
+    this._wireWindowDrag();
 
     // Capture before gameplay's global keys: typing a name must never fly,
     // fire, roll, pause, or pick a card underneath the native dialog.
@@ -240,11 +302,14 @@ export class TestingGroundsPanel {
         if (event.target?.closest?.('.labNav')) {
           if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
             event.preventDefault();
-            const tabs = ['pilot', 'augments', 'arena', 'effects'];
-            const index = event.key === 'Home' ? 0 : event.key === 'End' ? 3
-              : (tabs.indexOf(this.activeTab) + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + 4) % 4;
+            const tabs = ['pilot', 'augments', 'arena', 'effects', 'tuning', 'debug'];
+            const index = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+              : (tabs.indexOf(this.activeTab) + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
             this.selectTab(tabs[index]); $(`#labTab-${tabs[index]}`).focus();
           }
+        }
+        if (!editing && event.ctrlKey && event.key.toLowerCase() === 'k') {
+          event.preventDefault(); this.selectTab('tuning'); $('#labTuningSearch').focus();
         }
         event.stopImmediatePropagation();
       }
@@ -252,6 +317,40 @@ export class TestingGroundsPanel {
     this._keyUp = event => { if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open],#pilotIdentityDialog[open]')) return; if (this.dialog.open || (this.unlocked && (event.code === 'F2' || event.code === 'Backquote'))) event.stopImmediatePropagation(); };
     window.addEventListener('keydown', this._keyDown, true);
     window.addEventListener('keyup', this._keyUp, true);
+  }
+
+  _wireWindowDrag() {
+    const header = this.dialog.querySelector('.labHeader');
+    let drag = null;
+    header.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || event.target.closest('button,input,select')) return;
+      const rect = this.dialog.getBoundingClientRect();
+      drag = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      this.dialog.style.margin = '0'; this.dialog.style.left = `${rect.left}px`; this.dialog.style.top = `${rect.top}px`;
+      header.setPointerCapture(event.pointerId); this.dialog.classList.add('labDragging');
+    });
+    header.addEventListener('pointermove', event => {
+      if (!drag) return;
+      const width = this.dialog.offsetWidth, height = this.dialog.offsetHeight;
+      this.dialog.style.left = `${Math.max(0, Math.min(innerWidth - width, event.clientX - drag.x))}px`;
+      this.dialog.style.top = `${Math.max(0, Math.min(innerHeight - Math.min(height, 80), event.clientY - drag.y))}px`;
+    });
+    const end = () => { drag = null; this.dialog.classList.remove('labDragging'); };
+    header.addEventListener('pointerup', end); header.addEventListener('pointercancel', end);
+    header.addEventListener('dblclick', event => {
+      if (event.target.closest('button')) return;
+      this.dialog.style.removeProperty('left'); this.dialog.style.removeProperty('top'); this.dialog.style.removeProperty('margin');
+    });
+  }
+
+  _filterTuning(value = '') {
+    const search = String(value).trim().toLowerCase();
+    for (const row of this.tuningRows.values()) row.hidden = search && !row.dataset.search.includes(search);
+    this.dialog.querySelectorAll('[data-tuning-category]').forEach(category => {
+      const any = [...category.querySelectorAll('[data-tuning-row]')].some(row => !row.hidden);
+      category.hidden = !any;
+      if (search && any) category.open = true;
+    });
   }
 
   _action(action) {
@@ -280,11 +379,28 @@ export class TestingGroundsPanel {
       scrap: [() => t.spawnScrap(), 'SCRAP CACHE DROPPED.'],
       testWallet: [() => t.creditTestScrap(), '5,000 TEST SCRAP ADDED. NEVER BANKED.'],
       clear: [() => t.clearArena(), 'RANGE CLEARED. YOUR BUILD IS KEPT.'],
+      clearProjectiles: [() => t.clearProjectiles(), 'ALL PROJECTILES CLEARED.'],
+      destroyEnemies: [() => t.destroyEnemies(), 'ALL ACTIVE ENEMIES DESTROYED.'],
+      forceAttack: [() => t.forceEnemyAttack(), 'ENEMY ATTACK TIMERS RELEASED. CLOSE THE CONSOLE TO OBSERVE.'],
       heat: [() => t.setHeat(Number(value('labHeat'))), `RIFT HEAT SET TO ${value('labHeat')}.`],
       bloomReset: [() => t.setBloom(null), 'BLOOM FOLLOWS THE SCENE AGAIN.'],
       fx: [() => t.burstFX(), 'VOXEL BURST READY. CLOSE THE CONSOLE TO WATCH.'],
+      tuningReset: [() => t.resetTuning(), 'ALL LIVE TUNING RESET TO AUTHORED BASELINES.'],
+      saveTuning: [() => t.saveTuningPreset(value('labPresetName')), 'TUNING PRESET SAVED EXPLICITLY.'],
+      loadTuning: [() => t.loadTuningPreset(value('labTuningPreset')), 'TUNING PRESET LOADED.'],
+      deleteTuning: [() => t.deleteTuningPreset(value('labTuningPreset')), 'TUNING PRESET DELETED.'],
+      exportTuning: [() => { const text = t.exportTuning(); this.dialog.querySelector('#labTuningTransfer').value = text; this._downloadText(text, 'rift-pirates-tuning.json'); }, 'TUNING JSON EXPORTED.'],
+      importTuning: [() => t.importTuning(this.dialog.querySelector('#labTuningTransfer').value), 'TUNING JSON IMPORTED AND APPLIED LIVE.'],
+      reviewTuning: [() => { this.dialog.querySelector('#labTuningTransfer').value = t.productionReview(); }, 'DEFAULTS REVIEW GENERATED. NORMAL GAME CONFIGURATION IS UNCHANGED.'],
+      copyTuning: [() => { const area = this.dialog.querySelector('#labTuningTransfer'); area.select(); navigator.clipboard?.writeText(area.value); }, 'CONFIGURATION TEXT COPIED.'],
     };
     if (actions[action]) this.run(...actions[action]);
+  }
+
+  _downloadText(text, filename) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   run(action, message) {
@@ -384,5 +500,19 @@ export class TestingGroundsPanel {
     const bloom = state.settings?.bloom;
     this.dialog.querySelector('#labBloomValue').textContent = bloom == null ? 'SCENE DEFAULT' : `${Number(bloom).toFixed(2)}× GLOW`;
     if (bloom != null && document.activeElement !== this.dialog.querySelector('#labBloom')) this.dialog.querySelector('#labBloom').value = bloom;
+    for (const item of TUNING_SCHEMA) {
+      const current = state.tuning?.[item.key] ?? item.default;
+      const row = this.tuningRows.get(item.key);
+      if (!row) continue;
+      for (const input of row.querySelectorAll('input')) if (document.activeElement !== input) input.value = current;
+      row.classList.toggle('labTuningChanged', current !== item.default);
+    }
+    const presets = this.dialog.querySelector('#labTuningPreset');
+    const selected = presets.value;
+    const names = state.presets || [];
+    if ([...presets.options].slice(1).map(option => option.value).join('\n') !== names.join('\n')) {
+      presets.replaceChildren(new Option('SAVED PRESETS', ''), ...names.map(name => new Option(name, name)));
+      presets.value = names.includes(selected) ? selected : '';
+    }
   }
 }

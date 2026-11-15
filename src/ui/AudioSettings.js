@@ -1,7 +1,7 @@
 import { Audio2 } from '../core/AudioManager.js';
 import { Save } from '../core/SaveSystem.js';
 
-/** The title and pause menus share levels, while mute remembers each level. */
+/** The title and pause menus share master/channel levels; mute remembers each channel level. */
 export function initAudioSettings() {
   const sliders = [...document.querySelectorAll('[data-audio-volume]')];
   const toggles = ['musicTgl', 'musicTgl2', 'sfxTgl', 'sfxTgl2']
@@ -19,8 +19,9 @@ export function initAudioSettings() {
       const percentage = Math.round(Save.data[`${key}Volume`] * 100);
       slider.value = percentage;
       slider.style.setProperty('--volume', `${percentage}%`);
-      slider.setAttribute('aria-valuetext', `${percentage} percent${Save.data[key] ? '' : ', muted'}`);
-      slider.closest('.audioChannel').classList.toggle('isMuted', !Save.data[key]);
+      const muted = key !== 'master' && !Save.data[key];
+      slider.setAttribute('aria-valuetext', `${percentage} percent${muted ? ', muted' : ''}`);
+      slider.closest('.audioChannel').classList.toggle('isMuted', muted);
       document.getElementById(`${slider.id}Value`).value = `${percentage}%`;
     }
   };
@@ -34,12 +35,13 @@ export function initAudioSettings() {
   for (const slider of sliders) {
     slider.addEventListener('input', () => {
       const value = Number(slider.value) / 100;
-      if (slider.dataset.audioVolume === 'music') Audio2.setMusicVolume(value);
+      if (slider.dataset.audioVolume === 'master') Audio2.setMasterVolume(value);
+      else if (slider.dataset.audioVolume === 'music') Audio2.setMusicVolume(value);
       else Audio2.setSfxVolume(value);
       paint();
     });
     slider.addEventListener('change', () => {
-      if (slider.dataset.audioVolume === 'sfx') Audio2.play('ui_select', .5, 1);
+      if (slider.dataset.audioVolume !== 'music') Audio2.play('ui_select', .5, 1);
     });
   }
   for (const mixer of document.querySelectorAll('.audioMixer')) {

@@ -18,7 +18,8 @@ try {
   await page.setViewport({ width: 1440, height: 900 });
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto('http://localhost:8000/?lab=unlock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(new URL('?lab=unlock', process.env.RIFT_TEST_URL || 'http://localhost:8000/').href,
+    { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => window.RIFT?.testing && !document.getElementById('launchBtn').disabled,
     { timeout: 120000 });
   const beforeSave = await page.evaluate(() => JSON.stringify(window.RIFT.save.data));
@@ -64,6 +65,41 @@ try {
   assert.equal(await page.evaluate(() => window.RIFT.testing.panelOpen), false, 'F2 closes the lab console');
   await page.keyboard.press('F2');
   assert.equal(await page.evaluate(() => window.RIFT.testing.panelOpen), true, 'F2 reopens the same test session');
+
+  await page.click('#labTab-tuning');
+  assert.equal(await page.$$eval('[data-tuning-row]', rows => rows.length), 42, 'All connected tuning parameters render from the registry');
+  await page.type('#labTuningSearch', 'critical');
+  assert.deepEqual(await page.$$eval('[data-tuning-row]:not([hidden])', rows => rows.map(row => row.dataset.tuningRow).sort()),
+    ['criticalChance', 'criticalDamage']);
+  await page.click('#labTuningSearch', { count: 3 }); await page.keyboard.press('Backspace');
+  await page.$eval('[data-tuning-number="moveSpeed"]', input => { input.value = '2'; input.dispatchEvent(new Event('input', { bubbles: true })); });
+  assert.equal(await page.evaluate(() => window.RIFT.testing.getTuning('moveSpeed')), 2, 'Numeric tuning controls apply live');
+  await page.click('#labCollapse');
+  assert.equal(await page.$eval('#testingGroundsPanel', dialog => dialog.classList.contains('labCollapsed')), true, 'Console collapses');
+  await page.click('#labCollapse');
+
+  const tuning = await page.evaluate(() => {
+    const g = window.RIFT, lab = g.testing;
+    const move = g.player.moveSpeed / g.player.stats.moveSpeed;
+    lab.setTuning('enemyHealth', 2); lab.clearArena(); const enemy = lab.spawnEnemy('scout', 1)[0];
+    const enemyHealth = enemy.target.maxHp / enemy.type.hp;
+    g.projectiles.reset(); lab.setTuning('playerProjectileSpeed', 2); lab.setTuning('playerProjectileSize', 1.5);
+    const bolt = g.projectiles.firePlayer({ x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: -20, speed: 10, radius: 1 });
+    lab.saveTuningPreset('automation-check'); lab.setTuning('moveSpeed', .5); lab.loadTuningPreset('automation-check');
+    const restored = lab.getTuning('moveSpeed');
+    const exported = JSON.parse(lab.exportTuning());
+    lab.setSetting('hitboxes', true); lab.beforeWorld(1 / 60);
+    const gizmos = lab.gizmos.root.visible && lab.gizmos.hitboxes.some(mesh => mesh.visible);
+    lab.deleteTuningPreset('automation-check'); lab.setSetting('hitboxes', false); lab.resetTuning(); lab.clearArena(); lab.spawnDummies();
+    return { move, enemyHealth, boltSpeed: bolt.speed, boltRadius: bolt.radius, restored,
+      exportKind: exported.kind, gizmos, presets: lab.listTuningPresets() };
+  });
+  assert.equal(tuning.move, 2); assert.equal(tuning.enemyHealth, 2);
+  assert.equal(tuning.boltSpeed, 20); assert.equal(tuning.boltRadius, 1.5);
+  assert.equal(tuning.restored, 2); assert.equal(tuning.exportKind, 'rift-pirates-testing-tuning');
+  assert.equal(tuning.gizmos, true, 'Debug hitboxes are real pooled scene overlays');
+  assert.equal(tuning.presets.includes('automation-check'), false);
+  await page.click('#labTab-pilot');
 
   const protection = await page.evaluate(() => {
     const g = window.RIFT, p = g.player, lab = g.testing;

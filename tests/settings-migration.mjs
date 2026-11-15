@@ -12,8 +12,9 @@ globalThis.window = {
 globalThis.CustomEvent = class { constructor(type, options) { this.type = type; this.detail = options?.detail; } };
 
 const { Save, AUDIO_DEFAULTS, UI_SCALE_DEFAULT, clampUIScale } = await import('../src/core/SaveSystem.js');
-assert.deepEqual(AUDIO_DEFAULTS, { musicVolume: .75, sfxVolume: .75 });
+assert.deepEqual(AUDIO_DEFAULTS, { masterVolume: 1, musicVolume: .75, sfxVolume: .75 });
 Save.load();
+assert.equal(Save.data.masterVolume, 1);
 assert.equal(Save.data.musicVolume, .75); assert.equal(Save.data.sfxVolume, .75);
 assert.equal(Save.data.uiScale, UI_SCALE_DEFAULT); assert.equal(Save.data.tutorialComplete, false);
 
@@ -22,6 +23,7 @@ Save.load();
 assert.equal(Save.data.scrapBanked, 9123); assert.equal(Save.data.bestScore, 456789); assert.equal(Save.data.runs, 12);
 assert.equal(Save.data.musicVolume, .31); assert.equal(Save.data.sfxVolume, .82,
   'Existing users keep their exact saved audio levels');
+assert.equal(Save.data.masterVolume, 1, 'Existing users receive a neutral master level');
 assert.equal(Save.data.uiScale, 1.1); assert.equal(Save.data.tutorialComplete, false,
   'Legacy saves receive additive interface/tutorial defaults');
 

@@ -4,7 +4,6 @@ export const PILOT_NAME_MAX = 16;
 export const PILOT_IDENTITY_DEFAULTS = Object.freeze({
   pilotName: PILOT_NAME_DEFAULT,
   pilotNameConfirmed: false,
-  nameTagVisible: true,
 });
 
 const segmenter = typeof Intl.Segmenter === 'function'

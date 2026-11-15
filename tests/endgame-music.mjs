@@ -80,8 +80,8 @@ try {
     await decode('defeat');
     await page.evaluate(() => { window.RIFT.audio.music.defeat.el.currentTime = 12; });
     const dying = await snapshot();
-    assert.ok(dying.source.endsWith('/music/sorryyoudied.mp3'));
-    assert.ok(dying.duration > 10);
+    assert.ok(dying.source.endsWith('/music/DAMNYOUDEAD.mp3'));
+    assert.ok(dying.duration > 216 && dying.duration < 218, 'The supplied new death recording decodes at its full duration');
     await settle();
     assert.equal(await page.evaluate(() => window.__terminalEncounterTicks), 0,
       'No encounter ticks may spawn new hostiles after terminal death, including the lethal environment frame');

@@ -16,13 +16,50 @@ try {
     await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
     await page.evaluate(() => { window.RIFT.renderFrame = () => {}; });
   };
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded' }); await ready();
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded' }); await ready();
   assert.equal(await page.$eval('#optionsDialog', e => e.open), false, 'Title settings start tucked away');
   await page.click('#optionsBtn');
   assert.equal(await page.$eval('#optionsDialog', e => e.open), true);
+  assert.equal(await page.$eval('#musicTgl', e => getComputedStyle(e).outlineStyle), 'none',
+    'Pointer-opened Options does not draw a keyboard focus box around Music');
+  assert.equal(await page.$eval('#masterVolume', e => e.value), '100');
   assert.equal(await page.$eval('#musicVolume', e => e.value), '75');
   assert.equal(await page.$eval('#sfxVolume', e => e.value), '75');
   assert.equal(await page.$eval('#musicVolume', e => e.labels[0].textContent), 'Music volume');
+  await page.click('#musicTgl');
+  assert.deepEqual(await page.evaluate(async () => {
+    const duplicateImport = (await import('/src/core/AudioManager.js?music-off-regression=one')).Audio2;
+    duplicateImport.playTitle(0);
+    duplicateImport.resume();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const title = window.RIFT.audio.music.title;
+    return {
+      shared: duplicateImport === window.RIFT.audio,
+      saved: window.RIFT.save.data.music,
+      gain: window.RIFT.audio.musicGain.gain.value,
+      paused: title.el.paused,
+      pressed: document.getElementById('musicTgl').getAttribute('aria-pressed'),
+      mirrored: document.getElementById('musicTgl2').getAttribute('aria-pressed'),
+    };
+  }), {
+    shared: true,
+    saved: 0,
+    gain: 0,
+    paused: true,
+    pressed: 'false',
+    mirrored: 'false',
+  }, 'Clicking Music Off silences the title and later title/resume requests cannot bypass it');
+  await page.click('#musicTgl');
+  await page.waitForFunction(() => !window.RIFT.audio.music.title.el.paused);
+  await page.$eval('#masterVolume', slider => {
+    slider.value = '50';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  assert.deepEqual(await page.evaluate(() => ({
+    saved: window.RIFT.save.data.masterVolume,
+    gain: Number(window.RIFT.audio.outputGain.gain.value.toFixed(6)),
+    mirrored: document.getElementById('masterVolume2').value,
+  })), { saved: .5, gain: .2375, mirrored: '50' });
   await page.evaluate(() => {
     window.__audioKeysLeaked = [];
     window.addEventListener('keydown', event => {
@@ -39,12 +76,12 @@ try {
     valueText: document.getElementById('musicVolume').getAttribute('aria-valuetext'),
     keys: window.__audioKeysLeaked,
   }));
-  assert.deepEqual(title, { level: .99, gain: .99, mirrored: '99', valueText: '99 percent', keys: [] });
+  assert.deepEqual(title, { level: .99, gain: .735075, mirrored: '99', valueText: '99 percent', keys: [] });
   await page.focus('#musicTgl'); await page.keyboard.press('Space');
   assert.equal(await page.$eval('#musicTgl2', e => e.getAttribute('aria-pressed')), 'false');
   assert.equal(await page.evaluate(() => window.RIFT.audio.musicGain.gain.value), 0);
   await page.keyboard.press('Space');
-  assert.ok(Math.abs(await page.evaluate(() => window.RIFT.audio.musicGain.gain.value) - .99) < 1e-6);
+  assert.ok(Math.abs(await page.evaluate(() => window.RIFT.audio.musicGain.gain.value) - .99 ** 2 * .75) < 1e-6);
 
   // Dragging the fader is a real pointer interaction, not a synthetic setter.
   const rect = await page.$eval('#sfxVolume', e => {
@@ -90,12 +127,14 @@ try {
   assert.equal(await page.evaluate(() => window.RIFT.paused), false, 'Escape remains available while adjusting audio');
 
   await page.reload({ waitUntil: 'domcontentloaded' }); await ready();
+  assert.equal(await page.$eval('#masterVolume', e => e.value), '50');
   assert.equal(await page.$eval('#musicVolume', e => e.value), '98');
   assert.equal(await page.$eval('#sfxVolume', e => Number(e.value)), sfx.title);
   assert.equal(await page.$eval('#sfxTgl', e => e.getAttribute('aria-pressed')), 'false');
   await page.click('#optionsBtn');
   await page.click('#sfxTgl');
-  assert.ok(Math.abs(await page.evaluate(() => window.RIFT.audio.sfxGain.gain.value) - sfx.saved) < 1e-6, 'Unmute restores the saved level after reload');
+  assert.ok(Math.abs(await page.evaluate(() => window.RIFT.audio.sfxGain.gain.value) - sfx.saved ** 2) < 1e-6,
+    'Unmute restores the perceptually scaled saved level after reload');
   assert.deepEqual(errors, []);
   console.log('PASS: native keyboard and pointer volume controls, mirrored percentages, no gameplay key leakage, independent mute, reload persistence, pause timing and menu bounds.');
 } finally { await browser.close(); }

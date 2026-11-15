@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
-import { AudioManagerImpl, GAMEPLAY_MUSIC, MUSIC_FILES } from '../src/core/AudioManager.js';
+import { AudioManagerImpl, AUDIO_OUTPUT, GAMEPLAY_MUSIC, MUSIC_FILES, volumeToGain } from '../src/core/AudioManager.js';
 import { Save } from '../src/core/SaveSystem.js';
 
 const approvedMusic = {
@@ -9,10 +9,11 @@ const approvedMusic = {
   escape: 'The Very Very End.mp3',
   arcade: 'arcade.mp3', astral: 'astral.mp3', neondrift: 'neondrift.mp3',
   pixelatedvoid: 'pixelatedvoid.mp3', thepirateking: 'thepirateking.mp3',
-  defeat: 'sorryyoudied.mp3', victory: 'Afterthefinalescape.mp3',
+  fallen: 'sorryyoudied.mp3', defeat: 'DAMNYOUDEAD.mp3', victory: 'Afterthefinalescape.mp3',
 };
 assert.deepEqual(MUSIC_FILES, approvedMusic, 'Every scene has its exact approved source recording');
-assert.deepEqual(GAMEPLAY_MUSIC, ['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking']);
+assert.deepEqual(GAMEPLAY_MUSIC, ['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking', 'fallen']);
+assert.equal(MUSIC_FILES.fallen, 'sorryyoudied.mp3', 'The former death cue joins ordinary gameplay rotation');
 const warnings = [];
 function failMedia(entry) {
   const warn = console.warn;
@@ -36,7 +37,8 @@ a.ready = true;
 a._startCurrent();
 a.update(1);
 assert.ok(a.music.title.el.src.includes(encodeURIComponent(MUSIC_FILES.title)));
-assert.equal(a.music.title.el.volume, .75, 'Element fallback honors the saved fresh-install music default');
+assert.equal(a.music.title.el.volume, volumeToGain(.75) * AUDIO_OUTPUT.musicTrim,
+  'Element fallback honors the saved fresh-install music default and global trim');
 a.playGameplay(0);
 a.update(1);
 const first = a.currentMusic;
@@ -69,8 +71,11 @@ const shuffle = new AudioManagerImpl();
 shuffle.ready = true;
 shuffle.playGameplay(0);
 const songs = [shuffle.currentMusic];
-for (let i = 0; i < 19; i++) { shuffle.music[shuffle.currentMusic].el.finish(); songs.push(shuffle.currentMusic); }
-for (let i = 0; i < songs.length; i += 5) assert.equal(new Set(songs.slice(i, i + 5)).size, 5, 'Each complete bag contains all five tracks once');
+for (let i = 0; i < 23; i++) { shuffle.music[shuffle.currentMusic].el.finish(); songs.push(shuffle.currentMusic); }
+for (let i = 0; i < songs.length; i += GAMEPLAY_MUSIC.length) {
+  assert.equal(new Set(songs.slice(i, i + GAMEPLAY_MUSIC.length)).size, GAMEPLAY_MUSIC.length,
+    'Each complete bag contains every gameplay track once');
+}
 for (let i = 1; i < songs.length; i++) assert.notEqual(songs[i], songs[i - 1], 'No immediate repeat at a bag boundary');
 a.playEscape(0);
 a.update(1);
@@ -95,7 +100,7 @@ a.setMusicEnabled(false);
 assert.equal(a.music.escape.el.volume, 0);
 assert.equal(a.music.escape.el.paused, true);
 a.setMusicEnabled(true);
-assert.equal(a.music.escape.el.volume, .75);
+assert.equal(a.music.escape.el.volume, volumeToGain(.75) * AUDIO_OUTPUT.musicTrim);
 assert.equal(a.music.escape.el.paused, false);
 a.music.escape.el.finish();
 assert.equal(a.currentMusic, 'escape', 'Finale never falls through to shuffle');
@@ -221,5 +226,5 @@ assert.ok(delayed._fades.length <= 2, 'Crossfades remain bounded under rapid sta
 globalThis.Audio = FakeAudio;
 const shippedMusic = readdirSync(new URL('../assets/music/', import.meta.url))
   .filter(file => /\.(mp3|m4a|ogg|wav|flac|aac)$/i.test(file)).sort();
-assert.deepEqual(shippedMusic, Object.values(approvedMusic).sort(), 'The public assets ship all ten approved songs and no legacy music');
-console.log('PASS: exact official-only shipping and mapping, shuffle bags, terminal continuity/repeat, unlock/loading races, stale callbacks, mute/background priority and bounded crossfades.');
+assert.deepEqual(shippedMusic, Object.values(approvedMusic).sort(), 'The public assets ship all eleven routed songs with no orphaned music');
+console.log('PASS: exact shipping and mapping, six-song gameplay shuffle, dedicated new death cue, terminal continuity/repeat, stale callback safety, mute/background priority and bounded crossfades.');

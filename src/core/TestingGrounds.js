@@ -7,9 +7,14 @@ import { PLAYER_SHIPS, isPlayerShipId } from '../render/PlayerFleet.js';
 import { ENEMY_TYPES } from '../enemies/EnemyTypes.js';
 import { Target } from '../combat/Target.js';
 import { $, clamp } from './Utils.js';
+import { TUNING_SCHEMA, TUNING_VERSION, TUNING_BY_KEY, normalizeTuning, tuningChanges, tuningDefaults } from './TuningRegistry.js';
+import { TestingGizmos } from './TestingGizmos.js';
 
 const defaults = () => ({ godMode: true, infiniteBoost: true, unlimitedRolls: false,
-  autoFire: false, timeScale: 1, freezeEnemies: false, trail: true, bloom: null });
+  autoFire: false, timeScale: 1, freezeEnemies: false, trail: true, bloom: null,
+  hitboxes: false, projectiles: false, targeting: false, ranges: false,
+  spawns: false, bounds: false, ai: false });
+const PRESET_KEY = 'riftpirates-testing-tuning-v1';
 const SCENES = {
   sandbox: [STATE.TESTING],
   approach1: [STATE.TRAVERSAL_1], approach2: [STATE.TRAVERSAL_2],
@@ -31,12 +36,16 @@ export class TestingGrounds {
     this.active = false;
     this.panelOpen = false;
     this.settings = defaults();
+    this.tuning = tuningDefaults();
     this.sceneId = 'sandbox';
     this.dummies = [];
     this.dummyDamage = 0;
     this.damageSamples = [];
     this.elapsed = 0;
     this.fps = 60;
+    this.gizmos = new TestingGizmos(game.scene);
+    // Runtime systems consult this object only while `active` is true.
+    for (const system of [game.player, game.player.exhaust, game.projectiles, game.fx, game.camera3]) system.testing = this;
   }
 
   changed() { this.onChange?.(); }
@@ -47,6 +56,7 @@ export class TestingGrounds {
       return;
     }
     this.settings = defaults();
+    this.tuning = tuningDefaults();
     this.active = true;
     this._disposeEncounter();
     this.game.hangar?.close();
@@ -67,6 +77,9 @@ export class TestingGrounds {
     this.active = false;
     this.panelOpen = false;
     this.settings = defaults();
+    this.tuning = tuningDefaults();
+    this.gizmos.hide();
+    this._applyRenderScale(1);
     this.damageSamples.length = 0;
     Input.reset();
     this.changed();
@@ -96,6 +109,132 @@ export class TestingGrounds {
     if (key === 'trail' && !this.settings.trail) this.game.player.exhaust.reset();
     this.game.syncMusicPause();
     this.changed();
+  }
+
+  getTuning(key, fallback = 1) {
+    return this.active && Object.hasOwn(this.tuning, key) ? this.tuning[key] : fallback;
+  }
+
+  setTuning(key, value) {
+    const item = TUNING_BY_KEY[key];
+    if (!this.active || !item || !Number.isFinite(Number(value))) return false;
+    this._applyTuning({ ...this.tuning, [key]: value });
+    this.changed();
+    return true;
+  }
+
+  resetTuning(category = null) {
+    if (!this.active) return;
+    const defaultsMap = tuningDefaults();
+    const next = { ...this.tuning };
+    for (const item of TUNING_SCHEMA) if (!category || item.category === category) next[item.key] = defaultsMap[item.key];
+    this._applyTuning(next);
+    this.changed();
+  }
+
+  _applyTuning(values) {
+    const previous = this.tuning;
+    const next = normalizeTuning(values);
+    const p = this.game.player;
+    // Capacity edits preserve the live percentage without mutating authored stats.
+    for (const [key, stat, field] of [
+      ['maxHealth', 'maxHealth', 'health'],
+      ['shieldCapacity', 'shieldMax', 'shield'],
+      ['boostCapacity', 'boostCapacity', 'boost'],
+    ]) {
+      const oldMax = p.stats[stat] * previous[key];
+      const newMax = p.stats[stat] * next[key];
+      p[field] = oldMax > 0 ? Math.min(newMax, p[field] / oldMax * newMax) : Math.min(p[field], newMax);
+    }
+    this.tuning = next;
+    this._applyRenderScale();
+  }
+
+  _applyRenderScale() {
+    const g = this.game;
+    if (!g.renderer || !g.display) return;
+    g._syncRenderResolution?.(true);
+  }
+
+  _readPresets() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}');
+      if (!parsed || typeof parsed !== 'object' || !parsed.presets || typeof parsed.presets !== 'object') return {};
+      return Object.fromEntries(Object.entries(parsed.presets)
+        .filter(([name, preset]) => !['__proto__', 'prototype', 'constructor'].includes(name) && preset && typeof preset === 'object'));
+    } catch { return {}; }
+  }
+
+  _writePresets(presets) {
+    try {
+      localStorage.setItem(PRESET_KEY, JSON.stringify({ version: TUNING_VERSION, presets }));
+      return true;
+    } catch { return false; }
+  }
+
+  listTuningPresets() { return Object.keys(this._readPresets()).sort(); }
+
+  saveTuningPreset(name) {
+    name = String(name || '').trim().slice(0, 48);
+    if (!this.active || !name || ['__proto__', 'prototype', 'constructor'].includes(name)) return false;
+    const presets = this._readPresets();
+    if (!Object.hasOwn(presets, name) && Object.keys(presets).length >= 50) return false;
+    presets[name] = { version: TUNING_VERSION, tuning: normalizeTuning(this.tuning), savedAt: new Date().toISOString() };
+    if (!this._writePresets(presets)) return false;
+    this.changed();
+    return true;
+  }
+
+  loadTuningPreset(name) {
+    if (!this.active) return false;
+    const preset = this._readPresets()[name];
+    if (!preset?.tuning || preset.version > TUNING_VERSION) return false;
+    this._applyTuning(preset.tuning);
+    this.changed(); return true;
+  }
+
+  deleteTuningPreset(name) {
+    const presets = this._readPresets();
+    if (!Object.hasOwn(presets, name)) return false;
+    delete presets[name];
+    if (!this._writePresets(presets)) return false;
+    this.changed(); return true;
+  }
+
+  exportTuning() {
+    return JSON.stringify({ kind: 'rift-pirates-testing-tuning', version: TUNING_VERSION,
+      tuning: normalizeTuning(this.tuning), changes: tuningChanges(this.tuning) }, null, 2);
+  }
+
+  importTuning(text) {
+    if (!this.active) return false;
+    try {
+      const parsed = typeof text === 'string' ? JSON.parse(text) : text;
+      if (!parsed || typeof parsed !== 'object' || !parsed.tuning || parsed.version > TUNING_VERSION) return false;
+      this._applyTuning(parsed.tuning);
+      this.changed(); return true;
+    } catch { return false; }
+  }
+
+  productionReview() {
+    const changes = tuningChanges(this.tuning);
+    const owners = {
+      player: 'src/player/Player.js', combat: 'src/config/weapons.js + src/player/PlayerWeapon.js',
+      enemy: 'src/enemies/EnemyTypes.js', visual: 'src/effects + src/core/Game.js',
+      gameplay: 'src/systems',
+    };
+    const review = Object.fromEntries(Object.entries(changes).map(([key, value]) => {
+      const item = TUNING_BY_KEY[key];
+      return [key, { value, authoredDefault: item.default, operation: item.unit === '+' ? 'add' : 'multiply',
+        owner: owners[item.category], description: item.description }];
+    }));
+    return JSON.stringify({
+      notice: 'REVIEW ARTIFACT ONLY — normal game defaults were not changed.',
+      generatedAt: new Date().toISOString(),
+      changes: review,
+      suggestedConfigModule: `// Generated for review; do not commit without translating values into their owning configs.\nexport const APPROVED_TUNING = Object.freeze(${JSON.stringify(changes, null, 2)});`,
+      guidance: 'Translate approved operations into the listed owning authored configs, run normal and lab suites, review the diff, then commit normally.',
+    }, null, 2);
   }
 
   setShip(id) {
@@ -204,7 +343,7 @@ export class TestingGrounds {
     g.weapon.reset(); g.augmentEffects.reset(); g.targeting.reset();
     g.scrap.reset(); g.fx.reset(); g.damageNumbers.reset(); g.closeNexusRift();
     g.env.reset(); g.death.end();
-    g.running = true; g.titleMode = false; g.paused = false;
+    g.running = true; g.titleMode = false; g.paused = false; g._syncPauseControl();
     g.testRun = true;
     $('pauseScreen').classList.add('hidden');
     $('skipHint').classList.add('hidden'); $('nexusFade').style.opacity = '0';
@@ -247,6 +386,22 @@ export class TestingGrounds {
   }
 
   clearArena() { this.loadScene('sandbox'); }
+
+  clearProjectiles() { if (!this.active) return; this.game.projectiles.reset(); this.changed(); }
+
+  destroyEnemies() {
+    if (!this.active) return;
+    for (const enemy of [...this.game.enemies.active]) if (enemy.alive) enemy.die();
+    this.changed();
+  }
+
+  forceEnemyAttack() {
+    if (!this.active) return;
+    for (const enemy of this.game.enemies.active) if (enemy.alive) {
+      enemy.fireT = 0; enemy.burstT = 0; if (enemy.special) enemy.special.t = 0;
+    }
+    this.changed();
+  }
 
   /** Explicit lab-only ending preview: never a real clear or paid reward. */
   previewEnding(victory = true) {
@@ -347,7 +502,9 @@ export class TestingGrounds {
       else this.loadScene(this.sceneId);
       return;
     }
-    p.health = p.stats.maxHealth; p.shield = p.stats.shieldMax; p.boost = p.stats.boostCapacity;
+    p.health = p.stats.maxHealth * this.getTuning('maxHealth');
+    p.shield = p.stats.shieldMax * this.getTuning('shieldCapacity');
+    p.boost = p.stats.boostCapacity * this.getTuning('boostCapacity');
     p.shieldBroken = false; p.timeSinceHit = 99; p.invuln = 0;
     p.blocksLeft = p.stats.freeBlocks; p.secondWindUsed = 0;
     this.changed();
@@ -416,7 +573,7 @@ export class TestingGrounds {
   beforeWorld(dt) {
     if (!this.active) return;
     const p = this.game.player;
-    if (this.settings.infiniteBoost) p.boost = p.stats.boostCapacity;
+    if (this.settings.infiniteBoost) p.boost = p.stats.boostCapacity * this.getTuning('boostCapacity');
     if (this.settings.unlimitedRolls) { p.rollCd = 0; p.boost = Math.max(p.boost, 24); }
     this.elapsed += dt;
     while (this.damageSamples.length && this.elapsed - this.damageSamples[0].time > 2) this.damageSamples.shift();
@@ -424,14 +581,17 @@ export class TestingGrounds {
       dummy.crystal.rotation.y += dt * .6;
       dummy.crystal.rotation.z += dt * .25;
     }
+    this.gizmos.update(this.game, this.settings);
   }
 
   snapshot() {
     const g = this.game, p = g.player;
     return { active: this.active, panelOpen: this.panelOpen, settings: { ...this.settings },
+      tuning: { ...this.tuning }, presets: this.listTuningPresets(),
       sceneId: this.sceneId, shipId: p.shipId || PLAYER_SHIPS[0].id, ranks: { ...g.upgrades.ranks },
       phase: g.encounter?.phase === undefined ? 0 : g.encounter.phase + 1,
-      hp: p.health, maxHp: p.stats.maxHealth, shield: p.shield, maxShield: p.stats.shieldMax,
+      hp: p.health, maxHp: p.stats.maxHealth * this.getTuning('maxHealth'),
+      shield: p.shield, maxShield: p.stats.shieldMax * this.getTuning('shieldCapacity'),
       level: g.xp.level, heat: g.heat.multiplier,
       projectiles: g.projectiles.player.filter(b => b.active).length + g.projectiles.enemy.filter(b => b.active).length,
       enemies: g.enemies.countAlive(), targets: g.targets.filter(t => t.alive).length,

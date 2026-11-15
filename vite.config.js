@@ -10,6 +10,10 @@ export default defineConfig({
   publicDir: 'assets',
   build: {
     target: 'es2022',
+    // The intentionally isolated Three.js engine chunk is ~594 kB minified
+    // (~148 kB gzip). Keep a documented ceiling above that stable vendor
+    // boundary while retaining the default-sized budget for the game chunk.
+    chunkSizeWarningLimit: 650,
     // Keep the renderer cached across gameplay/UI releases instead of making
     // returning players download the whole engine with every game change.
     rolldownOptions: {

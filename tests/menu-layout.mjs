@@ -20,7 +20,7 @@ try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => Boolean(window.RIFT) && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   await page.evaluate(() => document.fonts.ready);
   assert.equal(await page.evaluate(() => document.fonts.check('12px "Rift Pixel"')), true, 'Local pixel font loads');
@@ -105,12 +105,44 @@ try {
   await launchRun(page);
   assert.equal(await page.evaluate(() => window.RIFT.running), true, 'Launch starts gameplay');
   assert.equal(await page.evaluate(() => document.getElementById('titleScreen').classList.contains('hidden')), true);
+  assert.deepEqual(await page.$eval('#pauseBtn', button => ({
+    paused: button.classList.contains('isPaused'),
+    label: button.getAttribute('aria-label'),
+    pressed: button.getAttribute('aria-pressed'),
+    secondBar: getComputedStyle(button.querySelector('.pauseIcon'), '::after').display,
+  })), { paused: false, label: 'Pause game', pressed: 'false', secondBar: 'block' },
+  'Live play shows an explicit two-bar pause control');
   await page.click('#pauseBtn');
   await page.screenshot({ path: `${out}/pause-menu.png` });
   assert.equal(await page.evaluate(() => window.RIFT.paused), true, 'Pause suspends gameplay');
+  const playControl = await page.$eval('#pauseBtn', button => {
+    const rect = button.getBoundingClientRect();
+    const style = getComputedStyle(button);
+    const point = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return {
+      paused: button.classList.contains('isPaused'),
+      label: button.getAttribute('aria-label'),
+      pressed: button.getAttribute('aria-pressed'),
+      secondBar: getComputedStyle(button.querySelector('.pauseIcon'), '::after').display,
+      border: style.borderColor,
+      clickable: point === button || point?.closest('#pauseBtn') === button,
+    };
+  });
+  assert.deepEqual(playControl, {
+    paused: true, label: 'Resume game', pressed: 'true', secondBar: 'none',
+    border: 'rgb(168, 85, 247)', clickable: true,
+  }, 'Paused play triangle remains purple, visible and clickable above the pause screen');
   const pauseAboveToasts = await page.evaluate(() => Number(getComputedStyle(document.getElementById('pauseScreen')).zIndex) > Number(getComputedStyle(document.getElementById('toasts')).zIndex));
   assert.equal(pauseAboveToasts, true, 'Gameplay toasts stay behind pause console');
+  await page.click('#pauseBtn');
+  assert.equal(await page.evaluate(() => window.RIFT.paused), false, 'Top-right play control resumes gameplay');
+  await page.click('#pauseBtn');
   await page.click('#resumeBtn');
+  assert.deepEqual(await page.$eval('#pauseBtn', button => ({
+    paused: button.classList.contains('isPaused'),
+    label: button.getAttribute('aria-label'),
+    pressed: button.getAttribute('aria-pressed'),
+  })), { paused: false, label: 'Pause game', pressed: 'false' }, 'Pause console resume restores the pause icon');
   await page.evaluate(() => {
     const g = window.RIFT;
     g.scrap.burst(0, 0, -10, 12);

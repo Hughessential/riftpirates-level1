@@ -18,7 +18,7 @@ try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.goto(process.env.RIFT_TEST_URL || 'http://localhost:8000/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready(page);
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -231,7 +231,8 @@ try {
   const labPage = await browser.newPage();
   await labPage.setViewport({ width: 1440, height: 900 });
   labPage.on('pageerror', error => errors.push(error.message));
-  await labPage.goto('http://localhost:8000/?lab=1', { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await labPage.goto(new URL('?lab=1', process.env.RIFT_TEST_URL || 'http://localhost:8000/').href,
+    { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready(labPage);
   assert.deepEqual(await labPage.evaluate(() => ({
     unlocked: RIFT.testingPanel.unlocked,

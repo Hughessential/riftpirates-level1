@@ -56,7 +56,7 @@ export class CameraRig {
   }
 
   shake(amount) {
-    this.shakeAmt = Math.min(1.2, this.shakeAmt + amount);
+    this.shakeAmt = Math.min(1.2, this.shakeAmt + amount * (this.testing?.getTuning('screenShake') ?? 1));
   }
 
   update(dt, player, boosting) {

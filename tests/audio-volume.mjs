@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
-import { AudioManagerImpl } from '../src/core/AudioManager.js';
+import { AudioManagerImpl, AUDIO_OUTPUT, volumeToGain } from '../src/core/AudioManager.js';
 import { Save, AUDIO_DEFAULTS } from '../src/core/SaveSystem.js';
 
 const initial = { ...Save.data }, storage = new Map();
+assert.equal(AUDIO_OUTPUT.musicTrim, .75, 'Every music track is globally reduced to 75% of its prior output');
+assert.deepEqual([0, .25, .5, .75, 1].map(volumeToGain), [0, .0625, .25, .5625, 1],
+  'Volume controls use a perceptual squared-gain curve');
 const KEY = 'riftpirates-level1-v1';
 class FakeAudio {
   constructor() { this.paused = true; this.currentTime = 0; this.duration = 270; this.volume = 1; }
@@ -27,6 +30,7 @@ globalThis.window = {
 storage.set(KEY, JSON.stringify({ music: 0, sfx: 1, bestScore: 12345 }));
 Save.load();
 assert.equal(Save.data.music, 0); assert.equal(Save.data.bestScore, 12345);
+assert.equal(Save.data.masterVolume, 1);
 assert.equal(Save.data.musicVolume, .75); assert.equal(Save.data.sfxVolume, .75);
 storage.set(KEY, JSON.stringify({ musicVolume: 4, sfxVolume: -.5 }));
 Save.load();
@@ -43,8 +47,8 @@ storage.set(KEY, JSON.stringify({ musicVolume: .31, sfxVolume: .22 }));
 Save.load();
 webAudio._loadSfx = async () => {};
 await webAudio.init();
-assert.equal(webAudio.musicGain.gain.value, .31);
-assert.equal(webAudio.sfxGain.gain.value, .22);
+assert.equal(webAudio.musicGain.gain.value, volumeToGain(.31) * AUDIO_OUTPUT.musicTrim);
+assert.equal(webAudio.sfxGain.gain.value, volumeToGain(.22));
 assert.deepEqual(webAudio.musicGain.connections, [webAudio.mixBus], 'Music bypasses death filtering before the final protected mix');
 assert.deepEqual(webAudio.master.connections, [webAudio.warpFilter], 'Death filtering remains available to SFX');
 assert.deepEqual(webAudio.warpFilter.connections, [webAudio.mixBus]);
@@ -54,6 +58,10 @@ assert.deepEqual(webAudio.outputGain.connections, [webAudio.ctx.destination]);
 assert.equal(webAudio.mixLimiter.threshold.value, -3);
 assert.equal(webAudio.mixLimiter.ratio.value, 20);
 assert.equal(webAudio.outputGain.gain.value, .95);
+webAudio.setMasterVolume(.5);
+assert.equal(webAudio.masterVol, .5); assert.equal(Save.data.masterVolume, .5);
+assert.equal(webAudio.outputGain.gain.value, .95 * volumeToGain(.5));
+webAudio.setMasterVolume(1);
 
 // The boot title can start before the renderer exists, without waiting on the
 // SFX download bank or requiring a render-loop tick to lift a zero-duration fade.
@@ -88,14 +96,16 @@ webAudio.music.battle.el.currentTime = 42;
 webAudio.pauseMusic();
 webAudio.setMusicVolume(.78);
 webAudio.setSfxVolume(.43);
-assert.equal(webAudio.musicGain.gain.value, .78); assert.equal(webAudio.sfxGain.gain.value, .43);
+assert.equal(webAudio.musicGain.gain.value, volumeToGain(.78) * AUDIO_OUTPUT.musicTrim);
+assert.equal(webAudio.sfxGain.gain.value, volumeToGain(.43));
 assert.equal(webAudio.musicOwner, 'battle'); assert.equal(webAudio.music.battle.el.currentTime, 42);
 assert.equal(webAudio.music.battle.el.paused, true, 'Adjusting volume cannot unpause gameplay music');
 webAudio.setMusicEnabled(false); webAudio.setSfxEnabled(false);
 webAudio.setMusicVolume(.6); webAudio.setSfxVolume(.7);
 assert.equal(webAudio.musicGain.gain.value, 0); assert.equal(webAudio.sfxGain.gain.value, 0);
 webAudio.setMusicEnabled(true); webAudio.setSfxEnabled(true);
-assert.equal(webAudio.musicGain.gain.value, .6); assert.equal(webAudio.sfxGain.gain.value, .7);
+assert.equal(webAudio.musicGain.gain.value, volumeToGain(.6) * AUDIO_OUTPUT.musicTrim);
+assert.equal(webAudio.sfxGain.gain.value, volumeToGain(.7));
 assert.equal(webAudio.music.battle.el.paused, true, 'Unmute preserves the game pause reason');
 webAudio.resumeMusic();
 assert.equal(webAudio.music.battle.el.currentTime, 42); assert.equal(webAudio.music.battle.el.paused, false);
@@ -105,13 +115,16 @@ assert.equal(Save.data.musicVolume, .6); assert.equal(Save.data.sfxVolume, .7);
 // The media-element fallback applies the same level, independent of WebAudio.
 const fallback = new AudioManagerImpl(); fallback.ready = true;
 fallback.playTitle(0); fallback.update(1);
-assert.equal(fallback.music.title.el.volume, .6);
+assert.equal(fallback.music.title.el.volume, volumeToGain(.6) * AUDIO_OUTPUT.musicTrim);
+fallback.setMasterVolume(.5);
+assert.equal(fallback.music.title.el.volume, volumeToGain(.6) * volumeToGain(.5) * AUDIO_OUTPUT.musicTrim);
+fallback.setMasterVolume(1);
 fallback.setMusicVolume(.25);
-assert.equal(fallback.music.title.el.volume, .25);
+assert.equal(fallback.music.title.el.volume, volumeToGain(.25) * AUDIO_OUTPUT.musicTrim);
 fallback.setMusicEnabled(false); fallback.setMusicVolume(.9);
 assert.equal(fallback.music.title.el.volume, 0);
 fallback.setMusicEnabled(true);
-assert.equal(fallback.music.title.el.volume, .9);
+assert.equal(fallback.music.title.el.volume, volumeToGain(.9) * AUDIO_OUTPUT.musicTrim);
 fallback.setMusicVolume(0);
 assert.equal(Save.data.music, 1, 'Zero level and mute remain independent');
 fallback.setMusicVolume(Infinity); fallback.setSfxVolume(-2);
