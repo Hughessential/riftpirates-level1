@@ -1,9 +1,11 @@
-// Private/local prototype. Public builds deliberately have no entitlement path.
-// A future trusted account entitlement must replace this gate before sharing.
+// Session-only Easter egg access, explicitly enabled by the owner.
+// This discovery gate is not authenticated account authorization.
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const LOCAL_ULTRA_ACCESS = import.meta.env?.DEV === true
   && LOCAL_HOSTS.has(globalThis.location?.hostname);
-export function hasUltraUltimateAccess() { return LOCAL_ULTRA_ACCESS; }
+let brimbySignal = false;
+export function enableUltraFromBrimbySignal() { brimbySignal = true; }
+export function hasUltraUltimateAccess() { return LOCAL_ULTRA_ACCESS || brimbySignal; }
 
 export const ULTRA_ULTIMATE_DEFAULTS = Object.freeze({
   // Toggle mode: unlimited active gameplay until a second fresh press of 2.

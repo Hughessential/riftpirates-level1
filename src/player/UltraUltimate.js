@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ULTRA_ULTIMATE_DEFAULTS, ULTRA_TUNING_KEYS, ULTRA_ACTIVATION_AUDIO, hasUltraUltimateAccess } from '../config/abilities.js';
+import { ULTRA_ULTIMATE_DEFAULTS, ULTRA_TUNING_KEYS, ULTRA_ACTIVATION_AUDIO, hasUltraUltimateAccess, enableUltraFromBrimbySignal } from '../config/abilities.js';
 import { primaryWeaponOutput } from '../config/weapons.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { UltraUltimateEffect } from '../effects/UltraUltimateEffect.js';
@@ -30,6 +30,11 @@ export class UltraUltimate {
     // No GPU allocation or effect creation for public/unauthorized visitors.
     this.effect = this.authorized ? new UltraUltimateEffect(this.player, game.fx, game.camera) : null;
     this.measureHull();
+  }
+
+  unlockFromBrimbySignal() {
+    enableUltraFromBrimbySignal();
+    this.effect ||= new UltraUltimateEffect(this.player, this.game.fx, this.game.camera);
   }
 
   get active() { return this.#active; }

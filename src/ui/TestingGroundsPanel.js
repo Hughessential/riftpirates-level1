@@ -155,7 +155,7 @@ export class TestingGroundsPanel {
     this.globeTarget.id = 'labGlobeUnlock';
     this.globeTarget.setAttribute('aria-label', 'Mysterious rift globe');
     const armSecret = () => {
-      if (this.unlocked) return;
+      if (this.unlocked && this.testing.game.ultraUltimate.authorized) return;
       this.secretArmed = true;
       this.secretBuffer = '';
       this.globeTarget.setAttribute('aria-description', 'The globe is listening. Enter the hidden access word.');
@@ -186,7 +186,7 @@ export class TestingGroundsPanel {
     this.pauseEntry?.classList.toggle('hidden', !this.unlocked);
     this.globeTarget?.classList.toggle('labUnlocked', this.unlocked);
     if (this.unlocked && !quiet) {
-      this.testing.game.hud.toast('BRIMBY SIGNAL ACCEPTED', 'TESTING GROUNDS ACCESS / THIS SESSION ONLY', '#27f5da', { duration: 4.2, category: 'instruction' });
+      this.testing.game.hud.toast('BRIMBY SIGNAL ACCEPTED', 'TESTING GROUNDS + ULTRA / THIS SESSION ONLY', '#27f5da', { duration: 4.2, category: 'instruction' });
     }
   }
 
@@ -216,11 +216,13 @@ export class TestingGroundsPanel {
     }
   }
 
-  _buildTuning() {
+  _buildTuning(ultraOnly = false) {
     const host = this.dialog.querySelector('#labTuningCategories');
-    this.tuningRows = new Map();
+    this.tuningRows ||= new Map();
     for (const [category, label, description] of TUNING_CATEGORIES) {
       const ultraCategory = category.startsWith('ultra');
+      if (ultraOnly && !ultraCategory) continue;
+      if (this.dialog.querySelector(`[data-tuning-category="${category}"]`)) continue;
       if (ultraCategory && !this.testing.game.ultraUltimate?.authorized) continue;
       const details = document.createElement('details');
       details.className = 'labTuningCategory'; details.dataset.tuningCategory = category; details.open = true;
@@ -240,7 +242,7 @@ export class TestingGroundsPanel {
   }
 
   _buildUltra() {
-    if (!this.testing.game.ultraUltimate?.authorized) return;
+    if (!this.testing.game.ultraUltimate?.authorized || this.dialog.querySelector('#labTab-ultra')) return;
     const tab = document.createElement('button');
     tab.type = 'button'; tab.className = 'labTab'; tab.id = 'labTab-ultra';
     tab.dataset.tab = 'ultra'; tab.setAttribute('role', 'tab');
@@ -250,7 +252,7 @@ export class TestingGroundsPanel {
     const page = document.createElement('section');
     page.className = 'labPage'; page.id = 'labPage-ultra'; page.hidden = true;
     page.setAttribute('role', 'tabpanel'); page.setAttribute('aria-labelledby', 'labTab-ultra');
-    page.innerHTML = `<div class="labSectionHead"><div><span class="labEyebrow">PRIVATE LOCAL TESTING</span><h3>ULTRA-ULTIMATE</h3></div><span class="labPill">KEY 2 / TOGGLE</span></div>
+    page.innerHTML = `<div class="labSectionHead"><div><span class="labEyebrow">BRIMBY SIGNAL / SESSION ACCESS</span><h3>ULTRA-ULTIMATE</h3></div><span class="labPill">KEY 2 / TOGGLE</span></div>
       <p class="labHint">BLACK ARMOR + GOD HAKI stays active until you press 2 again. Cooldown starts when it ends. Normal Black Armor remains on key 1.</p>
       <output id="labUltraStatus" class="labUltraStatus">READY</output>
       <div class="labActionGrid labUltraControls"><button type="button" data-action="ultraActivate" class="labPrimary">ACTIVATE</button><button type="button" data-action="ultraCancel">CANCEL + START COOLDOWN</button><button type="button" data-action="ultraReset">RESET COOLDOWN</button></div>
@@ -292,9 +294,11 @@ export class TestingGroundsPanel {
     this.dialog.querySelectorAll('[data-setting]').forEach(input => {
       input.addEventListener('change', () => this.run(() => this.testing.setSetting(input.dataset.setting, input.checked)));
     });
-    this.dialog.querySelectorAll('[data-ultra-setting]').forEach(input => {
-      input.addEventListener('change', () => this.run(() => this.testing.game.ultraUltimate?.authorized
-        ? this.testing.setTuning(input.dataset.ultraSetting, Number(input.checked)) : false));
+    this.dialog.addEventListener('change', event => {
+      const input = event.target;
+      if (input.matches('[data-ultra-setting]') && this.testing.game.ultraUltimate.authorized)
+        this.run(() => this.testing.setTuning(input.dataset.ultraSetting, Number(input.checked)));
+      if (input.matches('[data-tuning-range],[data-tuning-number]')) this.renderState();
     });
     $('#labTimeScale').addEventListener('change', event => this.run(() => this.testing.setSetting('timeScale', Number(event.target.value))));
     $('#labBloom').addEventListener('input', event => this.run(() => this.testing.setBloom(Number(event.target.value))));
@@ -302,12 +306,10 @@ export class TestingGroundsPanel {
     $('#labAugmentRarity').addEventListener('change', event => { this.rarity = event.target.value; this._filterAugments(); });
     $('#labAugmentCategory').addEventListener('change', event => { this.category = event.target.value; this._filterAugments(); });
     $('#labTuningSearch').addEventListener('input', event => this._filterTuning(event.target.value));
-    this.dialog.querySelectorAll('[data-tuning-range],[data-tuning-number]').forEach(input => {
-      input.addEventListener('input', event => {
-        const key = event.target.dataset.tuningRange || event.target.dataset.tuningNumber;
-        this.testing.setTuning(key, Number(event.target.value));
-      });
-      input.addEventListener('change', () => this.renderState());
+    this.dialog.addEventListener('input', event => {
+      const input = event.target;
+      const key = input.dataset.tuningRange || input.dataset.tuningNumber;
+      if (key) this.testing.setTuning(key, Number(input.value));
     });
     this._wireWindowDrag();
 
@@ -316,10 +318,14 @@ export class TestingGroundsPanel {
     this._keyDown = event => {
       if (document.querySelector('#controllerSettings[open],#controllerKeyboard[open],#pilotIdentityDialog[open]')) return;
       const editing = event.target?.matches?.('input,select,textarea,[contenteditable="true"]') ?? false;
-      if (this.secretArmed && !this.unlocked && !editing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key?.length === 1) {
+      if (this.secretArmed && !editing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key?.length === 1) {
         this.secretBuffer = `${this.secretBuffer}${event.key.toLowerCase()}`.slice(-6);
         if (this.secretBuffer === 'brimby') {
           this.secretArmed = false;
+          this.testing.game.ultraUltimate.unlockFromBrimbySignal();
+          this._buildUltra();
+          this._buildTuning(true);
+          this.testing.game.hud._updateUltraArmor();
           this._setUnlocked(true);
         }
       }
