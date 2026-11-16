@@ -106,6 +106,27 @@ try {
   };
 
   await show();
+  const backdrop = await page.$eval('#upgradeBackdrop', el => {
+    const rect = el.getBoundingClientRect();
+    return { display: getComputedStyle(el).display, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+  });
+  assert.deepEqual(backdrop, { display: 'block', left: 0, top: 0, right: 1440, bottom: 900 },
+    'The unscaled augment backdrop covers every viewport edge');
+  const originalScale = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-user-scale'));
+  for (const [width, height] of [[2560, 1296], [1440, 900], [390, 844]]) {
+    await page.setViewport({ width, height, hasTouch: true });
+    for (const scale of [.8, 1, 1.1, 1.25, 1.4]) {
+      await page.evaluate(scale => document.documentElement.style.setProperty('--ui-user-scale', String(scale)), scale);
+      const bounds = await page.$eval('#upgradeBackdrop', el => {
+        const r = el.getBoundingClientRect(), css = getComputedStyle(el);
+        return { x: r.x, y: r.y, width: r.width, height: r.height, display: css.display, pointerEvents: css.pointerEvents };
+      });
+      assert.deepEqual(bounds, { x: 0, y: 0, width, height, display: 'block', pointerEvents: 'none' },
+        `Backdrop covers every edge at ${width}x${height}, UI scale ${scale}`);
+    }
+  }
+  await page.evaluate(scale => document.documentElement.style.setProperty('--ui-user-scale', scale), originalScale);
+  await page.setViewport({ width: 1440, height: 900, hasTouch: true });
   await page.evaluate(async () => { __preview(Object.keys(__registry).slice(0, 3)); await __settle(); });
   const defaults = await page.$$eval('#upgradeCards .holoCard', cards => cards.map(card => ({
     tag: card.tagName, rarity: card.dataset.rarity, label: card.querySelector('.holoRarity')?.textContent,
@@ -435,6 +456,7 @@ try {
   assert.equal(await page.$eval('#upgradeCards', el => el.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running' && animation.effect.getTiming().iterations === Infinity).length), 0, 'Pause stops card effects');
   await page.evaluate(() => { RIFT.togglePause(); RIFT.upgradeScreen.hide(); });
   assert.equal(await page.$eval('#upgradeCards', el => el.getAnimations({ subtree: true }).filter(animation => animation.playState === 'running').length), 0, 'Hidden cards do no animation work');
+  assert.equal(await page.$eval('#upgradeBackdrop', el => getComputedStyle(el).display), 'none', 'Closing the shop removes its full-screen dimmer');
   assert.deepEqual(errors, []);
   console.log(`PASS: ${ids.length} augment texts at desktop/narrow sizes, rarity art and bounded effects, reduced motion, paid mouse/keyboard/touch/virtual MCON, zero-wallet skips, exact-price and single-charge transactions, stable offers and stale callback safety. Screenshots: ${artifacts}`);
 } finally {

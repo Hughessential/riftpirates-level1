@@ -1,5 +1,9 @@
 /* Three artifacts, bounded decoration, no additional render loops or contexts. */
-#upgradeScreen{background:radial-gradient(ellipse at 50% 10%,#240a3de6,transparent 65%),#020308ed;gap:14px;padding:24px 30px;isolation:isolate}
+/* Keep the dimmer outside the UI-scaled screen. Safari can round CSS zoom on a
+   fixed element, leaving an uncovered strip at the right and bottom edges. */
+#upgradeBackdrop{display:none;position:fixed;inset:0;z-index:19;pointer-events:none;backdrop-filter:blur(4px);background:radial-gradient(ellipse at 50% 10%,#240a3de6,transparent 65%),#020308ed}
+#upgradeScreen:not(.hidden)+#upgradeBackdrop{display:block}
+#upgradeScreen{background:transparent;backdrop-filter:none;gap:14px;padding:24px 30px;isolation:isolate}
 #upgradeScreen .eyebrow{color:#54f4de;letter-spacing:.32em;font-size:13px}
 #upgradeScreen .upSub{color:#b9a9d1;line-height:1.7;font-size:10px;letter-spacing:.16em}
 #augmentWallet{display:flex;align-items:center;justify-content:center;gap:12px;font-size:8px;letter-spacing:.12em;color:#80aaa2;line-height:1.5}
