@@ -20,6 +20,7 @@ import { AdaptiveResolution } from '../render/AdaptiveResolution.js';
 
 import { Player, BASE_STATS } from '../player/Player.js';
 import { PlayerWeapon } from '../player/PlayerWeapon.js';
+import { UltraUltimate } from '../player/UltraUltimate.js';
 
 import { ProjectilePool } from '../combat/ProjectilePool.js';
 import { TargetingSystem } from '../combat/TargetingSystem.js';
@@ -164,6 +165,7 @@ export class Game {
     this.director = new LevelDirector(this);
     this.escape = new FinalEscape(this);
     this.testing = new TestingGrounds(this);
+    this.ultraUltimate = this.player.ultraUltimate = new UltraUltimate(this);
     this.tutorial = new OpeningTutorial(this);
 
     // --- run state ---
@@ -259,6 +261,7 @@ export class Game {
     // resolution-query event. Catch that before submitting the next frame.
     if (this._watchedDensity !== (devicePixelRatio || 1)) this._resize();
     this._updateLighting(dt);
+    this.presentation.blackSurfacePass.enabled = (this.ultraUltimate?.effect?.fade || 0) > 0;
     this.presentation.render(dt);
   }
 
@@ -281,7 +284,7 @@ export class Game {
     const authoredBloom = this.testing?.active && this.testing.settings.bloom !== null
       ? this.testing.settings.bloom : mood.bloom;
     this.presentation.setBloom(authoredBloom * (this.testing?.getTuning('bloom') ?? 1)
-      + (this.player?.blackArmorBloom || 0));
+      + (this.player?.blackArmorBloom || 0) + (this.ultraUltimate?.bloom || 0));
   }
 
   // ------------------------------------------------------------------ helpers
@@ -365,6 +368,7 @@ export class Game {
     this.clearHazards();
     this.projectiles.reset();
     this.player.frozen = true;
+    this.ultraUltimate.reset();
     this.player.resetBlackArmor();
     Audio2.playVictory();
     this.director.go(STATE.VICTORY);
@@ -403,6 +407,7 @@ export class Game {
   // ------------------------------------------------------------------- run flow
 
   prepareTitle() {
+    this.ultraUltimate.reset();
     this.tutorial?.stop();
     if (this.adaptiveResolution.restore()) this._resize();
     this.director.clearPresentation();
@@ -521,6 +526,7 @@ export class Game {
   _onPlayerDeath(source) {
     if (!this.running || this.player.alive || this._terminalOutcome || this._resultsFinalized || this.death.active) return;
     this._terminalOutcome = 'defeat';
+    this.ultraUltimate.reset();
     this.player.resetBlackArmor();
     Audio2.playDeath();
     this.director.clearPresentation();
@@ -549,6 +555,7 @@ export class Game {
     this.enemies.clear();
     this.clearHazards();
     this.projectiles.reset();
+    this.ultraUltimate.reset();
     this._resultsFinalized = true;
     this.escape.dispose();
     this.player.exhaust.reset();
@@ -727,7 +734,10 @@ export class Game {
 
     // --- player ---
     if (!dying) {
+      // Simulation clocks advance only while active gameplay owns the world.
       this.player.update(dt, this);
+      if (active && this.director.inCombat) this.ultraUltimate.update(dt);
+      this.ultraUltimate.updateEffects(dt);
       if (active && this.director.inCombat) this.weapon.update(dt, this);
     }
 

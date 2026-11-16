@@ -68,10 +68,10 @@ try {
   assert.equal(await page.evaluate(() => window.RIFT.testing.panelOpen), true, 'F2 reopens the same test session');
 
   await page.click('#labTab-tuning');
-  assert.equal(await page.$$eval('[data-tuning-row]', rows => rows.length), TUNING_SCHEMA.length,
+  assert.equal(await page.$$eval('[data-tuning-row],[data-ultra-setting]', rows => rows.length), TUNING_SCHEMA.length,
     'All connected tuning parameters render from the registry');
   await page.type('#labTuningSearch', 'critical');
-  assert.deepEqual(await page.$$eval('[data-tuning-row]:not([hidden])', rows => rows.map(row => row.dataset.tuningRow).sort()),
+  assert.deepEqual(await page.$$eval('#labTuningCategories [data-tuning-row]:not([hidden])', rows => rows.map(row => row.dataset.tuningRow).sort()),
     ['criticalChance', 'criticalDamage']);
   await page.click('#labTuningSearch', { count: 3 }); await page.keyboard.press('Backspace');
   await page.$eval('[data-tuning-number="moveSpeed"]', input => { input.value = '2'; input.dispatchEvent(new Event('input', { bubbles: true })); });

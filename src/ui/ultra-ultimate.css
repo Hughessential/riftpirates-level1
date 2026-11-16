@@ -1,0 +1,14 @@
+.ultraUltimateRow{margin-top:1px}
+.ultraUltimateBar{height:22px!important;border-color:#674386!important;background:#090813;overflow:hidden;box-shadow:0 0 6px #742be936}
+.ultraUltimateFill{height:100%;width:100%;background:linear-gradient(90deg,#321250,#681e8e 40%,#147c88 80%,#24bda7);opacity:.8}
+.ultraUltimateReadout{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:0 7px;color:#effffb;font-size:6px;line-height:1;text-shadow:0 1px 3px #000,0 0 3px #000;white-space:nowrap;pointer-events:none}
+.ultraUltimateReadout strong{font-size:6px;letter-spacing:.05em}
+.ultraUltimateRow.active .ultraUltimateBar{border-color:#65ffe4!important;box-shadow:0 0 9px #8b3bf777,0 0 16px #30ffd838}
+.ultraUltimateRow.active .ultraUltimateFill{background:linear-gradient(100deg,#7221b5,#c628a8 30%,#354ade 53%,#10aaab 78%,#73deca);opacity:1}
+.ultraUltimateRow.cooldown .ultraUltimateFill{opacity:.55}
+.ultraUltimateRow.cooldown .ultraUltimateReadout{color:#b8b2c6}
+.labUltraStatus{display:block;margin:15px 0;padding:12px 14px;border:1px solid #4b4270;background:linear-gradient(110deg,#37124b33,#0a3b3033);color:#b8fff0;font-size:10px;line-height:1.8}
+.labUltraControls{margin-bottom:16px}
+#labPage-ultra .labPrimary:disabled{background:#102429;color:#8fcbc0;opacity:.8;box-shadow:none}
+.labConsole:has(#labTab-ultra) .labNav .labTab{min-height:59px}
+@media(max-width:600px){.labConsole:has(#labTab-ultra) .labNav{grid-template-columns:repeat(7,1fr)}.labConsole:has(#labTab-ultra) .labNav .labTab{min-height:45px}.labTab#labTab-ultra strong{font-size:6px}}

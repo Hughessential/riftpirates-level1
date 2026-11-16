@@ -14,7 +14,7 @@ export const DEFAULT_BUTTONS = { fire: 7, cancel: 1, brake: 0, rollLeft: 4, roll
 const GP_CAM_DEADZONE = 0.18;
 const GP_TRIGGER_ON = 0.12; // analog triggers count as held past this value
 export const ROLL_DOUBLE_TAP_MS = 280;
-const isTextEntry = target => target?.matches?.('input:not([type="range"]):not([type="checkbox"]),textarea,[contenteditable="true"]');
+const isTextEntry = target => target?.isContentEditable || target?.closest?.('input,textarea,select,[contenteditable="true"]');
 
 class InputImpl {
   constructor() {
@@ -51,6 +51,7 @@ class InputImpl {
     // one-shot barrel-roll requests, drained by the player each frame
     this._rollQueue = 0; // -1 = left, +1 = right, 0 = none
     this._blackArmorQueued = false;
+    this._ultraUltimateQueued = false;
     this._rollTapTimes = new Map();
     this._rollStickDir = 0;
 
@@ -208,6 +209,7 @@ class InputImpl {
       // entry never count, and Input.enabled is false while a menu owns input.
       if (!wasDown && !e.repeat && this.enabled && !isTextEntry(e.target)) {
         if (e.code === 'Digit1') this._blackArmorQueued = true;
+        else if (e.code === 'Digit2' && !document.querySelector('dialog[open]')) this._ultraUltimateQueued = true;
         else if (e.code === 'KeyQ') this._rollQueue = -1;
         else if (e.code === 'KeyE') this._rollQueue = 1;
         else if (e.code === 'KeyA' || e.code === 'ArrowLeft') this._recordRollTap(`key:${e.code}`, -1);
@@ -230,6 +232,7 @@ class InputImpl {
       this._blockKeyboardFireUntilRelease = false;
       this._rollQueue = 0;
       this._blackArmorQueued = false;
+      this._ultraUltimateQueued = false;
       this._resetRollTaps();
       this.boost = false;
       fOff();
@@ -382,6 +385,7 @@ class InputImpl {
     this.menuConfirmHeld = false;
     this._rollQueue = 0;
     this._blackArmorQueued = false;
+    this._ultraUltimateQueued = false;
     this._resetRollTaps();
   }
 
@@ -434,6 +438,12 @@ class InputImpl {
   consumeBlackArmor() {
     const queued = this._blackArmorQueued;
     this._blackArmorQueued = false;
+    return queued;
+  }
+
+  consumeUltraUltimate() {
+    const queued = this._ultraUltimateQueued;
+    this._ultraUltimateQueued = false;
     return queued;
   }
 
@@ -520,6 +530,7 @@ class InputImpl {
     this.menuConfirmHeld = false;
     this._rollQueue = 0;
     this._blackArmorQueued = false;
+    this._ultraUltimateQueued = false;
     this._resetRollTaps();
   }
 }

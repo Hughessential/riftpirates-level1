@@ -1,4 +1,5 @@
 import { clamp } from './Utils.js';
+import { ULTRA_ULTIMATE_DEFAULTS, ULTRA_TUNING_KEYS } from '../config/abilities.js';
 
 export const TUNING_VERSION = 2;
 
@@ -8,11 +9,17 @@ export const TUNING_CATEGORIES = Object.freeze([
   ['enemy', 'ENEMIES & DIFFICULTY', 'Hostile durability, movement, attacks and aim.'],
   ['visual', 'VFX & GRAPHICS', 'Bloom, particles, trails, shake and render scale.'],
   ['ability', 'BLACK ARMOR', 'Transformation timing, armor finish, energy, lightning and activation audio.'],
+  ['ultraGameplay', 'GAMEPLAY', 'Indefinite toggle, cooldown, damage range and overwhelming offensive power.'],
+  ['ultraAura', 'AURA', 'Layered rainbow envelope, shimmer, lattice and flowing ribbons.'],
+  ['ultraLightning', 'BLACK LIGHTNING', 'Opaque black bodies, branching fractures and luminous colored edges.'],
+  ['ultraPresentation', 'PRESENTATION', 'Polished armor, particles, Void Beam trails, impact flashes and sound.'],
   ['gameplay', 'GAMEPLAY SYSTEMS', 'Rewards, score, XP, pickups and Rift Heat.'],
 ]);
 
 const entry = (category, key, label, description, min, max, step, value = 1, unit = '×') =>
   Object.freeze({ category, key, label, description, min, max, step, default: value, unit });
+const ultraEntry = (category, key, label, description, min, max, step, unit = '×') =>
+  entry(category, ULTRA_TUNING_KEYS[key], label, description, min, max, step, ULTRA_ULTIMATE_DEFAULTS[key], unit);
 
 /**
  * Every entry below is connected to a real runtime system. Values expressed as
@@ -74,6 +81,40 @@ export const TUNING_SCHEMA = Object.freeze([
   entry('ability', 'blackArmorParticles', 'Particle density', 'Density of activation debris and sustained electrical sparks.', 0, 3, .05, 1.25, '×'),
   entry('ability', 'blackArmorShimmer', 'Shimmer / glint intensity', 'Strength and frequency of armor sweeps and brilliant glints.', 0, 4, .05, 1.6, '×'),
   entry('ability', 'blackArmorSoundVolume', 'Activation sound volume', 'Black Armor charge cue level on the sound-effects bus.', 0, 1, .01, .82, 'gain'),
+
+  ultraEntry('ultraGameplay', 'cooldown', 'Cooldown after toggle-off', 'Seconds of gameplay before another activation. Active duration is unlimited.', 0, 300, 1, 'sec'),
+  ultraEntry('ultraGameplay', 'fieldRadius', 'Damage field radius', 'World-unit sphere radius. Zero uses 15 measured hull lengths, without exhaust or effects.', 0, 300, .5, 'm'),
+  ultraEntry('ultraGameplay', 'pulseInterval', 'Damage pulse interval', 'Damage per pulse is area DPS times this interval; includes an immediate activation pulse.', .05, 2, .05, 'sec'),
+  ultraEntry('ultraGameplay', 'areaDps', 'Area damage per second', 'Explicit DPS override. Zero derives damage from the pre-ultra primary weapon at activation.', 0, 1000000, 100, 'DPS'),
+  ultraEntry('ultraGameplay', 'areaDpsMultiplier', 'Automatic area DPS multiplier', 'Scales primary-weapon DPS when the explicit area DPS override is zero.', 1, 1000, 1),
+  ultraEntry('ultraGameplay', 'projectileMultiplier', 'Void Beam damage multiplier', 'Applied once to each normal upgrade-adjusted cannon shot. Firing cadence is preserved.', 1, 1000, 1),
+  ultraEntry('ultraGameplay', 'showRadius', 'Damage-radius gizmo', 'A visible sphere shows the actual damage range in the test arena.', 0, 1, 1, 'on'),
+
+  ultraEntry('ultraAura', 'auraSize', 'Rainbow envelope size', 'Radius of the layered visual envelope, independent from the actual damage range.', 4, 35, .5, 'm'),
+  ultraEntry('ultraAura', 'auraIntensity', 'Rainbow light intensity', 'Radiance of the envelope, ribbons and iridescent filaments.', .2, 5, .1),
+  ultraEntry('ultraAura', 'auraOpacity', 'Envelope opacity', 'Translucency of the rainbow envelope; lower values open more battlefield sightlines.', .02, .6, .01, 'ratio'),
+  ultraEntry('ultraAura', 'shimmer', 'Sustained shimmer', 'Strength of traveling energy ripples and prismatic glints.', 0, 3, .05),
+  ultraEntry('ultraAura', 'rainbowSpeed', 'Rainbow cycling speed', 'Speed of continuous color travel through the full rainbow palette.', 0, 1.5, .01),
+  ultraEntry('ultraAura', 'latticeDensity', 'Lattice density', 'Fine faceted energy filaments within the bounded visual pool.', 0, 2, .1),
+  ultraEntry('ultraAura', 'ribbonDensity', 'Ribbon density', 'Sweeping energy ribbons within the bounded visual pool.', 0, 2, .1),
+
+  ultraEntry('ultraLightning', 'majorCount', 'Major black branches', 'Large signature lightning branches. Their geometry persists for a coherent short lifetime.', 4, 24, 1, 'bolts'),
+  ultraEntry('ultraLightning', 'minorCount', 'Minor electrical branches', 'Smaller connecting arcs and filaments; reduce these first for a lighter effect.', 0, 40, 1, 'bolts'),
+  ultraEntry('ultraLightning', 'coreWidth', 'Black-core width', 'Physical thickness of the opaque black lightning bodies.', .08, 1.2, .01, 'm'),
+  ultraEntry('ultraLightning', 'branching', 'Branching density', 'Frequency of secondary forks along the larger fractures.', 0, 1, .05, 'ratio'),
+  ultraEntry('ultraLightning', 'lightningReach', 'Decorative lightning reach', 'World-unit reach of decorative branches. Gameplay radius is configured separately.', 10, 100, 1, 'm'),
+  ultraEntry('ultraLightning', 'lightningLifetime', 'Bolt lifetime', 'Coherent lifetime before a branch changes shape.', .2, 2, .05, 'sec'),
+  ultraEntry('ultraLightning', 'glowWidth', 'Colored edge width', 'Width of luminous colored edge light around the opaque black body.', 1.1, 3, .05),
+  ultraEntry('ultraLightning', 'glowIntensity', 'Edge glow intensity', 'Brightness of the purple-to-teal lightning edge treatment.', .5, 6, .1),
+  ultraEntry('ultraLightning', 'gradientMix', 'Purple-to-teal color balance', 'Weight of signature purple and teal edges versus pink, electric blue and red accents.', 0, 1, .05, 'ratio'),
+
+  ultraEntry('ultraPresentation', 'armorShine', 'Obsidian shine', 'Moving polished highlights and prismatic reflections on the black hull.', 0, 3, .05),
+  ultraEntry('ultraPresentation', 'particles', 'Ship particles and wake', 'Prismatic sparks and trailing electrical fragments. Boost intensifies the wake.', 0, 2, .1),
+  ultraEntry('ultraPresentation', 'projectileTrails', 'Void Beam trails', 'Prismatic tails on discrete cannon shots.', 0, 3, .1),
+  ultraEntry('ultraPresentation', 'impactEffects', 'Void Beam impact effects', 'Intensity of brief rainbow and purple electrical impact bursts.', 0, 2, .1),
+  ultraEntry('ultraPresentation', 'bloom', 'Bloom contribution', 'Additional bloom while the transformation is visible.', 0, 1, .01, '+'),
+  ultraEntry('ultraPresentation', 'soundVolume', 'Activation audio volume', 'One activation cue through the existing effects volume controls.', 0, 1, .01, 'gain'),
+  ultraEntry('ultraPresentation', 'reducedFlashing', 'Reduced flashing', 'Gentler pulses and impacts retain the black lightning and rainbow identity.', 0, 1, 1, 'on'),
 
   entry('gameplay', 'lootValue', 'Loot value', 'Scales value authorized by new loot drops.', 0, 10, .1),
   entry('gameplay', 'pickupRadius', 'Pickup radius', 'Scales the scrap attraction radius.', .25, 8, .05),

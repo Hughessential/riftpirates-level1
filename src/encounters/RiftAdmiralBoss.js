@@ -59,6 +59,8 @@ export class RiftAdmiralBoss extends TowerEncounter {
       damageScale: c.coreDamageScale,
       onDamage: (d) => this._bossDamage(d),
     });
+    // Both colliders feed one health pool; area pulses must hit it only once.
+    this.bodyTarget.damageGroup = this.coreTarget.damageGroup = this;
     this.coreTarget.targetable = false;
     this.targets.push(this.coreTarget);
     game.targets.push(this.coreTarget);

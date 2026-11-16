@@ -272,8 +272,8 @@ export class ControllerMenus {
     }
     if (!items.includes(this.focused)) this.focus(items.includes(document.activeElement) ? document.activeElement : items[0]);
     if (root === this.game.testingPanel?.dialog && (nav.prevTab || nav.nextTab)) {
-      const tabs = ['pilot', 'augments', 'arena', 'effects'];
-      const index = (tabs.indexOf(this.game.testingPanel.activeTab) + (nav.nextTab ? 1 : -1) + 4) % 4;
+      const tabs = [...root.querySelectorAll('[data-tab]')].map(tab => tab.dataset.tab);
+      const index = (tabs.indexOf(this.game.testingPanel.activeTab) + (nav.nextTab ? 1 : -1) + tabs.length) % tabs.length;
       this.game.testingPanel.selectTab(tabs[index]);
       this.focus(root.querySelector(`#labTab-${tabs[index]}`));
     } else if (nav.up || nav.down) this.move(items, nav.down ? 1 : -1);

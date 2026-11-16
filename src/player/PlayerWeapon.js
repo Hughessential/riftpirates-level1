@@ -128,10 +128,29 @@ export class PlayerWeapon {
       rank: weapon === 'pulse' ? 1 + this.signature.stacks : rank(s, WEAPON_AUGMENTS[weapon]) || 1,
       power: this.signature.power, signature: this.signature, crit,
     });
+    const ultra = p.ultraUltimate?.active ? p.ultraUltimate.tuning() : null;
     const emit = (weapon, options = {}) => {
       const visual = appearance(weapon);
       if (absolute) { visual.width *= 1.7; visual.trail *= 1.4; }
-      return this.proj.firePlayer({ ...base, x: p.x, weapon, color: visual.color, visual, ...options });
+      const shot = { ...base, x: p.x, weapon, color: visual.color, visual, ...options };
+      // Apply once, after all ordinary damage/critical/capacitor adjustments.
+      // The salvo base and player stats remain unchanged, so echoes and proc
+      // projectiles cannot recursively acquire the ultra multiplier.
+      if (ultra && ['pulse', 'capacitor', 'twin'].includes(weapon)) {
+        const multiplier = Number(ultra.projectileMultiplier);
+        shot.damage *= Number.isFinite(multiplier) ? Math.max(0, Math.min(10000, multiplier)) : 100;
+        Object.assign(visual, {
+          voidBeam: true, shape: 'voidBeam', color: '#a64dff', accent: '#28ffe2',
+          width: Math.max(.52, Math.min(1.2, visual.width * 1.75)),
+          length: Math.max(7.5, Math.min(11, visual.length * 1.7)),
+          trail: Math.max(0, Math.min(3, Number(ultra.projectileTrails ?? 1) || 0)) * 14,
+          brightness: 2.4,
+          impactEffects: Math.max(0, Math.min(3, Number(ultra.impactEffects ?? 1) || 0)),
+          reducedFlashing: Boolean(ultra.reducedFlashing),
+        });
+        shot.color = visual.color;
+      }
+      return this.proj.firePlayer(shot);
     };
     const charged = kinetic && this.charge >= 1;
     const primary = emit(charged ? 'capacitor' : 'pulse', { x: p.x + this.muzzle * 1.15,

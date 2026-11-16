@@ -80,7 +80,17 @@ export class CollisionSystem {
           g.damageNumbers.spawn(b.x, b.y, b.z, Math.round(dealt), b.crit);
           g.heat.onDealDamage(dealt);
           Audio2.play(b.crit ? 'crit' : 'hit', b.crit ? 0.6 : 0.28, 1, 0.1);
-          g.fx.explode(b.x, b.y, b.z, {
+          const voidImpact = b.voidBeam ? b.visual.impactEffects : 0;
+          g.fx.explode(b.x, b.y, b.z, voidImpact > 0 ? {
+            count: Math.round(9 * voidImpact),
+            colors: ['#1c092c', '#b642ff', '#2affdd', '#ff3a8c', '#338bff'],
+            sparkColors: ['#bf74ff', '#38ffe4', '#ff3b83', '#428bff', '#ffe88b'],
+            power: 13, gravity: 0, scale: .45, life: .3,
+            arcs: true, arcColor: '#be62ff',
+            flashColor: '#a65aff',
+            flashScale: b.visual.reducedFlashing ? 0 : .65 * voidImpact,
+            flashTime: .08,
+          } : {
             count: b.crit ? 5 : 2,
             colors: [b.color || P.magenta, P.white],
             power: b.crit ? 9 : 5,

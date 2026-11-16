@@ -88,7 +88,35 @@ export class HUD {
     this.el.boost.closest('.barRow').after(this.blackArmor);
     this.blackArmorLabel = this.blackArmor.querySelector('.blackArmorReadout span');
     this.blackArmorFill = this.blackArmor.querySelector('#blackArmorFill');
+    this.ultraArmor = null;
     this.augmentFlash = 0;
+  }
+
+  _updateUltraArmor() {
+    const ability = this.game.ultraUltimate;
+    if (!ability?.authorized) {
+      this.ultraArmor?.remove();
+      this.ultraArmor = null;
+      return;
+    }
+    if (!this.ultraArmor) {
+      this.ultraArmor = document.createElement('div');
+      this.ultraArmor.id = 'ultraUltimateHud';
+      this.ultraArmor.className = 'barRow ultraUltimateRow';
+      this.ultraArmor.innerHTML = '<div class="bar thin ultraUltimateBar"><div class="ultraUltimateFill"></div><span class="ultraUltimateReadout"><strong>BLACK ARMOR + GOD HAKI</strong><span>2 / READY</span></span></div>';
+      this.blackArmor.after(this.ultraArmor);
+      this.ultraArmorLabel = this.ultraArmor.querySelector('.ultraUltimateReadout span');
+      this.ultraArmorFill = this.ultraArmor.querySelector('.ultraUltimateFill');
+    }
+    const cooling = !ability.active && ability.cooldown > 0;
+    this.ultraArmor.classList.toggle('active', ability.active);
+    this.ultraArmor.classList.toggle('cooldown', cooling);
+    this.ultraArmor.classList.toggle('ready', !ability.active && !cooling);
+    writeText(this.ultraArmorLabel, ability.active
+      ? `ON ${Math.floor(ability.elapsed || 0)}S / 2 TO END`
+      : cooling ? `${ability.cooldown.toFixed(1)}S / RECHARGING` : '2 / READY');
+    this.ultraArmorFill.style.width = `${cooling
+      ? (1 - clamp(ability.cooldown / Math.max(.001, ability.cooldownDuration), 0, 1)) * 100 : 100}%`;
   }
 
   flashAugment(augment) {
@@ -417,6 +445,8 @@ export class HUD {
       writeText(this.blackArmorLabel, '1 / READY');
       this.blackArmorFill.style.width = '100%';
     }
+
+    this._updateUltraArmor();
 
     // rift heat
     const heat = g.heat;

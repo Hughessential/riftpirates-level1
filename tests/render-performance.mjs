@@ -58,11 +58,13 @@ try {
     g.presentation.render = originalRender;
     g.renderFrame(.016);
     return { hudTextMutations, fullRatio, reducedRatio, cssWidth, sameAspect, resolution,
-      passes: g.presentation.composer.passes.length, disposedMaterials, disposedGeometry,
+      passes: g.presentation.composer.passes.filter(pass => pass.enabled).length,
+      blackSurfacePassEnabled: g.presentation.blackSurfacePass.enabled, disposedMaterials, disposedGeometry,
       backgroundRenders, frozenTime };
   });
   assert.equal(result.hudTextMutations, 0, 'Unchanged HUD does not rebuild text nodes');
   assert.equal(result.passes, 4, 'Vignette and signal share one HDR pass');
+  assert.equal(result.blackSurfacePassEnabled, false, 'Ordinary gameplay pays no ultra black-surface redraw cost');
   assert.equal(result.reducedRatio, result.fullRatio * .65);
   assert.equal(result.cssWidth, '1440px');
   assert.equal(result.sameAspect, true, 'Adaptive resolution never stretches the camera');

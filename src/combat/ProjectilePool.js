@@ -12,6 +12,9 @@ export class ProjectilePool {
     this._dummy = new THREE.Object3D();
     this._part = new THREE.Object3D();
     this._color = new THREE.Color();
+    this._voidBody = new THREE.Color();
+    this._voidAccent = new THREE.Color();
+    this._voidSpark = new THREE.Color();
     this._zero = new THREE.Matrix4().makeScale(0, 0, 0);
     const batch = (geometry, count, glow = false) => {
       const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({
@@ -47,7 +50,7 @@ export class ProjectilePool {
         damage: 0, crit: false, radius: .7, life: 0, weapon: 'pulse', color: WEAPON_STYLES.pulse.color,
         pierce: 0, splash: 0, homing: 0, target: null, searchT: 0,
         procDepth: 0, hitTargets: new Set(), ricochetsRemaining: 0,
-        augmentTimeScale: 1, heavy: false, age: 0, visual: null, label: 'ENEMY FIRE' };
+        augmentTimeScale: 1, heavy: false, age: 0, visual: null, voidBeam: false, label: 'ENEMY FIRE' };
     });
   }
 
@@ -90,7 +93,8 @@ export class ProjectilePool {
       vx: dx / d * speed, vy: dy / d * speed, vz: dz / d * speed,
       speed, damage, crit, life, weapon, color: color || scaledAppearance.color || style.color,
       radius: (radius ?? scaledAppearance.radius ?? style.radius) * sizeScale, pierce, splash, homing, target,
-      searchT: 0, procDepth, ricochetsRemaining, augmentTimeScale: 1, age: 0, visual: scaledAppearance, onEnd: null });
+      searchT: 0, procDepth, ricochetsRemaining, augmentTimeScale: 1, age: 0,
+      visual: scaledAppearance, voidBeam: Boolean(scaledAppearance.voidBeam), onEnd: null });
     o.hitTargets.clear();
     o.mesh.visible = true; o.mesh.material.color.set(o.color);
     this._write(o);
@@ -179,12 +183,22 @@ export class ProjectilePool {
         d.lookAt(o.x + o.vx, o.y + o.vy, o.z + o.vz);
         d.scale.set(w, w, l);
         o.mesh.position.copy(d.position); o.mesh.quaternion.copy(d.quaternion); o.mesh.scale.copy(d.scale);
-        const color = o.color;
-        const accent = v.accent || color;
+        const hue = (o.age * (v.reducedFlashing ? .16 : .8) + o.index * .137) % 1;
+        const color = o.voidBeam ? this._voidBody.setHSL(hue, .95, .58) : o.color;
+        const accent = o.voidBeam ? this._voidAccent.setHSL((hue + .37) % 1, 1, .55) : v.accent || color;
         const brightness = v.brightness * Math.sqrt(this.readabilityGain);
         // Parts share the bolt's flight transform; there are no extra scene
         // objects, colliders or damage events for the decorative silhouette.
-        if (v.shape === 'orb') {
+        if (o.voidBeam) {
+          // A bounded, moving bullet: one elongated body and two traveling
+          // prismatic glints, rendered in the existing fixed instance slices.
+          // Its identity also survives cosmetic Blackwake augment overrides.
+          const glintZ = ((o.age * 2.1 + o.index * .31) % 1 - .5) * l * .7;
+          const spark = this._voidSpark.setHSL((hue + .72) % 1, .55, .8);
+          this._put(core, ci, 0, 0, 0, w * .62, w * .62, l, Math.PI / 4, color, brightness);
+          this._put(core, ci + 1, 0, 0, glintZ, w * 3, w * .13, l * .07, o.age * .5, spark, brightness);
+          this._put(core, ci + 2, 0, 0, glintZ, w * .13, w * 2.4, l * .07, o.age * .5, accent, brightness);
+        } else if (v.shape === 'orb') {
           this._put(core, ci, 0, 0, 0, w, w, w * 1.1, o.age * 2, color, brightness);
           const a = o.age * 6 + o.index;
           this._put(core, ci + 1, Math.cos(a) * w * .75, Math.sin(a) * w * .75, 0, w * .27, w * .27, w * .27, a, accent, brightness);

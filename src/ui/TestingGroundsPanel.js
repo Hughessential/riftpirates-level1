@@ -3,7 +3,9 @@ import { PLAYER_SHIPS } from '../render/PlayerFleet.js';
 import { WEAPON_AUDIO } from '../core/AudioManager.js';
 import { Input } from '../core/Input.js';
 import { TUNING_SCHEMA, TUNING_CATEGORIES } from '../core/TuningRegistry.js';
+import { ULTRA_TUNING_KEYS } from '../config/abilities.js';
 import './testing-grounds.css';
+import './ultra-ultimate.css';
 
 const SCENES = [
   ['sandbox', 'OPEN TEST RANGE'], ['approach1', '01 / OUTER APPROACH'],
@@ -139,6 +141,7 @@ export class TestingGroundsPanel {
 
     this._addEntrances();
     this._buildAugments();
+    this._buildUltra();
     this._buildTuning();
     this._wire();
     testing.onChange = () => this.renderState();
@@ -217,11 +220,14 @@ export class TestingGroundsPanel {
     const host = this.dialog.querySelector('#labTuningCategories');
     this.tuningRows = new Map();
     for (const [category, label, description] of TUNING_CATEGORIES) {
+      const ultraCategory = category.startsWith('ultra');
+      if (ultraCategory && !this.testing.game.ultraUltimate?.authorized) continue;
       const details = document.createElement('details');
       details.className = 'labTuningCategory'; details.dataset.tuningCategory = category; details.open = true;
       details.innerHTML = `<summary><span><strong>${label}</strong><small>${description}</small></span><button type="button" data-reset-category="${category}">RESET CATEGORY</button></summary><div class="labTuningGrid"></div>`;
       const grid = details.querySelector('.labTuningGrid');
       for (const item of TUNING_SCHEMA.filter(entry => entry.category === category)) {
+        if (item.key === ULTRA_TUNING_KEYS.showRadius || item.key === ULTRA_TUNING_KEYS.reducedFlashing) continue;
         const row = document.createElement('div');
         row.className = 'labTuningRow'; row.dataset.tuningRow = item.key;
         row.dataset.search = `${item.label} ${item.description} ${label}`.toLowerCase();
@@ -229,8 +235,31 @@ export class TestingGroundsPanel {
         row.innerHTML = `<div class="labTuningCopy"><strong>${item.label}</strong><small>${item.description}</small></div><input type="range" min="${item.min}" max="${item.max}" step="${item.step}" value="${item.default}" data-tuning-range="${item.key}" aria-label="${item.label}"><label><input type="number" min="${item.min}" max="${item.max}" step="${item.step}" value="${item.default}" data-tuning-number="${item.key}" aria-label="${item.label} numeric value"><span>${item.unit}</span></label><button type="button" data-reset-tuning="${item.key}" aria-label="Reset ${item.label}" title="Reset to ${item.default}">↺</button>`;
         grid.append(row); this.tuningRows.set(item.key, row);
       }
-      host.append(details);
+      (ultraCategory ? this.dialog.querySelector('#labUltraTuning') : host).append(details);
     }
+  }
+
+  _buildUltra() {
+    if (!this.testing.game.ultraUltimate?.authorized) return;
+    const tab = document.createElement('button');
+    tab.type = 'button'; tab.className = 'labTab'; tab.id = 'labTab-ultra';
+    tab.dataset.tab = 'ultra'; tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', 'labPage-ultra'); tab.setAttribute('aria-selected', 'false');
+    tab.innerHTML = '<small>07</small><strong>ULTRA</strong><span>Black Armor + God Haki</span>';
+    this.dialog.querySelector('.labReadout').before(tab);
+    const page = document.createElement('section');
+    page.className = 'labPage'; page.id = 'labPage-ultra'; page.hidden = true;
+    page.setAttribute('role', 'tabpanel'); page.setAttribute('aria-labelledby', 'labTab-ultra');
+    page.innerHTML = `<div class="labSectionHead"><div><span class="labEyebrow">PRIVATE LOCAL TESTING</span><h3>ULTRA-ULTIMATE</h3></div><span class="labPill">KEY 2 / TOGGLE</span></div>
+      <p class="labHint">BLACK ARMOR + GOD HAKI stays active until you press 2 again. Cooldown starts when it ends. Normal Black Armor remains on key 1.</p>
+      <output id="labUltraStatus" class="labUltraStatus">READY</output>
+      <div class="labActionGrid labUltraControls"><button type="button" data-action="ultraActivate" class="labPrimary">ACTIVATE</button><button type="button" data-action="ultraCancel">CANCEL + START COOLDOWN</button><button type="button" data-action="ultraReset">RESET COOLDOWN</button></div>
+      <div class="labToggleGrid labUltraControls">${[
+        ['showRadius', 'DAMAGE-RADIUS GIZMO', 'Show the true spherical damage range. Decorative lightning may extend beyond it.'],
+        ['reducedFlashing', 'REDUCED FLASHING', 'Keep the rainbow aura and black lightning with gentler pulse and impact effects.'],
+      ].map(([key, label, description]) => `<label class="labToggle"><input type="checkbox" data-ultra-setting="${ULTRA_TUNING_KEYS[key]}"><span class="labSwitch" aria-hidden="true"></span><span><strong>${label}</strong><small>${description}</small></span></label>`).join('')}</div>
+      <div id="labUltraTuning" class="labTuningCategories"></div>`;
+    this.dialog.querySelector('.labPages').append(page);
   }
 
   _wire() {
@@ -262,6 +291,10 @@ export class TestingGroundsPanel {
     });
     this.dialog.querySelectorAll('[data-setting]').forEach(input => {
       input.addEventListener('change', () => this.run(() => this.testing.setSetting(input.dataset.setting, input.checked)));
+    });
+    this.dialog.querySelectorAll('[data-ultra-setting]').forEach(input => {
+      input.addEventListener('change', () => this.run(() => this.testing.game.ultraUltimate?.authorized
+        ? this.testing.setTuning(input.dataset.ultraSetting, Number(input.checked)) : false));
     });
     $('#labTimeScale').addEventListener('change', event => this.run(() => this.testing.setSetting('timeScale', Number(event.target.value))));
     $('#labBloom').addEventListener('input', event => this.run(() => this.testing.setBloom(Number(event.target.value))));
@@ -302,7 +335,7 @@ export class TestingGroundsPanel {
         if (event.target?.closest?.('.labNav')) {
           if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
             event.preventDefault();
-            const tabs = ['pilot', 'augments', 'arena', 'effects', 'tuning', 'debug'];
+            const tabs = [...this.dialog.querySelectorAll('[data-tab]')].map(tab => tab.dataset.tab);
             const index = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
               : (tabs.indexOf(this.activeTab) + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
             this.selectTab(tabs[index]); $(`#labTab-${tabs[index]}`).focus();
@@ -345,8 +378,10 @@ export class TestingGroundsPanel {
 
   _filterTuning(value = '') {
     const search = String(value).trim().toLowerCase();
-    for (const row of this.tuningRows.values()) row.hidden = search && !row.dataset.search.includes(search);
-    this.dialog.querySelectorAll('[data-tuning-category]').forEach(category => {
+    for (const row of this.tuningRows.values()) {
+      if (row.closest('#labTuningCategories')) row.hidden = search && !row.dataset.search.includes(search);
+    }
+    this.dialog.querySelectorAll('#labTuningCategories [data-tuning-category]').forEach(category => {
       const any = [...category.querySelectorAll('[data-tuning-row]')].some(row => !row.hidden);
       category.hidden = !any;
       if (search && any) category.open = true;
@@ -357,6 +392,9 @@ export class TestingGroundsPanel {
     const value = id => this.dialog.querySelector(`#${id}`).value;
     const t = this.testing;
     const actions = {
+      ultraActivate: [() => t.game.ultraUltimate?.authorized && t.game.ultraUltimate.activate(), 'ULTRA-ULTIMATE ACTIVE. CLOSE THE CONSOLE TO FLY.'],
+      ultraCancel: [() => t.game.ultraUltimate?.authorized && t.game.ultraUltimate.cancel({ cooldown: true }), 'ULTRA-ULTIMATE ENDED. COOLDOWN STARTED.'],
+      ultraReset: [() => t.game.ultraUltimate?.authorized && t.game.ultraUltimate.resetCooldown(), 'ULTRA-ULTIMATE COOLDOWN RESET.'],
       identity: [() => t.game.pilotIdentity?.open(), 'TEST IDENTITY / NEVER SAVED.'],
       victory: [() => t.previewEnding(true), 'VICTORY PREVIEW / NO PROGRESS SAVED.'],
       defeat: [() => t.previewEnding(false), 'DEATH PREVIEW / NO PROGRESS SAVED.'],
@@ -434,11 +472,13 @@ export class TestingGroundsPanel {
   }
 
   selectTab(id) {
+    if (!this.dialog.querySelector(`[data-tab="${id}"]`)) return;
     this.activeTab = id;
     this.dialog.querySelectorAll('[data-tab]').forEach(tab => {
       const selected = tab.dataset.tab === id;
       tab.setAttribute('aria-selected', String(selected));
       tab.tabIndex = selected ? 0 : -1;
+      if (selected && this.dialog.open) tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
     this.dialog.querySelectorAll('.labPage').forEach(page => { page.hidden = page.id !== `labPage-${id}`; });
   }
@@ -464,6 +504,20 @@ export class TestingGroundsPanel {
     for (const [key, value] of Object.entries(values)) this.dialog.querySelector(`[data-readout="${key}"]`).textContent = value;
     this.badge.querySelector('.labBadgeGod').textContent = state.settings?.godMode ? 'GOD MODE ON' : 'DAMAGE ON';
     this.badge.classList.toggle('labDamageOn', !state.settings?.godMode);
+    const ultra = this.testing.game.ultraUltimate;
+    const ultraStatus = this.dialog.querySelector('#labUltraStatus');
+    if (ultraStatus && ultra?.authorized) {
+      const values = ultra.tuning();
+      const radius = ultra.radius ?? values.fieldRadius;
+      const dps = ultra.areaDps ?? ultra.dps ?? values.areaDps;
+      const status = ultra.active ? `ACTIVE ${Math.floor(ultra.elapsed || 0)}S / PRESS 2 TO END`
+        : ultra.cooldown > 0 ? `RECHARGING / ${ultra.cooldown.toFixed(1)}S` : 'READY / PRESS 2';
+      ultraStatus.textContent = `${status} · RANGE ${Number(radius || 0).toFixed(1)} · ${fmt(dps)} AREA DPS`;
+      const activate = this.dialog.querySelector('[data-action="ultraActivate"]');
+      activate.disabled = !!ultra.active || ultra.cooldown > 0;
+      activate.textContent = ultra.active ? 'ACTIVE' : ultra.cooldown > 0 ? 'RECHARGING' : 'ACTIVATE';
+      this.dialog.querySelector('[data-action="ultraCancel"]').disabled = !ultra.active;
+    }
   }
 
   renderState() {
@@ -479,6 +533,7 @@ export class TestingGroundsPanel {
     this._telemetry(state);
     this.dialog.querySelector('#labStatus').textContent = this.lastMessage;
     this.dialog.querySelectorAll('[data-setting]').forEach(input => { input.checked = !!state.settings?.[input.dataset.setting]; });
+    this.dialog.querySelectorAll('[data-ultra-setting]').forEach(input => { input.checked = !!state.tuning?.[input.dataset.ultraSetting]; });
     this.dialog.querySelector('#labTimeScale').value = String(state.settings?.timeScale ?? 1);
     this.dialog.querySelectorAll('[data-lab-ship]').forEach(button => {
       button.setAttribute('aria-pressed', String(button.dataset.labShip === state.shipId));

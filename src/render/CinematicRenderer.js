@@ -4,6 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { BlackSurfacePass } from './BlackSurfacePass.js';
 
 // A quiet digital-print texture, not a glitch event. It never changes time,
 // blurs, flashes or reduces render resolution; aim lines remain pixel sharp.
@@ -66,10 +67,12 @@ export class CinematicRenderer {
     // Apply vignette at each signal sample in one shader. This removes an HDR
     // fullscreen pass while retaining the same vignette-before-signal order.
     this.signalPass = new ShaderPass(RiftSignalShader);
+    this.blackSurfacePass = new BlackSurfacePass(scene, camera);
     this.outputPass = new OutputPass();
 
     this.composer.addPass(this.renderPass);
     this.composer.addPass(this.bloomPass);
+    this.composer.addPass(this.blackSurfacePass);
     this.composer.addPass(this.signalPass);
     this.composer.addPass(this.outputPass);
     this.setSize(innerWidth, innerHeight);

@@ -6,6 +6,7 @@ import { createPlayerShip, isPlayerShipId, PLAYER_SHIPS } from '../render/Player
 import { Input } from '../core/Input.js';
 import { EngineTrail } from '../effects/EngineTrail.js';
 import { BlackArmorEffect } from '../effects/BlackArmorEffect.js';
+import { BLACK_SURFACE_LAYER } from '../render/BlackSurfacePass.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { clamp, lerp, rand, damp, TAU } from '../core/Utils.js';
 
@@ -143,6 +144,9 @@ export class Player {
     this.reticle.position.set(0, 0.05, -26);
     this.reticle.visible = false;
     this.group.add(this.reticle);
+    // The ultra's post-bloom opaque redraw must not paint over the aiming UI.
+    // Transparent reticle meshes render last on this layer with depth disabled.
+    this.reticle.traverse(object => { if (object.isMesh) object.layers.enable(BLACK_SURFACE_LAYER); });
     this.reticleLock = false;
     this._boostVisual = 0;
     this._brakeVisual = 0;
@@ -171,6 +175,7 @@ export class Player {
 
   /** Hull selection only changes render geometry. Collision and weapons stay identical. */
   setShip(id) {
+    this.ultraUltimate?.reset();
     const armorActive = this.blackArmorActive;
     this.blackArmorEffect.restoreHull();
     const shipId = isPlayerShipId(id) ? id : PLAYER_SHIPS[0].id;
@@ -192,9 +197,11 @@ export class Player {
     this.trail.position.z = rear + 1.4;
     this.exhaust.reset();
     if (armorActive) this.blackArmorEffect.coatHull();
+    this.ultraUltimate?.measureHull();
   }
 
   reset(stats) {
+    this.ultraUltimate?.reset();
     this.blackArmorEffect.cancel();
     this.exhaust.reset();
     this.stats = stats;
@@ -302,7 +309,12 @@ export class Player {
     this.blackArmorDuration = tuning.duration;
     this.blackArmorCooldownDuration = tuning.cooldown;
     this.blackArmorTime = tuning.duration;
+    if (this.ultraUltimate?.active) this.ultraUltimate.effect.restoreHull();
     this.blackArmorEffect.activate(tuning);
+    if (this.ultraUltimate?.active) {
+      this.blackArmorEffect.restoreHull();
+      this.ultraUltimate.effect.coatHull();
+    }
     Audio2.play('black_armor', tuning.soundVolume, 1, 0);
     return true;
   }
@@ -327,6 +339,9 @@ export class Player {
     const shieldMax = this.stats.shieldMax * tune('shieldCapacity');
 
     const inp = this.frozen ? { x: 0, y: 0, boost: false } : Input.read();
+
+    // Key 2 is a separate edge-triggered toggle; movement stays uninterrupted.
+    if (!this.frozen && Input.consumeUltraUltimate() && ctx.director.inCombat && !ctx.testingPanel?.secretArmed) this.ultraUltimate?.toggle();
 
     // ---- Black Armor ----
     // Edge-triggered and completely orthogonal to steering, weapons, boost and
@@ -448,7 +463,7 @@ export class Player {
       // blink, but never hide the ship completely — you must always see yourself.
       // During a barrel roll we keep the hull solid so the spin stays readable.
       const blink = Math.floor(ctx.time * 16) % 2 === 0;
-      this.hull.visible = this.rollT > 0 || blink;
+      this.hull.visible = this.ultraUltimate?.active || this.rollT > 0 || blink;
     } else {
       this.hull.visible = true;
     }
@@ -525,7 +540,7 @@ export class Player {
 
   /** @returns {boolean} true if damage actually landed. */
   takeDamage(amount, source = 'UNKNOWN') {
-    if (!this.alive || this.blackArmorActive || this.invuln > 0 || !(amount > 0)) return false;
+    if (!this.alive || this.ultraUltimate?.active || this.blackArmorActive || this.invuln > 0 || !(amount > 0)) return false;
 
     // Armor Plating grants a free block per encounter
     if (this.blocksLeft > 0) {
