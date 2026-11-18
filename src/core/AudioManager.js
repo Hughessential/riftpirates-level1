@@ -77,10 +77,19 @@ export const MUSIC_FILES = Object.freeze({
   pixelatedvoid: 'pixelatedvoid.mp3',
   thepirateking: 'thepirateking.mp3',
   fallen: 'sorryyoudied.mp3',
+  whatabout8bit: 'whatabout8bit.mp3',
+  kokoro: 'kokoro.mp3',
+  colourboxprism: 'colourboxprism.mp3',
+  mytoyscomealiveatnight: 'mytoyscomealiveatnight.mp3',
+  moonbouncehouse: 'moonbouncehouse.mp3',
+  theonesummerjam: 'theonesummerjam.mp3',
   defeat: 'DAMNYOUDEAD.mp3',
   victory: 'Afterthefinalescape.mp3',
 });
-export const GAMEPLAY_MUSIC = Object.freeze(['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking', 'fallen']);
+export const GAMEPLAY_MUSIC = Object.freeze([
+  'arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking', 'fallen',
+  'whatabout8bit', 'kokoro', 'colourboxprism', 'mytoyscomealiveatnight', 'moonbouncehouse', 'theonesummerjam',
+]);
 const THEME_TAIL = 1.4; // Deliberate end fade, not a claimed seamless musical loop.
 export const AUDIO_OUTPUT = Object.freeze({
   threshold: -3,

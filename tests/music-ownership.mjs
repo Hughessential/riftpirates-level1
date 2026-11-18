@@ -9,10 +9,17 @@ const approvedMusic = {
   escape: 'The Very Very End.mp3',
   arcade: 'arcade.mp3', astral: 'astral.mp3', neondrift: 'neondrift.mp3',
   pixelatedvoid: 'pixelatedvoid.mp3', thepirateking: 'thepirateking.mp3',
+  whatabout8bit: 'whatabout8bit.mp3',
+  kokoro: 'kokoro.mp3',
+  colourboxprism: 'colourboxprism.mp3',
+  mytoyscomealiveatnight: 'mytoyscomealiveatnight.mp3',
+  moonbouncehouse: 'moonbouncehouse.mp3',
+  theonesummerjam: 'theonesummerjam.mp3',
   fallen: 'sorryyoudied.mp3', defeat: 'DAMNYOUDEAD.mp3', victory: 'Afterthefinalescape.mp3',
 };
 assert.deepEqual(MUSIC_FILES, approvedMusic, 'Every scene has its exact approved source recording');
-assert.deepEqual(GAMEPLAY_MUSIC, ['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking', 'fallen']);
+assert.deepEqual(GAMEPLAY_MUSIC, ['arcade', 'astral', 'neondrift', 'pixelatedvoid', 'thepirateking', 'fallen',
+  'whatabout8bit', 'kokoro', 'colourboxprism', 'mytoyscomealiveatnight', 'moonbouncehouse', 'theonesummerjam']);
 assert.equal(MUSIC_FILES.fallen, 'sorryyoudied.mp3', 'The former death cue joins ordinary gameplay rotation');
 const warnings = [];
 function failMedia(entry) {
@@ -71,12 +78,39 @@ const shuffle = new AudioManagerImpl();
 shuffle.ready = true;
 shuffle.playGameplay(0);
 const songs = [shuffle.currentMusic];
-for (let i = 0; i < 23; i++) { shuffle.music[shuffle.currentMusic].el.finish(); songs.push(shuffle.currentMusic); }
+for (let i = 0; i < GAMEPLAY_MUSIC.length * 10 - 1; i++) { shuffle.music[shuffle.currentMusic].el.finish(); songs.push(shuffle.currentMusic); }
 for (let i = 0; i < songs.length; i += GAMEPLAY_MUSIC.length) {
-  assert.equal(new Set(songs.slice(i, i + GAMEPLAY_MUSIC.length)).size, GAMEPLAY_MUSIC.length,
+  assert.deepEqual([...new Set(songs.slice(i, i + GAMEPLAY_MUSIC.length))].sort(), [...GAMEPLAY_MUSIC].sort(),
     'Each complete bag contains every gameplay track once');
 }
 for (let i = 1; i < songs.length; i++) assert.notEqual(songs[i], songs[i - 1], 'No immediate repeat at a bag boundary');
+// Force a refill that would repeat its last song without the boundary guard.
+const originalRandom = Math.random;
+try {
+  Math.random = () => .999999;
+  const boundary = new AudioManagerImpl();
+  boundary._lastGameplay = GAMEPLAY_MUSIC.at(-1);
+  const previous = boundary._lastGameplay;
+  const first = boundary._nextGameplay();
+  assert.notEqual(first, previous, 'Refill swaps away a forced immediate repeat');
+  const cycle = [first];
+  while (boundary._shuffleBag.length) cycle.push(boundary._nextGameplay());
+  assert.deepEqual(cycle.slice().sort(), [...GAMEPLAY_MUSIC].sort(), 'Boundary repair preserves every song');
+
+  const degraded = new AudioManagerImpl();
+  degraded._nextGameplay();
+  const failed = degraded._shuffleBag.at(-1);
+  degraded._unavailable.add(failed);
+  for (let i = 0; i < GAMEPLAY_MUSIC.length * 3; i++) {
+    assert.notEqual(degraded._nextGameplay(), failed, 'Failed songs stay excluded across refills');
+  }
+  degraded._unavailable = new Set(GAMEPLAY_MUSIC.slice(1));
+  assert.equal(degraded._nextGameplay(), GAMEPLAY_MUSIC[0], 'A single remaining song still plays');
+  degraded._unavailable = new Set(GAMEPLAY_MUSIC);
+  assert.equal(degraded._nextGameplay(), null, 'An exhausted library stops safely');
+} finally {
+  Math.random = originalRandom;
+}
 a.playEscape(0);
 a.update(1);
 a.music.escape.el.currentTime = 65;
@@ -226,5 +260,5 @@ assert.ok(delayed._fades.length <= 2, 'Crossfades remain bounded under rapid sta
 globalThis.Audio = FakeAudio;
 const shippedMusic = readdirSync(new URL('../assets/music/', import.meta.url))
   .filter(file => /\.(mp3|m4a|ogg|wav|flac|aac)$/i.test(file)).sort();
-assert.deepEqual(shippedMusic, Object.values(approvedMusic).sort(), 'The public assets ship all eleven routed songs with no orphaned music');
-console.log('PASS: exact shipping and mapping, six-song gameplay shuffle, dedicated new death cue, terminal continuity/repeat, stale callback safety, mute/background priority and bounded crossfades.');
+assert.deepEqual(shippedMusic, Object.values(approvedMusic).sort(), 'The public assets ship all seventeen routed songs with no orphaned music');
+console.log('PASS: exact shipping and mapping, twelve-song gameplay shuffle, dedicated new death cue, terminal continuity/repeat, stale callback safety, mute/background priority and bounded crossfades.');

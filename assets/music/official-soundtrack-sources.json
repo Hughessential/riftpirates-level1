@@ -43,6 +43,36 @@
       "source": "User-provided endgame recording, 2026-11-13",
       "bytes": 4843469,
       "sha256": "3e032576c6dfe5a3273bb0cf7f3913d724ca84b47dc8c5d4b58a41f91d32555c"
+    },
+    "whatabout8bit.mp3": {
+      "source": "User-provided new songs.zip, 2026-11-17",
+      "bytes": 5792763,
+      "sha256": "3c64fbe76e0ad40bc85149b76241de57ba5edd44fa5c6f0d34d445a7a1b93607"
+    },
+    "kokoro.mp3": {
+      "source": "User-provided new songs.zip, 2026-11-17",
+      "bytes": 6128573,
+      "sha256": "4048f96f894dc2a84af24a1ffddeba336231049e6f0e96262884bf4002500ec9"
+    },
+    "colourboxprism.mp3": {
+      "source": "User-provided new songs.zip, 2026-11-17",
+      "bytes": 6913823,
+      "sha256": "7aefca7b27351d899df495a37cf9222e2217a9c65f5e13c212033c6834e15f25"
+    },
+    "mytoyscomealiveatnight.mp3": {
+      "source": "User-provided new songs.zip, 2026-11-17",
+      "bytes": 4873906,
+      "sha256": "208d1cd7e4f45e193036b80234b5a41a2bebc8033af79306ff9d937288a83054"
+    },
+    "moonbouncehouse.mp3": {
+      "source": "User-provided new songs.zip, 2026-11-17",
+      "bytes": 5540145,
+      "sha256": "51ecf922f465e262f760a3cc76453cbe30e44486a770bc7f83dfd6e025e208b9"
+    },
+    "theonesummerjam.mp3": {
+      "source": "User-provided new songs.zip, 2026-11-17",
+      "bytes": 5369914,
+      "sha256": "f908da9a2627ab92dd7afc2ce8e0b20c6f6dacf5eebd1e16e0f7814eba93af85"
     }
   }
 }
