@@ -12,6 +12,8 @@ const JOINT_NODES = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11];
 const MAX_BOLTS = MAX_MAJOR + MAX_MINOR + MAX_STRIKES;
 const WAKE_COUNT = 900;
 const GLINT_COUNT = 96;
+const CHARGE_COUNT = 220;
+const OPENING_ACCENTS = [.27, 1.07, 1.80, 2.57, 3.30, 4.07, 4.80];
 const TAU = Math.PI * 2;
 const Y = new THREE.Vector3(0, 1, 0);
 const ACCENTS = ['#ff139b', '#177aff', '#ff1538'];
@@ -40,18 +42,19 @@ const auraFragment = `
   uniform float intensity;
   uniform float cycle;
   uniform float kind;
+  uniform float layerPhase;
   varying vec3 vPoint;
   varying vec3 vViewNormal;
   varying vec3 vEye;
   ${rainbowGLSL}
   void main() {
     float rim = pow(1.0 - abs(dot(normalize(vViewNormal), normalize(vEye))), 2.6);
-    float phase = atan(vPoint.y, vPoint.x) / 6.2831853 + vPoint.z * .15 + time * cycle;
+    float phase = atan(vPoint.y, vPoint.x) / 6.2831853 + vPoint.z * .15 + time * cycle + layerPhase;
     vec3 color = rainbow(phase);
     vec3 royal = rainbow(.78 - .32 * (.5 + .5 * sin(phase * 6.2831853)));
     color = mix(royal, color, .8);
     float filament = pow(.5 + .5 * sin(vPoint.y * 37. + vPoint.z * 18. - time * 1.3), 18.);
-    float shimmer = .82 + .18 * sin(vPoint.x * 32. + time * 1.8);
+    float shimmer = .82 + .18 * sin(vPoint.x * 32. + time * 1.8 + layerPhase * 13.);
     float alpha = opacity * (rim * (.5 + filament * .5) + filament * .018) * shimmer;
     if (kind > .5) alpha = opacity * (.45 + .55 * pow(.5 + .5 * sin(phase * 19. - time), 3.));
     gl_FragColor = vec4(color * intensity, alpha);
@@ -59,7 +62,7 @@ const auraFragment = `
 
 function auraMaterial(uniforms, kind = 0) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...uniforms, kind: { value: kind } },
+    uniforms: { ...uniforms, kind: { value: kind }, layerPhase: { value: 0 } },
     vertexShader: auraVertex, fragmentShader: auraFragment,
     transparent: true, blending: kind ? THREE.AdditiveBlending : THREE.NormalBlending,
     side: THREE.DoubleSide, depthWrite: false, toneMapped: false,
@@ -90,7 +93,21 @@ export class UltraUltimateEffect {
     this.active = false;
     this.fade = 0;
     this.time = 0;
+    this.phase = 'awakening';
+    this.armorProgress = 0;
+    this.sparkleCount = 0;
+    this._teleportStart = -Infinity;
+    this._teleportArrival = -Infinity;
+    this._teleportDuration = .42;
+    this._teleportCursor = 0;
+    this._bounds = new THREE.Box3();
+    this._meshBounds = new THREE.Box3();
+    this._hullMatrix = new THREE.Matrix4();
+    this._hullInverse = new THREE.Matrix4();
+    this._armorCache = new WeakMap();
+    this._completedCoating = false;
     this.originalMaterials = [];
+    this._silhouetteLayers = [];
     this._dummy = new THREE.Object3D();
     this._delta = new THREE.Vector3();
     this._point = new THREE.Vector3();
@@ -110,6 +127,8 @@ export class UltraUltimateEffect {
     this._buildAura();
     this._buildWake();
     this._buildGlints();
+    this._buildCharge();
+    this._buildTeleport();
     this._buildRadiusGizmo();
   }
 
@@ -127,7 +146,11 @@ export class UltraUltimateEffect {
   }
 
   _buildArmor() {
-    this.armorUniforms = { time: { value: 0 }, shine: { value: 1.5 } };
+    this.armorUniforms = {
+      time: { value: 0 }, shine: { value: 1.5 }, progress: { value: 0 },
+      inverse: { value: this._hullInverse }, bounds: { value: new THREE.Vector2(-3, 3) },
+      glimmer: { value: 0 },
+    };
     this.armorMaterial = new THREE.MeshPhysicalMaterial({
       color: 0x010103, roughness: .045, metalness: .55,
       clearcoat: 1, clearcoatRoughness: .015, envMapIntensity: 2.4,
@@ -136,12 +159,13 @@ export class UltraUltimateEffect {
     this.armorMaterial.onBeforeCompile = shader => {
       shader.uniforms.ultraTime = this.armorUniforms.time;
       shader.uniforms.ultraShine = this.armorUniforms.shine;
+      shader.uniforms.ultraGlimmer = this.armorUniforms.glimmer;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vUltraPosition;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvUltraPosition = (modelMatrix * vec4(position, 1.0)).xyz;');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
-          varying vec3 vUltraPosition; uniform float ultraTime; uniform float ultraShine;
+          varying vec3 vUltraPosition; uniform float ultraTime; uniform float ultraShine; uniform float ultraGlimmer;
           ${rainbowGLSL}`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           float coord = vUltraPosition.x * .33 - vUltraPosition.z * .21 + vUltraPosition.y * .08;
@@ -150,9 +174,9 @@ export class UltraUltimateEffect {
           float finish = pow(.5 + .5 * sin(coord * 9. + ultraTime * .8), 24.) * .18;
           float rim = pow(1. - abs(dot(normalize(normal), normalize(vViewPosition))), 4.);
           vec3 prism = rainbow(.78 - .32 * (.5 + .5 * sin(coord + ultraTime * .6)));
-          totalEmissiveRadiance += (vec3(.82,.87,1.) * (sweep * 1.15 + sweep2 * .65 + finish) + prism * rim * .10) * ultraShine;`);
+          totalEmissiveRadiance += (vec3(.82,.87,1.) * (sweep * .24 + sweep2 * .14 + finish * .22) + prism * rim * .10) * ultraShine + vec3(.8,.9,1.) * sweep * ultraGlimmer * 2.;`);
     };
-    this.armorMaterial.customProgramCacheKey = () => 'rift-ultra-obsidian-v1';
+    this.armorMaterial.customProgramCacheKey = () => 'rift-ultra-obsidian-v2';
   }
 
   _buildStorm() {
@@ -204,7 +228,7 @@ export class UltraUltimateEffect {
     this.bolts = Array.from({ length: MAX_BOLTS }, (_, index) => ({
       index, age: 0, life: 0, scale: 1, phase: Math.random(),
       points: Array.from({ length: SEGMENTS + 1 }, () => new THREE.Vector3()),
-      endpoint: new THREE.Vector3(), target: false, enabled: false,
+      endpoint: new THREE.Vector3(), target: false, enabled: false, wait: 0, visible: false,
     }));
   }
 
@@ -217,6 +241,8 @@ export class UltraUltimateEffect {
     for (let i = 0; i < 3; i++) {
       const material = auraMaterial(this.auraUniforms);
       material.uniforms.opacity = { value: 0 };
+      material.uniforms.intensity = { value: 1 };
+      material.uniforms.layerPhase.value = i * .173;
       const mesh = new THREE.Mesh(envelopeGeo, material);
       mesh.renderOrder = 6;
       this.root.add(mesh);
@@ -244,6 +270,8 @@ export class UltraUltimateEffect {
       const geo = new THREE.TorusGeometry(1, i < 3 ? .006 : .0025, 3, 80, Math.PI * (1.1 + i % 3 * .33));
       const material = auraMaterial(this.auraUniforms, 1);
       material.uniforms.opacity = { value: 0 };
+      material.uniforms.intensity = { value: 1 };
+      material.uniforms.layerPhase.value = i * .173;
       const ribbon = new THREE.Mesh(geo, material);
       ribbon.rotation.set(i * .77, i * 1.8, i * 2.1);
       this.root.add(ribbon); this.ribbons.push(ribbon);
@@ -253,6 +281,8 @@ export class UltraUltimateEffect {
     for (let i = 0; i < 3; i++) {
       const material = auraMaterial(this.auraUniforms, 1);
       material.uniforms.opacity = { value: 0 };
+      material.uniforms.intensity = { value: 1 };
+      material.uniforms.layerPhase.value = i * .173;
       const pulse = new THREE.Mesh(pulseGeo, material);
       pulse.rotation.x = i * .43;
       this.root.add(pulse); this.pulses.push(pulse);
@@ -293,6 +323,110 @@ export class UltraUltimateEffect {
     this.glintSeeds = Array.from({ length: GLINT_COUNT }, (_, i) => ({
       x: random(-1, 1), y: random(-1, 1), z: random(-1, 1), phase: random(0, TAU), hull: i < 20,
     }));
+  }
+
+  _buildCharge() {
+    this.charge = this._batch(new THREE.OctahedronGeometry(1, 0), new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: .88, depthWrite: false,
+      blending: THREE.AdditiveBlending, toneMapped: false,
+    }), CHARGE_COUNT);
+    this.charge.name = 'ULTRA converging charge filaments';
+    this.chargeSeeds = Array.from({ length: CHARGE_COUNT }, (_, i) => ({
+      phase: i / CHARGE_COUNT, angle: random(0, TAU), depth: random(-1, 1), speed: random(.6, 1.4),
+    }));
+  }
+
+  _buildTeleport() {
+    const geometry = new THREE.RingGeometry(.83, 1, 64);
+    this.teleportRings = Array.from({ length: 4 }, () => {
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xaaffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+        depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.visible = false; mesh.name = 'ULTRA teleport residue';
+      this.player.scene.add(mesh);
+      return { mesh, age: Infinity, arrival: false };
+    });
+  }
+
+  get teleportHidden() {
+    const age = this.time - this._teleportStart;
+    return this.active && age >= Math.min(.07, this._teleportDuration * .16)
+      && age < Math.min(.21, this._teleportDuration * .5)
+      && this.time - this._teleportArrival < .04;
+  }
+
+  cancelTeleport() { this._teleportStart = this._teleportArrival = -Infinity; }
+
+  _teleportRing(position, arrival) {
+    const ring = this.teleportRings[this._teleportCursor];
+    this._teleportCursor = (this._teleportCursor + 1) % this.teleportRings.length;
+    ring.mesh.position.copy(position); ring.mesh.position.z += .2;
+    ring.age = 0; ring.arrival = arrival;
+    ring.mesh.visible = true;
+  }
+
+  beginTeleport(origin, duration = .42) {
+    if (!this.active) return;
+    this._teleportStart = this.time;
+    this._teleportArrival = Infinity;
+    this._teleportDuration = duration;
+    this._teleportRing(origin, false);
+  }
+
+  onTeleport(destination) {
+    if (!this.active) return;
+    this._teleportArrival = this.time;
+    this._primed = false;
+    this._wakeCarry = 0;
+    this._lastWorld.copy(destination);
+    this._teleportRing(destination, true);
+    // Discharge endpoints belong to the old location and must not stretch after a jump.
+    for (let i = MAX_MAJOR + MAX_MINOR; i < MAX_BOLTS; i++) {
+      this.bolts[i].enabled = false; this.bolts[i].life = 0;
+    }
+  }
+
+  _updateTeleport(dt, t) {
+    const reduced = !!t.reducedFlashing;
+    for (const ring of this.teleportRings) {
+      ring.age += dt;
+      const k = ring.age / .65;
+      ring.mesh.visible = k < 1 && this.fade > 0;
+      if (!ring.mesh.visible) continue;
+      if (this.camera) ring.mesh.quaternion.copy(this.camera.quaternion);
+      const size = ring.arrival ? 1.8 + k * 5.5 : 3.2 * (1 - k) + .3;
+      ring.mesh.scale.setScalar(size);
+      ring.mesh.material.opacity = (1 - k) ** 2 * (reduced ? .25 : .65) * this.fade;
+      ring.mesh.material.color.setHSL(ring.arrival ? .49 + k * .12 : .76 - k * .2, .8, .7);
+    }
+  }
+
+  _updateCharge(t) {
+    const quality = clamp(t.effectQuality ?? 1, .4, 1);
+    const reduced = !!t.reducedFlashing;
+    const charging = this.phase === 'charging';
+    const hardening = this.phase === 'hardening';
+    const count = (charging ? CHARGE_COUNT : hardening ? 100 : 0) * quality * (reduced ? .65 : 1);
+    const progress = clamp((this.time - 5) / 7, 0, 1);
+    const size = value(t, 'auraSize');
+    for (let i = 0; i < CHARGE_COUNT; i++) {
+      if (i >= count || !this.active) { this.charge.setMatrixAt(i, this._zero); continue; }
+      const seed = this.chargeSeeds[i];
+      const phase = ((this.time - 5) * (.35 + progress * .4) * seed.speed + seed.phase) % 1;
+      const radius = (1 - phase) ** 1.6 * size * (1.5 - progress * .35) + 1;
+      const angle = seed.angle + phase * (3.5 + progress * 2);
+      const d = this._dummy;
+      d.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius * .65, seed.depth * radius);
+      d.rotation.set(0, -angle, angle);
+      const scale = (.025 + phase * .035) * this.fade;
+      d.scale.set(scale, scale, scale * (3 + phase * 7));
+      d.updateMatrix(); this.charge.setMatrixAt(i, d.matrix);
+      this._color.setHSL((seed.phase + this.time * .025) % 1, .85, .6).multiplyScalar(.65 + phase * .75);
+      this.charge.setColorAt(i, this._color);
+    }
+    this.charge.instanceMatrix.needsUpdate = this.charge.instanceColor.needsUpdate = true;
   }
 
   _buildRadiusGizmo() {
@@ -337,22 +471,87 @@ export class UltraUltimateEffect {
     this.root.add(this.fieldBoundary);
   }
 
+  _measureHull() {
+    this.player.group.updateWorldMatrix(true, true);
+    this._hullInverse.copy(this.player.group.matrixWorld).invert();
+    this._bounds.makeEmpty();
+    this.player.hull?.traverse(object => {
+      if (!object.isMesh || !object.geometry) return;
+      object.geometry.computeBoundingBox();
+      this._hullMatrix.multiplyMatrices(this._hullInverse, object.matrixWorld);
+      this._meshBounds.copy(object.geometry.boundingBox).applyMatrix4(this._hullMatrix);
+      this._bounds.union(this._meshBounds);
+    });
+    if (this._bounds.isEmpty()) this._bounds.setFromCenterAndSize(this._point.set(0, 0, 0), this._delta.set(4, 1.4, 6));
+    this.armorUniforms.bounds.value.set(this._bounds.min.z, this._bounds.max.z);
+  }
+
+  _coatingMaterial(source) {
+    let material = this._armorCache.get(source);
+    if (material) return material;
+    material = source.clone();
+    const previous = source.onBeforeCompile;
+    material.onBeforeCompile = (shader, renderer) => {
+      previous?.call(material, shader, renderer);
+      shader.uniforms.ultraInverse = this.armorUniforms.inverse;
+      shader.uniforms.ultraBounds = this.armorUniforms.bounds;
+      shader.uniforms.ultraProgress = this.armorUniforms.progress;
+      shader.uniforms.ultraTime = this.armorUniforms.time;
+      shader.uniforms.ultraGlimmer = this.armorUniforms.glimmer;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform mat4 ultraInverse; varying vec3 vCoatPosition;')
+        .replace('#include <project_vertex>', 'vCoatPosition = (ultraInverse * modelMatrix * vec4(transformed, 1.)).xyz;\n#include <project_vertex>');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+          varying vec3 vCoatPosition; uniform vec2 ultraBounds; uniform float ultraProgress;
+          uniform float ultraTime; uniform float ultraGlimmer;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          float axis = (vCoatPosition.z - ultraBounds.x) / max(.01, ultraBounds.y - ultraBounds.x);
+          float front = ultraProgress * 1.12 - .06;
+          float coat = 1. - smoothstep(front - .035, front + .035, axis);
+          float edge = exp(-pow((axis - front) * 48., 2.));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.0003,.0003,.0009), coat);`)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, .045, coat);')
+        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, .55, coat);')
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          float sweep = pow(max(0., cos(vCoatPosition.z * 2. + vCoatPosition.x - ultraTime * 3.)), 30.);
+          totalEmissiveRadiance *= 1. - coat;
+          totalEmissiveRadiance += vec3(.35,.7,1.) * edge * .65
+            + vec3(.82,.9,1.) * sweep * coat * (.18 + ultraGlimmer * 2.5);`);
+    };
+    material.customProgramCacheKey = () => `ultra-coating-v2-${source.customProgramCacheKey()}`;
+    this._armorCache.set(source, material);
+    return material;
+  }
+
+  _protectHullSilhouette() {
+    // The original hull is redrawn after bloom during awakening/charge. Only
+    // the dedicated layer bit is owned here; its materials remain untouched.
+    this.player.hull?.traverse(object => {
+      if (!object.isMesh) return;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      if (!materials.some(material => material?.isMeshStandardMaterial)) return;
+      this._silhouetteLayers.push({ object, layerMask: object.layers.mask });
+      object.layers.enable(BLACK_SURFACE_LAYER);
+    });
+  }
+
   coatHull() {
     this.restoreHull();
+    if (!this.active) return;
+    if (this.time < 12) { this._protectHullSilhouette(); return; }
+    this._measureHull();
+    this._completedCoating = this.time >= 15;
+    const apply = source => source?.isMeshStandardMaterial
+      ? this._completedCoating ? this.armorMaterial : this._coatingMaterial(source) : source;
     this.player.hull?.traverse(object => {
       if (!object.isMesh) return;
       const material = object.material;
-      if (Array.isArray(material)) {
-        if (!material.some(m => m.isMeshStandardMaterial)) return;
-        const applied = material.map(m => m.isMeshStandardMaterial ? this.armorMaterial : m);
-        this.originalMaterials.push({ object, material, applied, layerMask: object.layers.mask });
-        object.layers.enable(BLACK_SURFACE_LAYER);
-        object.material = applied;
-      } else if (material?.isMeshStandardMaterial) {
-        this.originalMaterials.push({ object, material, applied: this.armorMaterial, layerMask: object.layers.mask });
-        object.layers.enable(BLACK_SURFACE_LAYER);
-        object.material = this.armorMaterial;
-      }
+      if (!(Array.isArray(material) ? material.some(m => m?.isMeshStandardMaterial) : material?.isMeshStandardMaterial)) return;
+      const applied = Array.isArray(material) ? material.map(apply) : apply(material);
+      this.originalMaterials.push({ object, material, applied, layerMask: object.layers.mask });
+      object.layers.enable(BLACK_SURFACE_LAYER);
+      object.material = applied;
     });
   }
 
@@ -364,10 +563,21 @@ export class UltraUltimateEffect {
         | (record.layerMask & (1 << BLACK_SURFACE_LAYER));
     }
     this.originalMaterials.length = 0;
+    for (const record of this._silhouetteLayers) {
+      record.object.layers.mask = (record.object.layers.mask & ~(1 << BLACK_SURFACE_LAYER))
+        | (record.layerMask & (1 << BLACK_SURFACE_LAYER));
+    }
+    this._silhouetteLayers.length = 0;
   }
 
   activate(tuning = {}) {
+    this.restoreHull();
     this.active = true; this.fade = 1; this.time = 0;
+    this.phase = 'awakening'; this.armorProgress = 0; this.sparkleCount = 0;
+    this._completedCoating = false;
+    this._teleportStart = this._teleportArrival = -Infinity;
+    this._measureHull();
+    for (const ring of this.teleportRings) { ring.age = Infinity; ring.mesh.visible = false; }
     this.root.visible = this.wakeRoot.visible = true;
     this._burstTime = 1; this._wakeCarry = 0; this._primed = false;
     // Expired visuals stop receiving simulation updates. Never resurrect their
@@ -378,14 +588,16 @@ export class UltraUltimateEffect {
       mesh.instanceMatrix.needsUpdate = true;
     }
     this.coatHull();
-    for (const bolt of this.bolts) { bolt.life = 0; bolt.enabled = false; }
+    for (const bolt of this.bolts) { bolt.life = 0; bolt.enabled = false; bolt.wait = random(.08, 1.5); }
     this.update(0, 0, tuning);
   }
 
-  expire() { this.active = false; this.restoreHull(); }
+  expire() { this.active = false; this._teleportStart = this._teleportArrival = -Infinity; this.restoreHull(); }
 
   cancel() {
     this.active = false; this.fade = 0;
+    this._teleportStart = this._teleportArrival = -Infinity;
+    for (const ring of this.teleportRings) { ring.age = Infinity; ring.mesh.visible = false; }
     this.root.visible = this.wakeRoot.visible = false;
     this.restoreHull();
     this._primed = false; this._wakeCarry = 0;
@@ -394,12 +606,16 @@ export class UltraUltimateEffect {
       for (let i = 0; i < WAKE_COUNT; i++) mesh.setMatrixAt(i, this._zero);
       mesh.instanceMatrix.needsUpdate = true;
     }
-    for (const bolt of this.bolts) { bolt.life = 0; bolt.enabled = false; }
+    for (const bolt of this.bolts) { bolt.life = 0; bolt.enabled = false; bolt.wait = random(.08, 1.5); }
   }
 
   /** A real damage pulse supplies a world position, copied into a bounded slot. */
   strike(worldPosition, tuning = {}) {
     if (!this.active || !worldPosition) return;
+    // Dense damage pulses must not fill the battlefield with decorative strikes.
+    let liveStrikes = 0;
+    for (let i = MAX_MAJOR + MAX_MINOR; i < MAX_BOLTS; i++) if (this.bolts[i].enabled) liveStrikes++;
+    if (liveStrikes >= 4) return;
     const bolt = this.bolts[MAX_MAJOR + MAX_MINOR + this._strikeCursor];
     this._strikeCursor = (this._strikeCursor + 1) % MAX_STRIKES;
     bolt.endpoint.copy(worldPosition);
@@ -408,7 +624,7 @@ export class UltraUltimateEffect {
     this._point.copy(bolt.endpoint);
     this.root.worldToLocal(this._point);
     this._shape(bolt, tuning, this._point);
-    bolt.life = Math.max(.22, value(tuning, 'lightningLifetime'));
+    bolt.life = tuning.reducedFlashing ? .28 : .13;
     bolt.enabled = true;
   }
 
@@ -431,6 +647,23 @@ export class UltraUltimateEffect {
       points[i].set(endpoint.x * r - Math.sin(angle) * bend + random(-j, j),
         endpoint.y * r + Math.cos(angle) * bend + random(-j, j), endpoint.z * r + random(-j, j));
     }
+    if (minor && !end) {
+      // A short bowed channel connects hull features or curls through the nearby aura.
+      // One shape remains intact during its discharge, including any restrike.
+      const around = bolt.index % 3 === 0;
+      const width = Math.max(1, (this._bounds.max.x - this._bounds.min.x) * .53);
+      const depthSize = Math.max(1.5, (this._bounds.max.z - this._bounds.min.z) * .5);
+      const radius = around ? value(t, 'auraSize') * random(.38, .7) : width;
+      const sweep = random(.7, 2.3);
+      for (let i = 0; i < 9; i++) {
+        const k = i / 8, theta = angle + k * sweep;
+        const bow = Math.sin(k * Math.PI);
+        const jitter = (i === 0 || i === 8) ? 0 : random(-.12, .12);
+        points[i].set(Math.cos(theta) * radius + jitter,
+          this._bounds.max.y + .15 + bow * (around ? radius * .35 : random(.35, 1.4)) + jitter,
+          Math.sin(theta) * (around ? radius : depthSize) + jitter);
+      }
+    }
     // Four fork segments branch from the middle; final two taper almost to zero.
     const base = points[4];
     for (let i = 9; i < 13; i++) {
@@ -441,8 +674,8 @@ export class UltraUltimateEffect {
       points[i].z += random(-jitter, jitter) * k;
     }
     bolt.age = 0;
-    bolt.life = Math.max(.15, value(t, 'lightningLifetime')) * random(.75, 1.4);
-    bolt.scale = (minor ? .29 : 1) * random(.72, 1.25);
+    bolt.life = clamp(value(t, 'lightningLifetime'), .16, .36) * random(.8, 1.2);
+    bolt.scale = (minor ? .18 : end ? .2 : 1) * random(.72, 1.25);
     bolt.phase = Math.random();
   }
 
@@ -460,8 +693,9 @@ export class UltraUltimateEffect {
 
   _updateStorm(dt, t) {
     const reduced = !!t.reducedFlashing;
-    const major = clamp(Math.round(value(t, 'majorCount')), 0, MAX_MAJOR);
-    const minor = clamp(Math.round(value(t, 'minorCount') * (reduced ? .5 : 1)), 0, MAX_MINOR);
+    const quality = clamp(t.effectQuality ?? 1, .4, 1);
+    const major = clamp(Math.round(value(t, 'majorCount') * quality), 0, MAX_MAJOR);
+    const minor = clamp(Math.round(value(t, 'minorCount') * quality * (reduced ? .65 : 1)), 0, MAX_MINOR);
     const branching = clamp(value(t, 'branching'), 0, 2);
     const coreWidth = Math.max(.04, value(t, 'coreWidth'));
     const edgeWidth = 1.06 + Math.max(0, value(t, 'glowWidth') - 1) * .14;
@@ -471,15 +705,26 @@ export class UltraUltimateEffect {
     for (const bolt of this.bolts) {
       const strike = bolt.index >= MAX_MAJOR + MAX_MINOR;
       const wanted = strike ? bolt.life > 0 : bolt.index < major || (bolt.index >= MAX_MAJOR && bolt.index < MAX_MAJOR + minor);
+      const luminous = bolt.index >= MAX_MAJOR;
       bolt.age += dt;
-      if (wanted && !strike && (!bolt.enabled || bolt.age >= bolt.life)) {
+      bolt.wait -= dt;
+      if (wanted && !strike && bolt.enabled && bolt.age >= bolt.life) {
+        bolt.enabled = false;
+        bolt.wait = luminous ? random(.06, .38) : random(.45, 1.8);
+        if (reduced) bolt.wait *= 1.8;
+      }
+      if (wanted && !strike && !bolt.enabled && bolt.wait <= 0) {
         this._shape(bolt, t); bolt.enabled = true;
-        // Reduced flashing slows geometry replacement, preserving signature bolts.
-        if (reduced) bolt.life *= 2.3;
+        if (reduced) bolt.life *= 2;
       }
       if (strike && bolt.age >= bolt.life) { bolt.life = 0; bolt.enabled = false; }
-      const visible = wanted && bolt.enabled && this.fade > 0;
-      const smooth = reduced ? 1 : Math.min(1, (bolt.life - bolt.age) / .09 + .25);
+      const age = bolt.age / Math.max(.001, bolt.life);
+      // A leader flash, a real dark interval, then a shorter return stroke.
+      const stroke = reduced ? Math.sin(Math.PI * clamp(age, 0, 1))
+        : age < .28 ? Math.min(1, age / .035) : age < .48 ? 0 : Math.max(0, 1 - (age - .48) / .52);
+      const visible = wanted && bolt.enabled && stroke > .015 && this.fade > 0;
+      bolt.visible = visible;
+      const smooth = (reduced ? .7 : 1) * stroke;
       for (let j = 0; j < SEGMENTS; j++) {
         const index = bolt.index * SEGMENTS + j;
         const isFork = j >= 8;
@@ -496,7 +741,8 @@ export class UltraUltimateEffect {
         const width = coreWidth * bolt.scale * taper * smooth * this.fade;
         this._boltColor(bolt, j, t, glow);
         this._segment(this.edges, index, from, to, width * edgeWidth, this._color);
-        this._segment(this.cores, index, from, to, width, null);
+        if (luminous) this.cores.setMatrixAt(index, this._zero);
+        else this._segment(this.cores, index, from, to, width, null);
         this._segment(this.halos, index, from, to, width * haloWidth, this._color);
       }
       // Weld adjacent cylinders with shared angular joints. Their black volume
@@ -514,7 +760,7 @@ export class UltraUltimateEffect {
         const d = this._dummy;
         d.position.copy(bolt.points[node]); d.rotation.set(node * .27, bolt.phase, node * .41);
         d.scale.setScalar(width); d.updateMatrix();
-        this.coreJoints.setMatrixAt(index, d.matrix);
+        this.coreJoints.setMatrixAt(index, luminous ? this._zero : d.matrix);
         d.scale.multiplyScalar(edgeWidth); d.updateMatrix();
         this.edgeJoints.setMatrixAt(index, d.matrix);
         this._boltColor(bolt, node, t, glow);
@@ -528,6 +774,10 @@ export class UltraUltimateEffect {
   }
 
   _boltColor(bolt, segment, tuning, glow) {
+    if (bolt.index >= MAX_MAJOR) {
+      this._color.setHSL(.49 + (bolt.index % 5) * .055, .72, .54).multiplyScalar(glow * this.fade * .72);
+      return;
+    }
     const wave = .5 + .5 * Math.sin(this.time * .85 + segment * .48 + bolt.phase * 3);
     const gradient = wave * wave;
     let luminance = 1 - gradient * .55;
@@ -546,40 +796,60 @@ export class UltraUltimateEffect {
   _updateAura(dt, t) {
     const size = Math.max(3, value(t, 'auraSize'));
     const reduced = !!t.reducedFlashing;
-    const breathing = reduced ? 1 : 1 + .025 * Math.sin(this.time * 2.8);
+    let accent = .15;
+    if (this.time < 5) {
+      accent = .18 * Math.exp(-this.time * 4);
+      for (const beat of OPENING_ACCENTS) accent = Math.max(accent,
+        Math.exp(-Math.pow((this.time - beat) / (reduced ? .26 : .13), 2)));
+    } else if (this.time < 12) {
+      accent = .3 + .6 * Math.exp(-Math.pow((this.time - 5.49) / .18, 2))
+        + .2 * Math.sin(this.time * 4) ** 2;
+    } else accent = .12 + .65 * Math.exp(-Math.pow((this.time - 12.2) / .22, 2)) + this.armorUniforms.glimmer.value * .5;
+    if (reduced) accent *= .35;
+    this.pulseIntensity = accent;
+    const charge = this.phase === 'charging';
+    const chargeProgress = clamp((this.time - 5) / 7, 0, 1);
+    const extent = this.time < 5 ? .78 + accent * .12 : charge ? .92 - chargeProgress * .21 - accent * .08 : 1;
     const opacity = value(t, 'auraOpacity') * this.fade;
     this.auraUniforms.time.value = this.time;
     this.auraUniforms.intensity.value = value(t, 'auraIntensity');
     this.auraUniforms.cycle.value = value(t, 'rainbowSpeed') * (reduced ? .45 : 1);
     this.envelopes.forEach((mesh, i) => {
-      const radius = (i === 0 ? .28 : i === 1 ? .58 : .82) * size * breathing;
+      const breath = Math.sin(this.time * (1.6 + i * .27) + i * 2.1);
+      const breathing = 1 + (reduced ? .018 : .05) * breath;
+      const radius = (.29 + i * .28) * size * breathing * extent;
       mesh.scale.set(radius, radius * .74, radius * 1.05);
-      mesh.rotation.y += dt * (i % 2 ? -.08 : .06);
-      mesh.material.uniforms.opacity.value = opacity * (i === 0 ? 1.2 : i === 1 ? .58 : .36);
+      mesh.rotation.y = this.time * (i % 2 ? -.08 : .06);
+      mesh.material.uniforms.opacity.value = opacity * (i === 0 ? 1.05 : i === 1 ? .64 : .39) * (.88 + breath * .12 + accent * .35);
+      mesh.material.uniforms.intensity.value = value(t, 'auraIntensity') * (.8 + accent * 1.6 + breath * .13);
     });
     this.lattices.forEach((mesh, i) => {
       mesh.visible = value(t, 'latticeDensity') > i * .6;
-      mesh.scale.setScalar(size * (.48 + i * .22));
+      mesh.scale.setScalar(size * (.48 + i * .22) * extent);
       mesh.rotation.set(this.time * .05, this.time * (i ? -.06 : .08), i + this.time * .04);
-      mesh.material.opacity = opacity * .18 * Math.min(1, value(t, 'latticeDensity'));
+      mesh.material.opacity = opacity * .12 * Math.min(1, value(t, 'latticeDensity'));
       mesh.material.color.setScalar(value(t, 'auraIntensity'));
     });
     this.ribbons.forEach((mesh, i) => {
-      mesh.visible = i < Math.round(value(t, 'ribbonDensity') * 9);
-      const radius = size * (.35 + (i % 4) * .13);
+      mesh.visible = i < Math.round(value(t, 'ribbonDensity') * 9 * clamp(t.effectQuality ?? 1, .4, 1));
+      const breath = Math.sin(this.time * (1.1 + i * .07) + i * 1.7);
+      const radius = size * (.35 + (i % 4) * .13) * extent * (1 + breath * .035);
       mesh.scale.set(radius, radius * (.75 + (i % 3) * .11), radius);
-      mesh.rotation.z += dt * (i % 2 ? -.13 : .17);
-      mesh.rotation.y += dt * .07;
-      mesh.material.uniforms.opacity.value = opacity * (i < 3 ? 2.6 : 1.4);
+      mesh.rotation.z = i * 2.1 + this.time * (i % 2 ? -.13 : .17) + (charge ? chargeProgress * (i % 2 ? -4 : 4) : 0);
+      mesh.rotation.y = i * 1.8 + this.time * .07;
+      mesh.material.uniforms.opacity.value = opacity * (i < 3 ? 2 : 1.1) * (.85 + breath * .15);
+      mesh.material.uniforms.intensity.value = value(t, 'auraIntensity') * (1 + accent * .9);
     });
-    this._burstTime = Math.max(0, this._burstTime - dt * .6);
     this.pulses.forEach((mesh, i) => {
-      const phase = (this.time * (reduced ? .08 : .22) + i / 3) % 1;
-      const radius = size * (.35 + phase * 1.9);
+      const phase = (this.time * (reduced ? .12 : charge ? .65 : .3) + i / 3) % 1;
+      const radial = charge ? 1 - phase : phase;
+      const radius = size * (.25 + radial * 1.15) * extent;
       mesh.scale.setScalar(radius);
-      mesh.material.uniforms.opacity.value = opacity * (1 - phase) * (reduced ? .25 : .7 + this._burstTime);
+      mesh.material.uniforms.opacity.value = opacity * Math.sin(phase * Math.PI) * (reduced ? .18 : .5 + accent * .5);
+      mesh.material.uniforms.intensity.value = value(t, 'auraIntensity') * (1 + accent);
     });
-    this.light.intensity = 11 * this.fade * Math.min(2, value(t, 'auraIntensity'));
+    this.light.color.setHSL(.57 + .12 * Math.sin(this.time * .5), .6, .7);
+    this.light.intensity = (2.5 + accent * 6) * this.fade * Math.min(1.3, value(t, 'auraIntensity'));
   }
 
   _updateGlints(t) {
@@ -590,12 +860,16 @@ export class UltraUltimateEffect {
     for (let i = 0; i < GLINT_COUNT; i++) {
       const s = this.glintSeeds[i];
       const shine = Math.pow(Math.max(0, Math.sin(this.time * (s.hull ? 2.2 : 1.1) * slow + s.phase)), 8);
-      const scale = (s.hull ? .09 : .17) * shine * shimmer * this.fade;
-      d.position.set(s.x * (s.hull ? 2.1 : size), s.y * (s.hull ? .65 : size * .7), s.z * (s.hull ? 2.6 : size));
+      const signature = s.hull ? this.armorUniforms.glimmer.value * (i < 5 ? 1 : .4) : 0;
+      const arrivalAge = this.time - this._teleportArrival;
+      const arrival = s.hull && arrivalAge >= 0 ? Math.exp(-Math.pow((arrivalAge - .22) / .1, 2)) * (t.reducedFlashing ? .2 : .6) : 0;
+      const scale = ((s.hull ? .1 : .16) * shine + signature * .7 + arrival * .35) * shimmer * this.fade;
+      d.position.set(s.x * (s.hull ? Math.max(1, this._bounds.max.x) : size), s.hull ? this._bounds.max.y + .12 : s.y * size * .7, s.z * (s.hull ? Math.max(1.5, this._bounds.max.z) : size));
       d.rotation.set(0, 0, s.phase + this.time * .12);
       d.scale.set(scale * 1.8, scale, scale);
       d.updateMatrix(); this.glints.setMatrixAt(i, d.matrix);
-      this._color.setHSL((s.phase / TAU + this.time * .055) % 1, 1, .5).multiplyScalar(1.8);
+      this._color.setHSL((s.phase / TAU + this.time * .055) % 1, 1, .5).multiplyScalar(1.15);
+      if (signature > .02 || arrival > .02) this._color.setRGB(1.5, 1.65, 1.8);
       this.glints.setColorAt(i, this._color);
     }
     this.glints.instanceMatrix.needsUpdate = true;
@@ -676,11 +950,35 @@ export class UltraUltimateEffect {
     }
   }
 
-  update(dt, _gameTime, tuning = {}) {
-    if (!this.active) this.fade = Math.max(0, this.fade - dt * 2.8);
+  update(dt, presentationTime, tuning = {}) {
+    const previousTime = this.time;
+    if (this.active) this.time = Math.max(this.time, Number.isFinite(presentationTime) ? presentationTime : this.time + dt);
+    else { this.time += dt; this.fade = Math.max(0, this.fade - dt * 2.8); }
+    this.phase = this.time < 5 ? 'awakening' : this.time < 12 ? 'charging' : this.time < 15 ? 'hardening' : 'sustained';
+    this.armorProgress = clamp((this.time - 12) / 3, 0, 1);
+    if (this.active && previousTime < 14 && this.time >= 14) this.sparkleCount++;
+    if (this.active && this.time >= 12 && !this.originalMaterials.length) this.coatHull();
+    if (this.active && this.time >= 15 && !this._completedCoating) {
+      for (const record of this.originalMaterials) {
+        if (record.object.material !== record.applied) continue;
+        record.applied = Array.isArray(record.material)
+          ? record.material.map(m => m?.isMeshStandardMaterial ? this.armorMaterial : m) : this.armorMaterial;
+        record.object.material = record.applied;
+      }
+      this._completedCoating = true;
+    }
+    this.player.group.updateWorldMatrix(true, false);
+    this._hullInverse.copy(this.player.group.matrixWorld).invert();
+    this.armorUniforms.progress.value = this.armorProgress;
+    this.armorUniforms.time.value = this.time;
+    this.armorUniforms.shine.value = value(tuning, 'armorShine');
+    const sparkleAge = this.time - 14;
+    this.armorUniforms.glimmer.value = sparkleAge >= 0 && sparkleAge < 1.1
+      ? Math.exp(-Math.pow((sparkleAge - .07) / (tuning.reducedFlashing ? .25 : .13), 2)) * (tuning.reducedFlashing ? .3 : 1) : 0;
     const showRadius = !!tuning.showRadius && Number.isFinite(tuning.fieldRadius) && tuning.fieldRadius > 0;
     this.radiusGizmo.visible = showRadius;
     if (showRadius) this.radiusGizmo.scale.setScalar(tuning.fieldRadius);
+    this._updateTeleport(dt, tuning);
     if (this.fade <= 0) {
       this.root.visible = showRadius;
       this.wakeRoot.visible = false;
@@ -691,11 +989,9 @@ export class UltraUltimateEffect {
     for (const object of this.root.children) if (object !== this.radiusGizmo) object.visible = true;
     this.fieldBoundary.visible = this.active && Number.isFinite(tuning.fieldRadius) && tuning.fieldRadius > 0;
     if (this.fieldBoundary.visible) this.fieldBoundary.scale.setScalar(tuning.fieldRadius);
-    this.time += dt;
-    this.armorUniforms.time.value = this.time;
-    this.armorUniforms.shine.value = value(tuning, 'armorShine');
     this._updateStorm(dt, tuning);
     this._updateAura(dt, tuning);
+    this._updateCharge(tuning);
     this._updateGlints(tuning);
     this._updateWake(dt, tuning);
   }

@@ -81,6 +81,12 @@ export class EngineTrail {
     this.core.instanceMatrix.needsUpdate = this.halo.instanceMatrix.needsUpdate = true;
   }
 
+  /** A teleport breaks emission interpolation without deleting existing exhaust. */
+  breakTrail() {
+    this.primed = false;
+    this.carry = 0;
+  }
+
   update(dt, player, camera, { emit = true } = {}) {
     if (!(dt > 0)) return;
     // A resumed/stalled frame must never dump a whole second's exhaust at once.

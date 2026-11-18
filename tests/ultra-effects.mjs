@@ -34,6 +34,37 @@ function resourceIdentity() {
 }
 
 effect.activate();
+assert.equal(body.material, original, 'Original hull survives the opening and charge');
+assert.ok(body.layers.isEnabled(BLACK_SURFACE_LAYER), 'Original hull is redrawn after bloom before hardening');
+assert.equal(effect.originalMaterials.length, 0, 'Opening protection owns a render layer, not materials');
+effect.cancel();
+assert.deepEqual([body.layers.mask, arrayHull.layers.mask], originalMasks, 'Pre-hardening cancellation restores original rendering layers');
+effect.activate();
+body.layers.enable(5);
+effect.cancel();
+assert.equal(body.layers.mask, originalMasks[0] | (1 << 5), 'Pre-hardening cleanup preserves layers acquired by another effect');
+body.layers.disable(5);
+effect.activate();
+effect.update(5, 5);
+assert.equal(effect.phase, 'charging');
+assert.equal(body.material, original);
+effect.update(7, 12);
+assert.equal(effect.phase, 'hardening');
+assert.notEqual(body.material, original, 'Hardening installs a hull-conforming transition shader');
+assert.notEqual(body.material, effect.armorMaterial, 'Hardening is not an instantaneous armor swap');
+assert.equal(effect.armorProgress, 0);
+const coating = body.material;
+effect.update(1.99, 13.99);
+assert.ok(effect.armorProgress > .66 && effect.armorProgress < .67);
+assert.equal(effect.sparkleCount, 0);
+effect.update(.09, 14.08);
+assert.equal(effect.sparkleCount, 1, 'Crossing fourteen seconds emits exactly one signature glimmer');
+assert.ok(effect.armorUniforms.glimmer.value > .9);
+effect.update(.1, 14.18);
+assert.equal(effect.sparkleCount, 1);
+effect.update(.82, 15);
+assert.equal(effect.phase, 'sustained');
+assert.equal(effect.armorProgress, 1);
 assert.equal(body.material, effect.armorMaterial);
 assert.equal(arrayHull.material[0], effect.armorMaterial);
 assert.equal(arrayHull.material[1], trim, 'Non-armor material slots retain their existing appearance');
@@ -48,7 +79,7 @@ assert.equal(body.material, original);
 assert.equal(arrayHull.material, arrayMaterial, 'The exact original multi-material array is restored');
 assert.deepEqual([body.layers.mask, arrayHull.layers.mask], originalMasks);
 
-effect.activate();
+effect.activate(); effect.update(15, 15);
 const newerBuffMaterial = new THREE.MeshPhysicalMaterial({ color: '#ffdd55' });
 body.material = newerBuffMaterial;
 body.layers.enable(5);
@@ -71,7 +102,7 @@ effect.activate();
 assert.equal(effect.wakeParticles.filter(particle => particle.life > 0).length, 0,
   'Reactivation after a full cooldown cannot resurrect the previous wake');
 assert.equal(effect.wakeRoot.visible, false, 'No old world-space trail flashes on the activation frame');
-effect.update(.1, 60.1);
+effect.update(.1, .1);
 assert.ok(effect.wakeParticles.some(particle => particle.life > 0 && particle.x > 10),
   'The next wake originates at the current ship position');
 effect.cancel();
@@ -110,6 +141,56 @@ assert.deepEqual([body.layers.mask, arrayHull.layers.mask], originalMasks);
 assert.equal(body.material, original);
 assert.equal(arrayHull.material, arrayMaterial);
 
+// A material acquired while hardening owns the surface even after completion.
+effect.activate(); effect.update(13, 13);
+body.material = newerBuffMaterial;
+effect.update(2, 15);
+assert.equal(body.material, newerBuffMaterial, 'Completion does not seize a newer material owner');
+effect.cancel();
+assert.equal(body.material, newerBuffMaterial);
+body.material = original;
+
+// Presentation clock, cancellation, and teleport discontinuities are independent of damage.
+effect.activate(); effect.update(14.4, 14.4);
+assert.equal(effect.sparkleCount, 1, 'A large frame cannot skip the signature event');
+effect.update(75.6, 90);
+assert.equal(effect.phase, 'sustained');
+assert.equal(effect.sparkleCount, 1, 'Sustained mode never replays the transformation');
+effect.cancel();
+effect.activate(); effect.update(12.5, 12.5);
+assert.equal(body.material, coating, 'Repeated activations reuse cached transition materials');
+effect.cancel();
+assert.equal(body.material, original, 'Cancel during partial coating restores the exact original');
+
+effect.activate();
+let offFrames = 0, onFrames = 0;
+for (let i = 1; i <= 240; i++) {
+  effect.update(1 / 60, i / 60);
+  if (effect.bolts[0].visible) onFrames++; else offFrames++;
+}
+assert.ok(offFrames > onFrames && onFrames > 0, 'Black lightning has genuine long off intervals and brief discharges');
+const inner = effect.envelopes.map(mesh => mesh.scale.x);
+effect.update(.25, 4.25);
+const ratios = effect.envelopes.map((mesh, i) => mesh.scale.x / inner[i]);
+assert.ok(Math.abs(ratios[0] - ratios[1]) > .001, 'Aura layers breathe independently');
+const origin = new THREE.Vector3(-16, 1, 0), destination = new THREE.Vector3(16, 1, 0);
+group.position.copy(origin);
+effect.beginTeleport(origin, .42);
+effect.update(.1, 4.35);
+assert.equal(effect.teleportHidden, true);
+group.position.copy(destination);
+effect.onTeleport(destination);
+assert.equal(effect._primed, false, 'Arrival breaks wake interpolation across the teleport gap');
+effect.update(.05, 4.4);
+assert.equal(effect.teleportHidden, false);
+assert.deepEqual(effect._lastWorld.toArray(), destination.toArray());
+assert.ok(effect.teleportRings.some(r => r.mesh.visible && r.mesh.position.x < 0));
+assert.ok(effect.teleportRings.some(r => r.mesh.visible && r.mesh.position.x > 0));
+effect.cancelTeleport();
+assert.equal(effect.teleportHidden, false);
+effect.cancel();
+assert.ok(effect.teleportRings.every(r => !r.mesh.visible));
+
 // The pass must draw into the bloom input's existing depth attachment and then
 // restore scene/camera/renderer state so ordinary rendering is unaffected.
 const passScene = new THREE.Scene();
@@ -147,4 +228,4 @@ assert.equal(passScene.background, background);
 assert.equal(renderer.shadowMap.autoUpdate, true);
 assert.equal(renderer.autoClear, true);
 
-console.log('Ultra effects PASS: no stale wake after cooldown, isolated materials and layer restoration, newer material ownership, bounded pools, and depth-preserving pass state.');
+console.log('Ultra effects PASS: timed transformation, partial coating, sparkle crossing, intermittent lightning, independent auras, teleport discontinuity, no stale wake after cooldown, isolated materials and layer restoration, newer material ownership, bounded pools, and depth-preserving pass state.');

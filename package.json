@@ -41,7 +41,9 @@
     "test:autoplay": "node tests/title-autoplay.mjs",
     "test:audio-integrity": "node tests/audio-volume.mjs && node tests/music-ownership.mjs && node tests/audio-mix.mjs && node tests/title-autoplay.mjs && node tests/audio-volume-browser.mjs && node tests/battle-soundtrack.mjs && node tests/endgame-music.mjs",
     "test:onboarding": "node tests/settings-migration.mjs && node tests/enemy-loot.mjs && node tests/hud-feedback.mjs && node tests/flight-visuals.mjs && node tests/crate-glow.mjs && node tests/opening-tutorial-browser.mjs && node tests/interface-settings-lab-browser.mjs && node tests/standalone-ui-scale-browser.mjs && node tests/flight-visuals-browser.mjs && node tests/loot-feedback-browser.mjs && node tests/crate-glow-browser.mjs",
-    "test:ultra": "node tests/void-projectiles.mjs && node tests/ultra-effects.mjs && node tests/ultra-ultimate.mjs && node tests/ultra-ui.mjs",
+    "test:ultra": "node tests/void-projectiles.mjs && node tests/ultra-effects.mjs && node tests/ultra-audio.mjs && node tests/ultra-ultimate.mjs && node tests/ultra-teleport.mjs && node tests/ultra-ui.mjs",
+    "test:ultra-audio": "node tests/ultra-audio.mjs && node tests/ultra-audio-browser.mjs",
+    "test:ultra-visual": "node tests/ultra-visual.mjs",
     "test:ultra-production": "node tests/ultra-production.mjs"
   },
   "private": true,

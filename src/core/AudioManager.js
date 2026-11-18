@@ -1,6 +1,7 @@
 import { Save, AUDIO_DEFAULTS, clampAudioVolume } from './SaveSystem.js';
 import { rand } from './Utils.js';
 import { fetchAssetBuffer, mapConcurrent } from './AssetLoader.js';
+import { UltraAudio } from './UltraAudio.js';
 
 /**
  * SFX are decoded into WebAudio buffers (short, fired constantly, need pitch
@@ -230,6 +231,17 @@ export class AudioManagerImpl {
     if (current?.el.ended && !this._pauseReasons.size && Save.data.music) this._finishTrack(current);
     else if (current?.el.paused) this._playEntry(current);
   }
+
+  _ultraTransport() {
+    return this._ultra ||= new UltraAudio(this, file => fetchAssetBuffer(`${ASSET_BASE}sfx/${file}`));
+  }
+
+  // Kept out of the ordinary startup SFX bank; authorized callers opt in.
+  preloadUltra() { return this._ultraTransport().preload(); }
+  startUltra(volume) { this._ultraTransport().start(volume); }
+  syncUltra(elapsed, paused = false, volume) { this._ultra?.sync(elapsed, paused, volume); }
+  stopUltra(immediate = false) { this._ultra?.stop(immediate); }
+  playUltraTeleport(volume) { this._ultra?.teleport(volume); }
 
   play(name, vol = 1, rate = 1, jitter = 0) {
     if (!this.ready || !Save.data.sfx) return;

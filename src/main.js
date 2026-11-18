@@ -152,12 +152,14 @@ game.controllerMenus = new ControllerMenus(game);
 
 // --- loop ---
 let last = performance.now();
+document.addEventListener('visibilitychange', () => { last = performance.now(); });
 function frame(ts) {
   requestAnimationFrame(frame);
   // clamp dt: a background tab must not teleport the player into a laser
-  const dt = Math.min((ts - last) / 1000 || 0.016, 0.05);
+  const presentationDt = Math.max(0, (ts - last) / 1000 || 0.016);
+  const dt = Math.min(presentationDt, 0.05);
   last = ts;
-  game.update(dt);
+  game.update(dt, presentationDt);
   positionMenuHalo();
   hangar.update(dt);
 }

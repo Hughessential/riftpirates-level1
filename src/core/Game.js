@@ -386,6 +386,7 @@ export class Game {
   }
 
   syncMusicPause() {
+    this.ultraUltimate?.syncAudio(true);
     Audio2.setMusicPaused('game', this.paused);
     Audio2.setMusicPaused('lab', this.testing.active && this.testing.panelOpen);
     Audio2.setMusicPaused('background', document.hidden);
@@ -619,7 +620,9 @@ export class Game {
       !this.upgradeScreen.closing && !(this.testing.active && this.testing.panelOpen);
   }
 
-  update(rawDt) {
+  update(rawDt, presentationDt = rawDt) {
+    // Audio and authored VFX retain real-time cadence when gameplay dt is capped.
+    this._presentationDt = Math.max(0, Number.isFinite(presentationDt) ? presentationDt : rawDt);
     // The flat sight is persistent only during live, controllable flight.
     // Central ownership hides it immediately on pauses, shops, cinematics,
     // death/results, title screens and Testing Grounds dialogs.
@@ -737,7 +740,7 @@ export class Game {
       // Simulation clocks advance only while active gameplay owns the world.
       this.player.update(dt, this);
       if (active && this.director.inCombat) this.ultraUltimate.update(dt);
-      this.ultraUltimate.updateEffects(dt);
+      this.ultraUltimate.updateEffects(this._presentationDt ?? dt);
       if (active && this.director.inCombat) this.weapon.update(dt, this);
     }
 

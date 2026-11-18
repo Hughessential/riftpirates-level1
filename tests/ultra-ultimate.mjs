@@ -37,8 +37,8 @@ try {
     window.__render = g.renderFrame.bind(g);
     g.renderFrame = () => {};
     window.__cues = 0;
-    const play = __Audio.play.bind(__Audio);
-    __Audio.play = (...args) => { if (args[0] === 'black_armor') __cues++; return play(...args); };
+    const startUltra = __Audio.startUltra.bind(__Audio);
+    __Audio.startUltra = (...args) => { __cues++; return startUltra(...args); };
     window.__advance = seconds => {
       const frames = Math.round(seconds * 60);
       for (let i = 0; i < frames; i++) __step(1 / 60);
@@ -58,12 +58,34 @@ try {
       coated: u.effect.originalMaterials.length, root: u.effect.root.visible,
       hud: document.getElementById('ultraUltimateHud')?.textContent || document.querySelector('.ultraUltimateRow')?.textContent };
   });
-  assert.ok(activated.active && activated.testRun && activated.root && activated.coated > 0);
+  assert.ok(activated.active && activated.testRun && activated.root);
+  assert.equal(await page.evaluate(() => RIFT.ultraUltimate.effect.armorProgress), 0,
+    'Protection is immediate, but the visual armor has not hardened yet');
   assert.equal(activated.cues, 1, 'Activation sound fires once');
   assert.equal(activated.cooldown, 0, 'Cooldown does not run during the transformation');
   assert.ok(Math.abs(activated.baseDps - 117) < .001, 'Area output snapshots pre-ultra primary DPS');
   assert.ok(Math.abs(activated.radius / activated.hull - 15) < .001, 'Radius uses only fifteen hull lengths');
   if (process.env.ULTRA_SCREENSHOT) await page.screenshot({ path: process.env.ULTRA_SCREENSHOT });
+
+  const phases = await page.evaluate(() => {
+    const u = RIFT.ultraUltimate;
+    const sample = () => ({ phase: u.effect.phase, armor: u.effect.armorProgress,
+      sparkles: u.effect.sparkleCount, time: u.presentationTime, active: u.active });
+    const states = [sample()];
+    for (const target of [4.99, 5.01, 11.99, 12.01, 13.99, 14.08, 15.01]) {
+      __step(target - u.presentationTime);
+      states.push(sample());
+    }
+    return states;
+  });
+  assert.deepEqual(phases.map(state => state.phase),
+    ['awakening', 'awakening', 'charging', 'charging', 'hardening', 'hardening', 'hardening', 'sustained']);
+  assert.ok(phases.every(state => state.active), 'All phases preserve immediate active gameplay');
+  assert.equal(phases[5].sparkles, 0);
+  assert.equal(phases[6].sparkles, 1, 'A frame crossing 14 triggers exactly one glimmer');
+  assert.equal(phases[7].sparkles, 1);
+  assert.ok(phases[5].armor > 0 && phases[5].armor < 1);
+  assert.equal(phases[7].armor, 1);
 
   const held = await page.evaluate(() => {
     for (let i = 0; i < 5; i++) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2', repeat: true, bubbles: true }));
@@ -92,13 +114,32 @@ try {
   const paused = await page.evaluate(() => {
     const u = RIFT.ultraUltimate;
     RIFT.togglePause({ showMenu: false });
-    const before = [u.elapsed, u.pulseClock, u.cooldown];
+    const before = [u.elapsed, u.pulseClock, u.cooldown, u.presentationTime];
     __advance(3);
-    const after = [u.elapsed, u.pulseClock, u.cooldown];
+    const after = [u.elapsed, u.pulseClock, u.cooldown, u.presentationTime];
     RIFT.togglePause({ showMenu: false });
     return { before, after };
   });
   assert.deepEqual(paused.after, paused.before, 'Pause freezes active and damage-pulse clocks');
+
+  const clockIsolation = await page.evaluate(() => {
+    const u = RIFT.ultraUltimate;
+    const before = { gameplay: u.elapsed, presentation: u.presentationTime };
+    __step(.05, .25); // low frame rate: simulation stays capped; authored audio/VFX do not slow down
+    const after = { gameplay: u.elapsed, presentation: u.presentationTime };
+    const descriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    const hiddenPaused = RIFT.paused && __Audio._ultra.paused;
+    if (descriptor) Object.defineProperty(document, 'hidden', descriptor);
+    else delete document.hidden;
+    document.dispatchEvent(new Event('visibilitychange'));
+    RIFT.togglePause({ showMenu: false });
+    return { before, after, hiddenPaused };
+  });
+  assert.ok(Math.abs(clockIsolation.after.gameplay - clockIsolation.before.gameplay - .05) < 1e-6);
+  assert.ok(Math.abs(clockIsolation.after.presentation - clockIsolation.before.presentation - .25) < 1e-6);
+  assert.ok(clockIsolation.hiddenPaused, 'Visibility change immediately pauses owned aura audio without another frame');
 
   const immunity = await page.evaluate(async () => {
     const g = RIFT, p = g.player;
@@ -198,7 +239,7 @@ try {
     p.resetBlackArmor(); u.reset(); const firstRestored = restored();
     u.activate(); p.activateBlackArmor(); __advance(6);
     const ultraAfterNormal = u.active && !p.blackArmorActive && p.blackArmorCooldown > 18.9
-      && u.effect.originalMaterials.length > 0 && p.hull.visible;
+      && u.effect.armorProgress === 0 && p.hull.visible;
     p.invuln = 1.7; u.cancel();
     const rollProtectionRetained = p.invuln === 1.7 && !p.takeDamage(100, 'OTHER PROTECTION');
     return { normalAfterUltra, immunityRetained, firstRestored, ultraAfterNormal,
@@ -246,7 +287,9 @@ try {
     return PLAYER_SHIPS.map(({ id }) => {
       p.setShip(id); p.resetBlackArmor();
       const masks = []; p.hull.traverse(o => { if (o.isMesh) masks.push(o.layers.mask); });
-      const started = u.activate(), count = u.effect.originalMaterials.length;
+      const started = u.activate();
+      u.updateEffects(15);
+      const count = u.effect.originalMaterials.length;
       const length = u.hullLength, radius = u.fieldRadius;
       p.setShip(id); // replacement itself must clean ownership
       const afterMasks = []; p.hull.traverse(o => { if (o.isMesh) afterMasks.push(o.layers.mask); });

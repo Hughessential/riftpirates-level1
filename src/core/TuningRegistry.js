@@ -98,12 +98,12 @@ export const TUNING_SCHEMA = Object.freeze([
   ultraEntry('ultraAura', 'latticeDensity', 'Lattice density', 'Fine faceted energy filaments within the bounded visual pool.', 0, 2, .1),
   ultraEntry('ultraAura', 'ribbonDensity', 'Ribbon density', 'Sweeping energy ribbons within the bounded visual pool.', 0, 2, .1),
 
-  ultraEntry('ultraLightning', 'majorCount', 'Major black branches', 'Large signature lightning branches. Their geometry persists for a coherent short lifetime.', 4, 24, 1, 'bolts'),
+  ultraEntry('ultraLightning', 'majorCount', 'Major black branches', 'Maximum signature discharge slots, with irregular gaps between flashes.', 0, 24, 1, 'bolts'),
   ultraEntry('ultraLightning', 'minorCount', 'Minor electrical branches', 'Smaller connecting arcs and filaments; reduce these first for a lighter effect.', 0, 40, 1, 'bolts'),
   ultraEntry('ultraLightning', 'coreWidth', 'Black-core width', 'Physical thickness of the opaque black lightning bodies.', .08, 1.2, .01, 'm'),
   ultraEntry('ultraLightning', 'branching', 'Branching density', 'Frequency of secondary forks along the larger fractures.', 0, 1, .05, 'ratio'),
   ultraEntry('ultraLightning', 'lightningReach', 'Decorative lightning reach', 'World-unit reach of decorative branches. Gameplay radius is configured separately.', 10, 100, 1, 'm'),
-  ultraEntry('ultraLightning', 'lightningLifetime', 'Bolt lifetime', 'Coherent lifetime before a branch changes shape.', .2, 2, .05, 'sec'),
+  ultraEntry('ultraLightning', 'lightningLifetime', 'Discharge cluster duration', 'A coherent path briefly flashes and restrikes, then disappears before the next discharge.', .16, .36, .01, 'sec'),
   ultraEntry('ultraLightning', 'glowWidth', 'Colored edge width', 'Width of luminous colored edge light around the opaque black body.', 1.1, 3, .05),
   ultraEntry('ultraLightning', 'glowIntensity', 'Edge glow intensity', 'Brightness of the purple-to-teal lightning edge treatment.', .5, 6, .1),
   ultraEntry('ultraLightning', 'gradientMix', 'Purple-to-teal color balance', 'Weight of signature purple and teal edges versus pink, electric blue and red accents.', 0, 1, .05, 'ratio'),
@@ -113,7 +113,7 @@ export const TUNING_SCHEMA = Object.freeze([
   ultraEntry('ultraPresentation', 'projectileTrails', 'Void Beam trails', 'Prismatic tails on discrete cannon shots.', 0, 3, .1),
   ultraEntry('ultraPresentation', 'impactEffects', 'Void Beam impact effects', 'Intensity of brief rainbow and purple electrical impact bursts.', 0, 2, .1),
   ultraEntry('ultraPresentation', 'bloom', 'Bloom contribution', 'Additional bloom while the transformation is visible.', 0, 1, .01, '+'),
-  ultraEntry('ultraPresentation', 'soundVolume', 'Activation audio volume', 'One activation cue through the existing effects volume controls.', 0, 1, .01, 'gain'),
+  ultraEntry('ultraPresentation', 'soundVolume', 'Ultra audio volume', 'Transformation, sustained aura and teleport sounds through the existing effects mixer.', 0, 1, .01, 'gain'),
   ultraEntry('ultraPresentation', 'reducedFlashing', 'Reduced flashing', 'Gentler pulses and impacts retain the black lightning and rainbow identity.', 0, 1, 1, 'on'),
 
   entry('gameplay', 'lootValue', 'Loot value', 'Scales value authorized by new loot drops.', 0, 10, .1),

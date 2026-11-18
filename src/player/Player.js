@@ -5,6 +5,7 @@ import { hopperVoxels } from '../render/Models.js';
 import { createPlayerShip, isPlayerShipId, PLAYER_SHIPS } from '../render/PlayerFleet.js';
 import { Input } from '../core/Input.js';
 import { EngineTrail } from '../effects/EngineTrail.js';
+import { UltraTeleport } from './UltraTeleport.js';
 import { BlackArmorEffect } from '../effects/BlackArmorEffect.js';
 import { BLACK_SURFACE_LAYER } from '../render/BlackSurfacePass.js';
 import { Audio2 } from '../core/AudioManager.js';
@@ -167,6 +168,8 @@ export class Player {
 
     scene.add(this.group);
     this.exhaust = new EngineTrail(scene);
+    this._ultraTeleport = new UltraTeleport();
+    this._teleportPosition = new THREE.Vector3();
     this.blackArmorEffect = new BlackArmorEffect(this, fx);
     this._blackArmorValues = { ...BLACK_ARMOR_DEFAULTS };
     this.radius = 1.35;
@@ -222,6 +225,10 @@ export class Player {
     this.rollT = 0; // >0 while a barrel roll is in progress
     this.rollCd = 0; // roll cooldown remaining
     this.rollDir = 0; // -1 left, +1 right
+    this._ultraRoll = false;
+    this._teleportPending = false;
+    this._teleportElapsed = 0;
+    this._teleportAt = 0;
     this.invuln = 0;
     this.blackArmorTime = 0;
     this.blackArmorCooldown = 0;
@@ -331,6 +338,14 @@ export class Player {
     this.reticle.visible = Boolean(active && this.alive && this.group.visible);
   }
 
+  cancelUltraTeleport() {
+    this._teleportPending = false;
+    this.ultraUltimate?.effect?.cancelTeleport();
+    // Keep the roll's original movement kind until it finishes. Cancellation
+    // must not suddenly grant a normal lateral dash on top of the teleport.
+    this.hull.visible = true;
+  }
+
   update(dt, ctx) {
     if (!this.alive) return;
     const tune = key => this.testing?.getTuning(key) ?? 1;
@@ -398,8 +413,19 @@ export class Player {
       this.dodgeUsed = false;
       this.dodgePending = false;
       this.dodgeSpoiled = false;
-      Audio2.play('boost', 0.55, 1.9, 0.05);
-      this.fx.jet(this.x, this.y, 2.5, { x: this.rollDir, y: 0, z: 0 }, 4, [P.cyan, P.white]);
+      this._ultraRoll = Boolean(this.ultraUltimate?.active);
+      if (this._ultraRoll) {
+        this._teleportPending = true;
+        this._teleportElapsed = 0;
+        this._teleportAt = Math.min(.15, rollTime * .36);
+        this._teleportSide = this._ultraTeleport.oppositeSide(this, ctx.camera, rollReq);
+        this._teleportPosition.set(this.x, this.y, 0);
+        this.ultraUltimate.effect.beginTeleport(this._teleportPosition, rollTime);
+        Audio2.playUltraTeleport(this.ultraUltimate.tuning().soundVolume);
+      } else {
+        Audio2.play('boost', 0.55, 1.9, 0.05);
+        this.fx.jet(this.x, this.y, 2.5, { x: this.rollDir, y: 0, z: 0 }, 4, [P.cyan, P.white]);
+      }
       this.cosmicEffects?.onDodgeStart(this.rollDir, 'roll');
     }
     if (this.rollT > 0) this.rollT -= dt;
@@ -417,7 +443,7 @@ export class Player {
     this.vy = damp(this.vy, inp.y * speed * 0.9, response, dt);
 
     // barrel roll adds a decaying lateral dash on top of steering
-    if (this.rollT > 0) {
+    if (this.rollT > 0 && !this._ultraRoll) {
       const rollTime = ROLL_TIME * tune('rollDuration');
       const k = this.rollT / Math.max(.001, rollTime); // 1 -> 0 across the roll (ease-out dash)
       this.x = clamp(this.x + this.rollDir * ROLL_DASH * tune('rollDistance') * k * dt, ARENA.minX, ARENA.maxX);
@@ -446,6 +472,19 @@ export class Player {
     }
 
     this.group.position.set(this.x, this.y, 0);
+    if (this._teleportPending) {
+      this._teleportElapsed += Math.max(0, ctx._presentationDt ?? dt);
+      if (!this.ultraUltimate?.active) this.cancelUltraTeleport();
+      else if (this._teleportElapsed + 1e-8 >= this._teleportAt) {
+        this._teleportPending = false;
+        this.x = this._ultraTeleport.destination(this, ctx.camera, ARENA, this._teleportSide);
+        this.group.position.set(this.x, this.y, 0);
+        this.group.updateWorldMatrix(true, true);
+        this.exhaust.breakTrail();
+        this._teleportPosition.copy(this.group.position);
+        this.ultraUltimate.effect.onTeleport(this._teleportPosition);
+      }
+    }
     if (this.rollT > 0) {
       // a full 360° roll around the travel axis over the roll's lifetime
       const k = 1 - this.rollT / Math.max(.001, ROLL_TIME * tune('rollDuration')); // 0 -> 1
@@ -467,6 +506,7 @@ export class Player {
     } else {
       this.hull.visible = true;
     }
+    if (this.ultraUltimate?.active && this.ultraUltimate.effect.teleportHidden) this.hull.visible = false;
     if (this.buffT > 0) this.buffT -= dt;
     if (this.critBuffT > 0) this.critBuffT -= dt;
 

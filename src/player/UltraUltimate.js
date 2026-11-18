@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ULTRA_ULTIMATE_DEFAULTS, ULTRA_TUNING_KEYS, ULTRA_ACTIVATION_AUDIO, hasUltraUltimateAccess, enableUltraFromBrimbySignal } from '../config/abilities.js';
+import { ULTRA_ULTIMATE_DEFAULTS, ULTRA_TUNING_KEYS, hasUltraUltimateAccess, enableUltraFromBrimbySignal } from '../config/abilities.js';
 import { primaryWeaponOutput } from '../config/weapons.js';
 import { Audio2 } from '../core/AudioManager.js';
 import { UltraUltimateEffect } from '../effects/UltraUltimateEffect.js';
@@ -20,6 +20,7 @@ export class UltraUltimate {
     this.cooldown = 0;
     this.cooldownDuration = ULTRA_ULTIMATE_DEFAULTS.cooldown;
     this.elapsed = 0;
+    this.presentationTime = 0;
     this.pulseClock = 0;
     this.baseDps = 0;
     this.hullLength = 5.8;
@@ -35,6 +36,7 @@ export class UltraUltimate {
   unlockFromBrimbySignal() {
     enableUltraFromBrimbySignal();
     this.effect ||= new UltraUltimateEffect(this.player, this.game.fx, this.game.camera);
+    Audio2.preloadUltra();
   }
 
   get active() { return this.#active; }
@@ -69,6 +71,7 @@ export class UltraUltimate {
     this.values.pulseInterval = Math.max(.02, this.values.pulseInterval);
     this.values.fieldRadius = this.values.fieldRadius || this.hullLength * ULTRA_ULTIMATE_DEFAULTS.hullLengths;
     this.values.areaDps = this.values.areaDps || this.baseDps * this.values.areaDpsMultiplier;
+    this.values.effectQuality = Math.max(.65, Math.min(1, this.game.adaptiveResolution?.scale ?? 1));
     this.fieldRadius = this.values.fieldRadius;
     return this.values;
   }
@@ -90,13 +93,14 @@ export class UltraUltimate {
     const tuning = this.tuning();
     this.#active = true; // protection and guns precede visual/audio work
     this.elapsed = 0;
+    this.presentationTime = 0;
     this.pulseClock = tuning.pulseInterval;
     this.cooldownDuration = tuning.cooldown;
     g.testRun = true; // existing no-banking / no-best-score path, sticky until reset
     p.blackArmorEffect.restoreHull();
     this.effect.activate(tuning);
     p.hull.visible = true;
-    Audio2.play(ULTRA_ACTIVATION_AUDIO, tuning.soundVolume, 1, 0);
+    Audio2.startUltra(tuning.soundVolume);
     this.pulse(tuning);
     return true;
   }
@@ -111,6 +115,8 @@ export class UltraUltimate {
     const wasActive = this.active;
     this.#active = false;
     this.pulseClock = 0;
+    this.player.cancelUltraTeleport?.();
+    Audio2.stopUltra(immediate);
     if (immediate) this.effect?.cancel();
     else this.effect?.expire();
     if (wasActive && this.player.blackArmorActive) this.player.blackArmorEffect.coatHull();
@@ -125,6 +131,7 @@ export class UltraUltimate {
     this.cancel({ cooldown: false, immediate: true });
     this.cooldown = 0;
     this.elapsed = 0;
+    this.presentationTime = 0;
     this._cooldownJustStarted = false;
     this._targets.clear();
   }
@@ -151,7 +158,32 @@ export class UltraUltimate {
   }
 
   updateEffects(dt) {
-    if (this.authorized) this.effect.update(dt, this.game.time, this.tuning());
+    if (!this.authorized) return;
+    const paused = this.presentationPaused;
+    if (this.active && !paused) this.presentationTime += Math.max(0, dt);
+    this.effect.update(paused ? 0 : dt, this.presentationTime, this.tuning());
+    this.syncAudio();
+  }
+
+  get presentationPaused() {
+    const g = this.game;
+    return globalThis.document?.hidden || !g.running || g.paused || this.player.frozen || g._terminalOutcome
+      || !this.player.alive || g.director?.inUpgrade || g.upgradeScreen?.open
+      || g.upgradeScreen?.closing || (g.testing?.active && g.testing.panelOpen)
+      || (g.testing?.active && g.testing.settings.timeScale === 0);
+  }
+
+  // Called even when the world update is suspended by menus or pause.
+  syncAudio(pauseOnly = false) {
+    if (!this.active) return;
+    if (!this.player.alive || this.game._terminalOutcome || !this.game.running) {
+      this.reset();
+      return;
+    }
+    const paused = Boolean(this.presentationPaused);
+    // Before a frame advances, the previous visual timestamp is intentionally
+    // stale. Only stop paused audio there; do not seek a playing source backward.
+    if (!pauseOnly || paused) Audio2.syncUltra(this.presentationTime, paused, this.tuning().soundVolume);
   }
 
   pulse(tuning = this.tuning()) {
