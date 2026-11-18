@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createImportedModel } from './ImportedAssets.js';
 
 const TAU = Math.PI * 2;
-const PALETTE = [0x24edff, 0xed38ff, 0xc4ff4d, 0x814cff, 0xffa633];
+const STATUE_RING_AMBER = 0x7a460c;
 
 function fallbackModel(id, size) {
   const group = new THREE.Group();
@@ -49,15 +49,18 @@ function model(id, size) {
   return group;
 }
 
-/** One instanced batch per ring, including color; no per-frame block uploads. */
-function voxelOrbit(radius, count, blockSize, paletteOffset = 0, bright = false) {
+/** One instanced batch per ring; no per-frame block uploads. */
+function voxelOrbit(radius, count, blockSize) {
   const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
-  const material = bright
-    ? new THREE.MeshBasicMaterial({ vertexColors: false })
-    : new THREE.MeshStandardMaterial({ metalness: 0.5, roughness: 0.38 });
+  const material = new THREE.MeshStandardMaterial({
+    color: STATUE_RING_AMBER,
+    emissive: STATUE_RING_AMBER,
+    emissiveIntensity: 0.08,
+    metalness: 0.2,
+    roughness: 0.8,
+  });
   const ring = new THREE.InstancedMesh(geometry, material, count);
   const transform = new THREE.Object3D();
-  const color = new THREE.Color();
   for (let i = 0; i < count; i++) {
     const angle = i / count * TAU;
     transform.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, Math.sin(angle * 5) * 0.2);
@@ -65,12 +68,8 @@ function voxelOrbit(radius, count, blockSize, paletteOffset = 0, bright = false)
     transform.scale.set(1, i % 4 === 0 ? 1.8 : 1, 1);
     transform.updateMatrix();
     ring.setMatrixAt(i, transform.matrix);
-    color.setHex(PALETTE[(Math.floor(i / 6) + paletteOffset) % PALETTE.length]);
-    if (bright) color.multiplyScalar(1.5);
-    ring.setColorAt(i, color);
   }
   ring.instanceMatrix.needsUpdate = true;
-  ring.instanceColor.needsUpdate = true;
   ring.computeBoundingSphere();
   return ring;
 }
@@ -160,6 +159,11 @@ function citadelPlanet() {
     mesh.computeBoundingSphere();
     root.add(mesh);
   }
+  // Bounds of the gold insignia only, in planet-local coordinates. Testing
+  // one box avoids raycasting the thousands of instanced hull voxels.
+  root.userData.skullBounds = new THREE.Box3(
+    new THREE.Vector3(-0.795, -0.205, 8.72), new THREE.Vector3(0.795, 1.385, 8.84));
+  root.userData.radius = radius * 0.57 + 0.27;
   root.userData.voxelCount = hull.length + energy.length;
   return root;
 }
@@ -218,25 +222,31 @@ export class RiftWorldShowcase {
     const menuRim = new THREE.PointLight(0xc42aff, 115, 40, 2);
     menuRim.position.set(7, 3, 8);
     this.menuRoot.add(menuKey, menuRim);
+    this.skullRay = new THREE.Raycaster();
+    this.skullPointer = new THREE.Vector2();
+    this.planetInverse = new THREE.Matrix4();
+    this.haloCenter = new THREE.Vector3();
+    this.haloScale = new THREE.Vector3();
+    this.haloBounds = { x: 0, y: 0, width: 0, height: 0 };
 
     // Guarding the sides of the route, these monuments are deliberately well
     // outside x=±22. Their slow drift gives each fly-by a sense of huge scale.
     this.guardians = [];
     const guardianDefs = [
-      { id: 'mechaGolem', x: -43, y: 2, z: -105, size: 22, tint: 0, rate: 0.24 },
-      { id: 'companion', x: 39, y: 6, z: -175, size: 16, tint: 2, rate: 0.19 },
-      { id: 'mechaGolem', x: 58, y: -5, z: -265, size: 28, tint: 1, rate: 0.15 },
-      { id: 'companion', x: -61, y: 15, z: -320, size: 19, tint: 4, rate: 0.12 },
+      { id: 'mechaGolem', x: -43, y: 2, z: -105, size: 22, rate: 0.24 },
+      { id: 'companion', x: 39, y: 6, z: -175, size: 16, rate: 0.19 },
+      { id: 'mechaGolem', x: 58, y: -5, z: -265, size: 28, rate: 0.15 },
+      { id: 'companion', x: -61, y: 15, z: -320, size: 19, rate: 0.12 },
     ];
     for (const [i, def] of guardianDefs.entries()) {
       const root = new THREE.Group();
       const character = model(def.id, def.size);
       character.rotation.y = def.x > 0 ? -0.55 : 0.55;
       root.add(character);
-      const crown = voxelOrbit(def.size * 0.62, 36, def.size * 0.035, def.tint, true);
+      const crown = voxelOrbit(def.size * 0.62, 36, def.size * 0.035);
       crown.position.set(0, 0, -3);
       crown.rotation.x = 0.13;
-      const dais = voxelOrbit(def.size * 0.35, 24, def.size * 0.055, def.tint, false);
+      const dais = voxelOrbit(def.size * 0.35, 24, def.size * 0.055);
       dais.rotation.x = -Math.PI / 2;
       dais.position.y = -def.size * 0.52;
       root.add(crown, dais);
@@ -255,6 +265,38 @@ export class RiftWorldShowcase {
       this.convoy.push({ ship, side, phase: i * 51, y: -6 + (i % 3) * 12, x: side * (31 + (i % 3) * 7) });
     }
     this.update(0, 0, { menu: false });
+  }
+
+  /** Project the planet's spherical silhouette, including its off-axis
+   * perspective shift. The DOM halo follows the same camera as the voxels. */
+  getMenuPlanetScreenBounds(camera, viewport) {
+    camera.updateWorldMatrix(true, false);
+    this.menuPlanet.getWorldPosition(this.haloCenter);
+    this.menuPlanet.getWorldScale(this.haloScale);
+    this.haloCenter.applyMatrix4(camera.matrixWorldInverse);
+    const { x, y } = this.haloCenter;
+    const depth = -this.haloCenter.z;
+    const radius = this.menuPlanet.userData.radius * this.haloScale.x;
+    const denominator = depth * depth - radius * radius;
+    const projection = camera.projectionMatrix.elements;
+    const bounds = this.haloBounds;
+    bounds.x = viewport.width * (1 + x * depth / denominator * projection[0]) / 2;
+    bounds.y = viewport.height * (1 - y * depth / denominator * projection[5]) / 2;
+    bounds.width = viewport.width * radius * Math.sqrt(depth * depth + x * x - radius * radius) / denominator * projection[0];
+    bounds.height = viewport.height * radius * Math.sqrt(depth * depth + y * y - radius * radius) / denominator * projection[5];
+    return bounds;
+  }
+
+  isPointerOverSkull(x, y, camera, viewport) {
+    if (!this.menu || !viewport.width || !viewport.height) return false;
+    this.skullPointer.set((x - viewport.left) / viewport.width * 2 - 1,
+      1 - (y - viewport.top) / viewport.height * 2);
+    if (Math.abs(this.skullPointer.x) > 1 || Math.abs(this.skullPointer.y) > 1) return false;
+    camera.updateWorldMatrix(true, false);
+    this.menuPlanet.updateWorldMatrix(true, false);
+    this.skullRay.setFromCamera(this.skullPointer, camera);
+    this.planetInverse.copy(this.menuPlanet.matrixWorld).invert();
+    return this.skullRay.ray.applyMatrix4(this.planetInverse).intersectsBox(this.menuPlanet.userData.skullBounds);
   }
 
   setMenu(menu) {

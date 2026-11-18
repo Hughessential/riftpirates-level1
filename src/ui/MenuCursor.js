@@ -1,9 +1,9 @@
-/** The title cursor's comet stays decorative: no hit testing or game objects. */
+/** A pointer-transparent title comet, with feedback for the planet's skull. */
 export const MENU_CURSOR_TRAIL = Object.freeze({
   points: 128, spacing: 6, life: 1.8, drawHz: 30, maxPixelRatio: 1.5, maxPixels: 3_000_000,
 });
 
-export function initMenuCursor() {
+export function initMenuCursor({ hitTestSkull = null } = {}) {
   const title = document.getElementById('titleScreen');
   if (!title || document.getElementById('menuCursorStar')) return;
   const layer = document.createElement('div');
@@ -30,6 +30,7 @@ export function initMenuCursor() {
   const points = Array.from({ length: MENU_CURSOR_TRAIL.points }, () => ({ x: 0, y: 0, at: 0 }));
   let start = 0, count = 0, lastPointer = false, previousX = 0, previousY = 0;
   let frame = 0, lastDraw = 0, width = 0, height = 0, dpr = 0;
+  let pointerX = -1, pointerY = -1;
   const dialogs = new Set();
   const dialogStack = [];
 
@@ -60,7 +61,18 @@ export function initMenuCursor() {
     // pixels instead of expanding to 80–140% with whichever modal owns them.
     const parentZoom = parent === document.body ? 1 : Number.parseFloat(getComputedStyle(parent).zoom) || 1;
     layer.style.zoom = String(1 / parentZoom);
-    if (visible) resize();
+    paintHover();
+    if (visible) {
+      resize();
+      if (hitTestSkull && !frame) frame = requestAnimationFrame(tick);
+    }
+  }
+  function paintHover() {
+    // A modal or foreground control must never reveal a skull behind it.
+    const control = document.elementFromPoint(pointerX, pointerY)?.closest('button,a,input,select,textarea');
+    const hovered = !layer.hidden && layer.parentElement === document.body
+      && (!control || control.id === 'labGlobeUnlock') && hitTestSkull?.(pointerX, pointerY);
+    star.classList.toggle('skullHover', Boolean(hovered));
   }
   function observeDialogs() {
     for (const dialog of document.querySelectorAll('dialog')) {
@@ -127,12 +139,18 @@ export function initMenuCursor() {
   }
   function tick(now) {
     frame = 0;
-    if (layer.hidden || motion.matches || !ctx) { clear(); return; }
-    if (now - lastDraw >= 1000 / MENU_CURSOR_TRAIL.drawHz) { draw(now); lastDraw = now; }
-    if (count) frame = requestAnimationFrame(tick);
+    if (layer.hidden) { clear(); return; }
+    if (now - lastDraw >= 1000 / MENU_CURSOR_TRAIL.drawHz) {
+      paintHover();
+      if (!motion.matches && ctx && count) draw(now);
+      lastDraw = now;
+    }
+    // Continue checking a stationary pointer as the planet gently moves.
+    if (count || (hitTestSkull && layer.parentElement === document.body)) frame = requestAnimationFrame(tick);
   }
   document.addEventListener('pointermove', event => {
     lastPointer = event.pointerType !== 'touch';
+    pointerX = event.clientX; pointerY = event.clientY;
     star.style.setProperty('--mouse-x', `${event.clientX + 15}px`);
     star.style.setProperty('--mouse-y', `${event.clientY + 16}px`);
     paintVisibility();
@@ -152,7 +170,7 @@ export function initMenuCursor() {
   document.addEventListener('pointerleave', () => { lastPointer = false; paintVisibility(); });
   window.addEventListener('blur', () => { lastPointer = false; paintVisibility(); });
   document.addEventListener('visibilitychange', paintVisibility);
-  window.addEventListener('resize', () => { clear(); resize(); });
+  window.addEventListener('resize', () => { clear(); paintVisibility(); });
   window.addEventListener('rift-ui-scale', paintVisibility);
   motion.addEventListener('change', () => { clear(); paintVisibility(); });
   new MutationObserver(paintVisibility).observe(title, { attributes: true, attributeFilter: ['class'] });

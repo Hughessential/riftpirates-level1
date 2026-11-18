@@ -63,8 +63,8 @@
   #titleScreen .labTitleEntry{right:var(--title-edge);bottom:calc(16% - 35px*var(--m));
     font-size:calc(8px*var(--m));padding:calc(6px*var(--m))}
   #titleScreen #labGlobeUnlock{left:calc(var(--menu-left,0px) + var(--menu-stage,100vw)*.76);top:40%;width:calc(470px*var(--t))}
-  #titleScreen .riftHalo,#titleScreen .riftOrbit{left:calc(var(--menu-left,0px) + var(--menu-stage,100vw)*.76);top:40%}
-  #titleScreen .riftHalo{width:calc(760px*var(--t));opacity:.45}
+  #titleScreen .riftOrbit{left:calc(var(--menu-left,0px) + var(--menu-stage,100vw)*.76);top:40%}
+  #titleScreen .riftHalo{opacity:.45}
   #titleScreen .riftOrbit{width:calc(450px*var(--t));opacity:.5}
   #titleScreen .orbitB{width:calc(500px*var(--t));opacity:.35}
   #titleScreen .orbitC{width:calc(570px*var(--t));opacity:.3}

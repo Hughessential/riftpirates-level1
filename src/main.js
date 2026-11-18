@@ -30,7 +30,6 @@ window.addEventListener('keydown', unlockAudio, { capture: true });
 document.addEventListener('visibilitychange', () => Audio2.setMusicPaused('background', document.hidden));
 
 initVoxelTitle();
-initMenuCursor();
 let fleetProgress = 0, worldProgress = 0;
 const paintProgress = () => { $('bootProgress').value = (worldProgress + fleetProgress) / 8; };
 await Promise.all([
@@ -39,6 +38,27 @@ await Promise.all([
 ]);
 if (!isPlayerShipId(Save.data.selectedShip)) Save.data.selectedShip = PLAYER_SHIPS[0].id;
 const game = new Game();
+const menuHalo = document.querySelector('.riftHalo');
+let haloLayout = '';
+function positionMenuHalo() {
+  if (!game.titleMode) return;
+  const bounds = game.worldShowcase.getMenuPlanetScreenBounds(game.camera, game.display);
+  const diameter = Math.max(bounds.width, bounds.height) * 1.7;
+  // Explicit bounds avoid Safari painting percentage-translated gradients
+  // at the wrong origin when the page is zoomed or the viewport changes.
+  const layout = `${(bounds.x - diameter / 2).toFixed(2)}px ${(bounds.y - diameter / 2).toFixed(2)}px ${diameter.toFixed(2)}px`;
+  if (layout === haloLayout) return;
+  haloLayout = layout;
+  const [left, top, size] = layout.split(' ');
+  menuHalo.style.left = left;
+  menuHalo.style.top = top;
+  menuHalo.style.width = size;
+  menuHalo.style.height = size;
+}
+initMenuCursor({
+  hitTestSkull: (x, y) => game.worldShowcase.isPointerOverSkull(
+    x, y, game.camera, game.renderer.domElement.getBoundingClientRect()),
+});
 const hangar = new ShipHangar({
   selectedId: Save.data.selectedShip,
   onSelect(id) {
@@ -73,6 +93,7 @@ function showTitle() {
   game.prepareTitle();
   Input.enabled = false;
   $('titleScreen').classList.remove('hidden');
+  positionMenuHalo();
   game.resultsScreen.hide();
   $('pauseScreen').classList.add('hidden');
   game.hud.hide();
@@ -137,6 +158,7 @@ function frame(ts) {
   const dt = Math.min((ts - last) / 1000 || 0.016, 0.05);
   last = ts;
   game.update(dt);
+  positionMenuHalo();
   hangar.update(dt);
 }
 

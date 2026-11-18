@@ -153,15 +153,20 @@ export class TestingGroundsPanel {
     this.globeTarget = document.createElement('button');
     this.globeTarget.type = 'button';
     this.globeTarget.id = 'labGlobeUnlock';
-    this.globeTarget.setAttribute('aria-label', 'Mysterious rift globe');
-    const armSecret = () => {
+    this.globeTarget.setAttribute('aria-label', 'Mysterious rift skull');
+    const armSecret = event => {
       if (this.unlocked && this.testing.game.ultraUltimate.authorized) return;
-      this.secretArmed = true;
+      const game = this.testing.game;
+      // Pointer clicks must land on the actual moving insignia. A keyboard
+      // click (detail=0) remains available, but focus alone never arms it.
+      const onSkull = event.detail === 0 || game.worldShowcase.isPointerOverSkull(
+        event.clientX, event.clientY, game.camera, game.renderer.domElement.getBoundingClientRect());
+      this.secretArmed = onSkull;
       this.secretBuffer = '';
-      this.globeTarget.setAttribute('aria-description', 'The globe is listening. Enter the hidden access word.');
+      if (onSkull) this.globeTarget.setAttribute('aria-description', 'The skull is listening. Enter the hidden access word.');
+      else this.globeTarget.removeAttribute('aria-description');
     };
     this.globeTarget.addEventListener('click', armSecret);
-    this.globeTarget.addEventListener('focus', armSecret);
     document.getElementById('titleScreen').append(this.globeTarget);
 
     this.titleEntry = document.createElement('button');
@@ -188,6 +193,27 @@ export class TestingGroundsPanel {
     if (this.unlocked && !quiet) {
       this.testing.game.hud.toast('BRIMBY SIGNAL ACCEPTED', 'TESTING GROUNDS + ULTRA / THIS SESSION ONLY', '#27f5da', { duration: 4.2, category: 'instruction' });
     }
+  }
+
+  _flashBrimbySignal() {
+    const title = document.getElementById('titleScreen');
+    const colors = [0x00ffe0, 0xff2ed2, 0xa52aff];
+    const started = performance.now();
+    const paint = () => {
+      const index = Math.floor((performance.now() - started) / 100) % colors.length;
+      const color = colors[index];
+      title.style.setProperty('--brimby-glow', `#${color.toString(16).padStart(6, '0')}`);
+    };
+    title.classList.add('brimbySignalActive');
+    paint();
+    const interval = setInterval(paint, 100);
+    // Wall-clock timing keeps the two-second burst independent of game speed,
+    // pausing or opening the lab. The unlock itself still lasts this session.
+    setTimeout(() => {
+      clearInterval(interval);
+      title.classList.remove('brimbySignalActive');
+      title.style.removeProperty('--brimby-glow');
+    }, 2000);
   }
 
   _buildAugments() {
@@ -323,6 +349,7 @@ export class TestingGroundsPanel {
         if (this.secretBuffer === 'brimby') {
           this.secretArmed = false;
           this.testing.game.ultraUltimate.unlockFromBrimbySignal();
+          this._flashBrimbySignal();
           this._buildUltra();
           this._buildTuning(true);
           this.testing.game.hud._updateUltraArmor();
