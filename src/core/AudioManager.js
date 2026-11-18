@@ -39,6 +39,7 @@ const SFX_FILES = {
   overload: 'overload.wav',
   shield_break: 'shield_break.wav',
   boost: 'boost.wav',
+  brimby_signal: 'brimby-signal-sfx.wav',
   black_armor: 'shield_charge_sfx.wav',
   boss_taunt: 'boss_taunt.wav',
 };
@@ -201,8 +202,8 @@ export class AudioManagerImpl {
   async _loadSfx() {
     // First interaction should make the primary gun, impact and menu audible
     // before decoding every rare weapon/boss sample. Four workers keep the
-    // soundtrack and geometry uploads from competing with 46 simultaneous jobs.
-    const first = ['weapon_pulse', 'player_shot', 'ui_select', 'player_hurt', 'hit', 'enemy_shot'];
+    // soundtrack and geometry uploads from competing with a burst of SFX jobs.
+    const first = ['weapon_pulse', 'player_shot', 'ui_select', 'brimby_signal', 'player_hurt', 'hit', 'enemy_shot'];
     const keys = [...first, ...Object.keys(SFX_FILES).filter(key => !first.includes(key))];
     await mapConcurrent(keys, 4, async (key) => {
       try {
@@ -238,7 +239,7 @@ export class AudioManagerImpl {
     const now = this.ctx.currentTime;
     if (this._lastPlay[name] && now - this._lastPlay[name] < 0.03) return;
     this._lastPlay[name] = now;
-    if (this.weaponGain && ['laser_warning', 'low_health', 'player_hurt', 'shield_break', 'phase_change', 'black_armor'].includes(name)) {
+    if (this.weaponGain && ['laser_warning', 'low_health', 'player_hurt', 'shield_break', 'phase_change', 'brimby_signal', 'black_armor'].includes(name)) {
       const gain = this.weaponGain.gain;
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(gain.value, now);

@@ -69,9 +69,10 @@ try {
     return { getChannelData: () => new Float32Array([.2, -.2]) };
   } };
   await audio._loadSfx();
-  assert.equal(Object.keys(audio.buffers).length, 47, 'Every normal, Black Armor and weapon cue finishes loading');
+  assert.equal(Object.keys(audio.buffers).length, 48, 'Every normal, Brimby, Black Armor and weapon cue finishes loading');
   assert.equal(peak, 4, 'Downloads and decoding share the same four-worker budget');
   assert.ok(requested[0].endsWith('/sfx/mayhem/pulse.wav'), 'Primary weapon sound starts first');
+  assert.ok(requested.some(url => url.endsWith('/sfx/brimby-signal-sfx.wav')), 'Brimby signal audio loads through the SFX bus');
   assert.ok(requested.some(url => url.endsWith('/sfx/shield_charge_sfx.wav')), 'Black Armor activation audio loads through the SFX bus');
   assert.equal(Object.keys(audio._weaponTrim).length, 18, 'All weapon loudness trims remain available');
 } finally {

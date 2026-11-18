@@ -348,6 +348,7 @@ export class TestingGroundsPanel {
         this.secretBuffer = `${this.secretBuffer}${event.key.toLowerCase()}`.slice(-6);
         if (this.secretBuffer === 'brimby') {
           this.secretArmed = false;
+          this.testing.game.audio.play('brimby_signal');
           this.testing.game.ultraUltimate.unlockFromBrimbySignal();
           this._flashBrimbySignal();
           this._buildUltra();
