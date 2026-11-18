@@ -3,8 +3,8 @@ import { Audio2 } from '../core/AudioManager.js';
 import { pilotNameCharacters } from '../core/PilotName.js';
 import './controller-menus.css';
 
-const controls = 'button,input:not([type="hidden"]),select,textarea';
-const visible = el => !el.disabled && !el.closest('[hidden],.hidden') && el.getClientRects().length > 0;
+const controls = 'button,input:not([type="hidden"]),select,textarea,.patchesContent';
+const visible = el => !el.disabled && !el.closest('[hidden],.hidden,[inert]') && el.getClientRects().length > 0;
 const labels = { fire: 'PRIMARY FIRE', cancel: 'BACK', brake: 'BRAKE', rollLeft: 'LEFT ROLL / PREVIOUS TAB', rollRight: 'RIGHT ROLL / NEXT TAB', aim: 'AIM / LOCK', boost: 'BOOST', view: 'CONTROLLER SETUP', pause: 'PAUSE', up: 'MENU UP', down: 'MENU DOWN', left: 'MENU LEFT', right: 'MENU RIGHT' };
 
 /** One focus owner per frame. Native controls receive their normal input/change
@@ -146,6 +146,7 @@ export class ControllerMenus {
     if (this.game.testingPanel?.dialog.open) return this.game.testingPanel.dialog;
     if (this.game.hangar?.dialog.open) return this.game.hangar.dialog;
     if (this.game.optionsMenu?.dialog.open) return this.game.optionsMenu.dialog;
+    if (this.game.patchesPanel?.isVisible()) return this.game.patchesPanel.panel;
     // The tutorial Skip is controller-accessible, but upgrade choices keep
     // priority while the final cache lesson and shop are both visible.
     for (const id of ['pauseScreen', 'resultsScreen', 'upgradeScreen', 'openingTutorial', 'titleScreen']) {
@@ -251,6 +252,7 @@ export class ControllerMenus {
       else if (root === this.game.testingPanel?.dialog) this.game.testingPanel.close();
       else if (root === this.game.hangar?.dialog) this.game.hangar.close();
       else if (root === this.game.optionsMenu?.dialog) this.game.optionsMenu.close();
+      else if (root === this.game.patchesPanel?.panel) this.game.patchesPanel.close();
       else if (root.id === 'pauseScreen' || root.id === 'upgradeScreen' || (root.id === 'openingTutorial' && nav.pause)) this.game.togglePause();
       else if (root.id === 'resultsScreen') document.getElementById('toTitleBtn').click();
       this.consume(); return;
@@ -270,12 +272,29 @@ export class ControllerMenus {
       // Physical A remains gameplay brake until Skip is deliberately armed.
       this.consume(); return;
     }
-    if (!items.includes(this.focused)) this.focus(items.includes(document.activeElement) ? document.activeElement : items[0]);
-    if (root === this.game.testingPanel?.dialog && (nav.prevTab || nav.nextTab)) {
+    if (!items.includes(this.focused)) {
+      // A controller waking on an already-visible title still starts at the
+      // primary action, even when masthead utilities precede it in DOM order.
+      const primary = root.querySelector('#launchBtn');
+      this.focus(items.includes(document.activeElement) ? document.activeElement : items.includes(primary) ? primary : items[0]);
+    }
+    if (root === this.game.patchesPanel?.panel && (nav.prevTab || nav.nextTab)) {
+      const panel = this.game.patchesPanel;
+      const tabs = [...root.querySelectorAll('[data-patches-tab]')];
+      const index = (tabs.findIndex(tab => tab.dataset.patchesTab === panel.state.tab) + (nav.nextTab ? 1 : 2)) % tabs.length;
+      panel.selectTab(tabs[index].dataset.patchesTab);
+      this.focus(tabs[index]);
+    } else if (root === this.game.testingPanel?.dialog && (nav.prevTab || nav.nextTab)) {
       const tabs = [...root.querySelectorAll('[data-tab]')].map(tab => tab.dataset.tab);
       const index = (tabs.indexOf(this.game.testingPanel.activeTab) + (nav.nextTab ? 1 : -1) + tabs.length) % tabs.length;
       this.game.testingPanel.selectTab(tabs[index]);
       this.focus(root.querySelector(`#labTab-${tabs[index]}`));
+    } else if (root === this.game.patchesPanel?.panel && this.focused?.classList.contains('patchesContent') && (nav.up || nav.down)) {
+      const content = this.focused;
+      const direction = nav.down ? 1 : -1;
+      const canScroll = direction > 0 ? content.scrollTop + content.clientHeight < content.scrollHeight - 1 : content.scrollTop > 0;
+      if (canScroll) content.scrollTop += direction * 110;
+      else this.move(items, direction);
     } else if (nav.up || nav.down) this.move(items, nav.down ? 1 : -1);
     else if (nav.left || nav.right) {
       const direction = nav.right ? 1 : -1;

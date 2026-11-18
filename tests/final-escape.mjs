@@ -8,7 +8,7 @@ import { AUDIO_DEFAULTS, UI_SCALE_DEFAULT } from '../src/core/SaveSystem.js';
 const legacy = { scrapBanked: 321, bestScore: 1234567, bestTime: 900, bestGrade: 'S',
   runs: 11, clears: 4, music: 0, sfx: 1, seenIntro: 1, selectedShip: 'void-corsair' };
 const migratedLegacy = { ...legacy, ...AUDIO_DEFAULTS, uiScale: UI_SCALE_DEFAULT, tutorialComplete: false,
-  ...PILOT_IDENTITY_DEFAULTS, lastBankedRunId: '' };
+  ...PILOT_IDENTITY_DEFAULTS, lastBankedRunId: '', patchesWindow: null };
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true, protocolTimeout: 180000,

@@ -44,7 +44,8 @@
     "test:ultra": "node tests/void-projectiles.mjs && node tests/ultra-effects.mjs && node tests/ultra-audio.mjs && node tests/ultra-ultimate.mjs && node tests/ultra-teleport.mjs && node tests/ultra-ui.mjs",
     "test:ultra-audio": "node tests/ultra-audio.mjs && node tests/ultra-audio-browser.mjs",
     "test:ultra-visual": "node tests/ultra-visual.mjs",
-    "test:ultra-production": "node tests/ultra-production.mjs"
+    "test:ultra-production": "node tests/ultra-production.mjs",
+    "test:patches": "node tests/patches-panel.mjs"
   },
   "private": true,
   "devDependencies": {

@@ -1,0 +1,146 @@
+/* The console's clipped, one-pixel chassis follows the title's cyan / violet
+   geometry. Fixed coordinates are viewport pixels, independent of game zoom. */
+.patchesToggle{--bevel:13px;position:relative;isolation:isolate;display:flex;align-items:center;justify-content:center;
+  gap:12px;flex:none;height:46px;padding:0 20px;margin-left:auto;margin-right:auto;color:#f5f0ff;
+  border:0;background:transparent;font-size:15px;white-space:nowrap;cursor:pointer;
+  filter:drop-shadow(0 0 5px #00e9ed40);transition:filter .18s,transform .18s}
+.patchesToggle::before,.patchesToggle::after{content:'';position:absolute;z-index:-1;
+  clip-path:polygon(var(--bevel) 0,calc(100% - var(--bevel)) 0,100% var(--bevel),100% calc(100% - var(--bevel)),calc(100% - var(--bevel)) 100%,var(--bevel) 100%,0 calc(100% - var(--bevel)),0 var(--bevel))}
+.patchesToggle::before{inset:0;background:linear-gradient(175deg,#36ffef 0%,#2af6ef 35%,#9441ff 68%,#e747ff 92%,#d598ff)}
+.patchesToggle::after{inset:1px;background:linear-gradient(0deg,#7e13b555,transparent 26%),linear-gradient(145deg,#080819,#0c051c 65%,#030912);
+  box-shadow:inset 0 -2px 10px #bb21f56b}
+.patchesToggle>svg{width:28px;height:28px;color:#e730ed;filter:drop-shadow(0 0 4px #de12f64d)}
+.patchesChevron{width:9px;height:9px;border-right:2px solid #27ffef;border-bottom:2px solid #27ffef;
+  transform:rotate(45deg) translateY(-2px);margin-left:9px;transition:transform .2s;filter:drop-shadow(0 0 4px #2fffff)}
+.patchesToggle[aria-expanded=true] .patchesChevron{transform:rotate(225deg) translate(-2px,-1px)}
+.patchesToggle>span::after{content:'';position:absolute;bottom:1px;left:46%;width:8%;height:2px;
+  background:#f5ceff;box-shadow:0 0 9px 2px #d42aff;animation:patchesShimmer 9s ease-in-out infinite}
+.patchesToggle:hover{transform:translateY(-2px);filter:drop-shadow(0 0 8px #33ffed77)}
+.patchesToggle:active{transform:translateY(0);filter:drop-shadow(0 0 11px #e355ff)}
+.patchesNew{font-size:8px;letter-spacing:.04em;color:#b6ff2b;text-shadow:0 0 7px #9aff36;padding:4px;border:1px solid #8ece293f}
+.patchesToggle.hasUnread{animation:patchesSignal 1.5s ease-out 2}
+.patchesPanel{position:fixed;z-index:8;width:640px;height:300px;opacity:0;visibility:hidden;pointer-events:none;
+  transform:translateY(-9px);filter:drop-shadow(0 0 5px #00fff048) drop-shadow(0 4px 10px #6b1cff24);
+  transition:opacity .28s,transform .28s,visibility 0s .28s;--cut:10px;
+  font-family:'Rift Pixel',monospace;font-size:12px;color:#c5c1d9;text-align:left}
+.patchesPanel.isOpen{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);transition-delay:0s}
+.patchesPanel::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(110deg,#00f5ee,#21e6dd 34%,#9248d8 59%,#dd2aff 69%,#00e9df 95%);
+  clip-path:polygon(var(--cut) 0,calc(100% - var(--cut)) 0,100% var(--cut),100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,var(--cut) 100%,0 calc(100% - var(--cut)),0 var(--cut))}
+.patchesSurface{position:absolute;inset:1px;display:flex;flex-direction:column;overflow:hidden;
+  background:radial-gradient(ellipse at 57% 110%,#42126555,transparent 64%),#040610f5;
+  clip-path:polygon(var(--cut) 0,calc(100% - var(--cut)) 0,100% var(--cut),100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,var(--cut) 100%,0 calc(100% - var(--cut)),0 var(--cut))}
+.patchesHeader{display:flex;align-items:center;gap:12px;flex:none;min-height:43px;padding:3px 11px 3px 18px;
+  color:#25fff0;border-bottom:1px solid #22e9df60;cursor:grab;touch-action:none;
+  background:linear-gradient(90deg,#00ffff08,transparent 65%)}
+.patchesHeader>svg{width:28px;height:28px;flex:none}
+.patchesHeader h2{font-size:17px;font-weight:400;white-space:nowrap;text-shadow:0 0 8px #00ffe74d}
+.patchesStripes{height:11px;width:80px;background:repeating-linear-gradient(135deg,#8a29b7 0 5px,transparent 5px 10px);
+  mask-image:linear-gradient(90deg,#000,transparent);opacity:.8}
+.patchesDragGrip{margin-left:auto;margin-right:auto;color:#18838e;font-size:23px;line-height:1}
+.patchesHeader button{width:32px;height:32px;flex:none;border:0;background:transparent;color:#1cf4e8;font-family:monospace;font-size:28px;cursor:pointer;line-height:1}
+.patchesHeader button:hover{background:#00fff019;color:#fff}
+.patchesTabs{display:flex;gap:10px;padding:8px 18px;flex:none;border-bottom:1px solid #7e70966e;margin:0 1px}
+.patchesTabs button{position:relative;isolation:isolate;flex:1;min-width:0;height:30px;border:0;color:#eae7f6;
+  font-size:11px;background:transparent;cursor:pointer;transition:filter .18s,color .18s}
+.patchesTabs button::before,.patchesTabs button::after{content:'';position:absolute;z-index:-1;
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 11px,100% calc(100% - 11px),calc(100% - 12px) 100%,12px 100%,0 calc(100% - 11px),0 11px)}
+.patchesTabs button::before{inset:0;background:#9386b0}
+.patchesTabs button::after{inset:1px;background:linear-gradient(#0d0b19,#040711)}
+.patchesTabs button[aria-selected=true]{filter:drop-shadow(0 0 5px #dd20ff80);color:#fff}
+.patchesTabs button[aria-selected=true]::before{background:linear-gradient(110deg,#e25aff,#aa31f7,#ee66ff)}
+.patchesTabs button[aria-selected=true]::after{background:linear-gradient(#27083b,#120b26 65%,#9025b9)}
+.patchesTabs button:hover{filter:drop-shadow(0 0 4px #bc39ff77);color:#37fff0}
+.patchesContent{flex:1;min-height:0;overflow:auto;padding:14px 18px;scrollbar-width:thin;scrollbar-color:#4c5f7e #080611;
+  overscroll-behavior:contain;touch-action:pan-y;outline-offset:-3px}
+.patchesContent *{touch-action:pan-y}
+.patchesContent :is(p,li,h3,h4,time){user-select:text;-webkit-user-select:text}
+.patchesEmpty{display:grid;grid-template-columns:32% 1fr;gap:24px;align-items:center;min-height:100%;animation:patchesContentIn .2s ease-out}
+.patchesArtwork{position:relative;align-self:stretch;display:flex;align-items:center;justify-content:center;min-height:120px;
+  border:1px solid #384a945e;border-radius:2px;overflow:hidden;
+  background:radial-gradient(ellipse at 75% 110%,#6a15bb77,transparent 65%),linear-gradient(135deg,#07162d,#030611 55%,#160b35)}
+.patchesArtwork::before{content:'';position:absolute;width:90%;height:100%;right:-30%;bottom:-70%;border:1px solid #ba4cff;border-radius:50%;box-shadow:0 -3px 18px #6534fa70}
+.patchesArtwork img{width:95%;height:auto;max-height:140px;object-fit:contain;filter:drop-shadow(0 0 10px #007ad450);transform:rotate(-10deg)}
+.patchesArtwork>span{position:absolute;bottom:8px;left:9px;font-size:5px;color:#72a7c5;letter-spacing:.05em}
+.patchesEmptyCopy small{display:block;color:#92b864;font-size:8px;letter-spacing:.07em;margin-bottom:11px}
+.patchesEmptyCopy h3,.patchesCard h3{color:#f0edfa;font-size:16px;font-weight:400;line-height:1.45;margin-bottom:9px}
+.patchesEmptyCopy p,.patchesCard p{font-size:11px;line-height:1.7;margin:5px 0}
+.patchesMuted{color:#9494af}
+.patchesEmptyCopy .patchesMuted{font-size:10px;line-height:1.7;margin-top:7px}
+.patchesFooter{height:28px;padding:0 30px 0 18px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  color:#69838e;font-size:6px;letter-spacing:.04em;border-top:1px solid #3d315c40}
+.patchesFooter>span{display:flex;align-items:center;gap:6px}
+.patchesFooter i{width:4px;height:4px;background:#27c3b8;box-shadow:0 0 5px #27c3b84d}
+.patchesReset{border:0;background:transparent;color:#9c97b6;font-size:6px;padding:8px 0;cursor:pointer}
+.patchesReset b{font-family:monospace;font-size:12px;color:#27eadd;vertical-align:middle;margin-left:5px}
+.patchesReset:hover{color:#29ffe6}
+.patchesResize{position:absolute;touch-action:none}
+.patchesResizeRight{right:-3px;top:45px;bottom:17px;width:9px;cursor:ew-resize}
+.patchesResizeBottom{bottom:-3px;left:16px;right:19px;height:9px;cursor:ns-resize}
+.patchesResizeCorner{right:0;bottom:0;width:24px;height:24px;cursor:nwse-resize}
+.patchesResizeCorner::before{content:'';position:absolute;inset:4px 7px 7px 4px;
+  background:repeating-linear-gradient(135deg,transparent 0 4px,#cbd5ff 4px 6px);clip-path:polygon(100% 0,100% 100%,0 100%);filter:drop-shadow(0 0 3px #ae3cff)}
+.patchesPanel.isMoving{transition:none}
+.patchesPanel.isMoving .patchesHeader{cursor:grabbing}
+.patchesCard{display:flex;align-items:flex-start;gap:20px;padding:3px 0 12px;animation:patchesContentIn .2s ease-out}
+.patchesCard+.patchesCard{border-top:1px solid #57327066;padding-top:16px;margin-top:6px}
+.patchesCardBody{flex:1;min-width:0;overflow-wrap:anywhere}
+.patchesPreview{width:31%;height:120px;object-fit:cover;border:1px solid #295d7b;border-radius:2px}
+.patchesMeta{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:0 0 10px;font-size:8px;color:#9b95b5}
+.patchesMeta strong{font-size:17px;color:#29fff2;text-shadow:0 0 7px #00d7d94d}
+.patchesStatus{font-size:7px;color:#baff45;border:1px solid #c0fd3b40;padding:4px 5px}
+.patchesStatus.in-development{color:#32f5ed;border-color:#32f5ed40}
+.patchesStatus.testing{color:#e6a1ff;border-color:#e6a1ff40}
+.patchesHighlights{list-style:none;margin:8px 0;font-size:11px;line-height:1.8}
+.patchesHighlights li{position:relative;padding-left:17px}
+.patchesHighlights li::before{content:'';position:absolute;top:.6em;left:0;width:6px;height:6px;background:#19eae5;box-shadow:0 0 6px #00e8ed55}
+.patchesDetailsToggle{padding:7px 0;background:none;border:0;color:#3aeadd;font-size:8px;cursor:pointer}
+.patchesDetails{border-top:1px solid #60407850;margin-top:8px;padding-top:8px}
+.patchesDetails h4{font-size:9px;color:#e2c4ff;margin:12px 0 5px;font-weight:400}
+.patchesDetails video{width:100%;margin-top:8px}
+.patchesMilestone{position:relative;border-left:1px solid #765191;margin-left:5px;padding-left:18px}
+.patchesMilestone::before{content:'';position:absolute;left:-4px;top:7px;width:7px;height:7px;background:#26e8dc;transform:rotate(45deg);box-shadow:0 0 8px #2beada55}
+.patchesToggle:focus-visible,.patchesPanel :focus-visible{outline:2px solid #bdff48;outline-offset:3px}
+.patchesPanel .patchesContent:focus-visible{outline-offset:-3px}
+@keyframes patchesShimmer{0%,80%,100%{opacity:.6;transform:translateX(0)}90%{opacity:1;transform:translateX(25px)}}
+@keyframes patchesSignal{0%,100%{filter:drop-shadow(0 0 5px #00e9ed40)}40%{filter:drop-shadow(0 0 10px #af35ff99)}}
+@keyframes patchesContentIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(min-width:901px) and (max-width:1200px){
+  .patchesToggle{height:40px;font-size:11px;gap:8px;padding:0 13px}
+  .patchesToggle>svg{width:23px;height:23px}.patchesChevron{margin-left:4px}
+}
+@media(max-width:900px){
+  #titleScreen .menuMasthead{gap:12px;flex-wrap:wrap}
+  #titleScreen .patchesToggle{order:3;margin:3px 0 0 auto;height:42px;font-size:12px}
+  #titleScreen .menuMasthead::after{content:'';order:2;flex-basis:100%;height:0}
+  #titleScreen .menuMain{margin-top:30px}
+  .patchesHeader h2{font-size:14px}.patchesHeader{gap:9px}
+  .patchesStripes{width:45px}
+}
+@media(max-width:700px),(max-width:900px) and (max-height:500px){
+  .patchesPanel{left:12px;right:12px;top:auto;bottom:12px;width:auto;height:min(430px,65dvh);max-height:calc(100dvh - 24px);transform:translateY(12px)}
+  .patchesPanel.isOpen{transform:none}
+  .patchesHeader{cursor:default;min-height:48px;padding-left:13px}
+  .patchesHeader h2{font-size:12px}.patchesHeader>svg{width:23px;height:23px}
+  .patchesHeader button{width:36px;height:38px}
+  .patchesStripes,.patchesDragGrip,.patchesResize{display:none}
+  .patchesHeader h2{margin-right:auto}
+  .patchesTabs{gap:7px;padding:9px 12px}.patchesTabs button{height:36px;font-size:9px}
+  .patchesContent{padding:16px 14px}
+  .patchesEmpty{grid-template-columns:1fr;gap:16px;align-content:start;min-height:0}
+  .patchesArtwork{min-height:115px;height:115px}.patchesArtwork img{height:105px;width:auto}
+  .patchesArtwork>span{font-size:6px}
+  .patchesEmptyCopy h3{font-size:14px}.patchesEmptyCopy p{font-size:11px}
+  .patchesEmptyCopy small{font-size:8px;margin-bottom:9px}
+  .patchesFooter{height:38px;padding:0 14px;font-size:6px}.patchesReset{padding:12px 0;font-size:6px}
+  .patchesCard{flex-direction:column;gap:12px}.patchesPreview{width:100%;height:140px;object-fit:contain}
+  .patchesPanel button{touch-action:manipulation}
+}
+@media(max-width:900px) and (max-height:500px){
+  .patchesPanel{height:58dvh}
+  .patchesEmpty{grid-template-columns:30% 1fr}
+  .patchesArtwork{height:100%;min-height:105px}
+}
+@media(prefers-reduced-motion:reduce){
+  .patchesToggle,.patchesToggle>span::after,.patchesPanel,.patchesPanel *{animation:none!important;transition:none!important}
+}

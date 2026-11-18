@@ -51,6 +51,7 @@ const DEFAULTS = {
   seenIntro: 0, // lets us offer a skip on the Nexus cinematic after the first view
   selectedShip: 'rift-talon', // cosmetic hull only; never changes run stats
   lastBankedRunId: '', // additive: prevents a repeated results callback banking twice
+  patchesWindow: null, // independently validated by the transmission console
 };
 
 export const Save = {

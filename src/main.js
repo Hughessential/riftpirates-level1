@@ -15,6 +15,7 @@ import { ControllerMenus } from './ui/ControllerMenus.js';
 import { PilotIdentity } from './ui/PilotIdentity.js';
 import { OptionsMenu } from './ui/OptionsMenu.js';
 import './ui/title-layout.css';
+import { PatchesPanel } from './ui/PatchesPanel.js';
 
 // Start the official title recording before voxel loading. Saved mute/volume
 // still apply, and browsers which block autoplay unlock on the first gesture.
@@ -138,6 +139,7 @@ Input.init(game.renderer.domElement, {
 initAudioSettings();
 initUISettings();
 game.optionsMenu = new OptionsMenu(game);
+game.patchesPanel = new PatchesPanel(game);
 for (const button of document.querySelectorAll('.tutorialReplayBtn')) {
   button.addEventListener('click', () => {
     game.tutorial.armReplay();
