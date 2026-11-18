@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, existsSync } from 'node:fs';
 import puppeteer from 'puppeteer-core';
 import { sanitizePatchesState, clampPatchesRect } from '../src/ui/PatchesState.js';
-import { publishedAnnouncements } from '../src/config/announcements.js';
+import { ANNOUNCEMENTS, publishedAnnouncements } from '../src/config/announcements.js';
 import { launchRun } from './helpers/start-run.mjs';
 
 assert.equal(sanitizePatchesState({ schema: 1, expanded: 'yes', tab: 'bad', rect: { x: Infinity } }).expanded, false);
@@ -30,7 +30,7 @@ try {
   await page.waitForFunction(() => window.RIFT && !document.getElementById('launchBtn').disabled, { timeout: 120000 });
   await page.evaluate(() => { RIFT.update = () => {}; RIFT.renderFrame(1); });
   assert.equal(await page.$eval('#patchesToggle', el => el.getAttribute('aria-expanded')), 'false');
-  assert.equal(await page.$eval('.patchesNew', el => el.hidden), true, 'Empty feed has no fake NEW indicator');
+  assert.equal(await page.$eval('.patchesNew', el => el.hidden), publishedAnnouncements(ANNOUNCEMENTS).length === 0, 'NEW reflects the published feed');
   await page.focus('#patchesToggle');
   await page.keyboard.press('Space');
   await pause(350);

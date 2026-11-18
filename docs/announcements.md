@@ -4,7 +4,7 @@ The title-screen transmission console is implemented in `src/ui/PatchesPanel.js`
 
 ## Publishing content
 
-Edit `src/config/announcements.js`. The feed intentionally starts empty: the reference artwork is a visual specification, not a release record. Do not publish its sample version, Mech Arena feature or future promises without confirmation.
+Edit `src/config/announcements.js`. The feed contains the released Beta console update and approved upcoming augment and progression announcements. The reference artwork is a visual specification, not a release record. Do not publish its sample version, Mech Arena feature or future promises without confirmation.
 
 Add objects to `ANNOUNCEMENTS` using this structure (the example is a draft, not a real announcement):
 
@@ -69,6 +69,6 @@ The test covers keyboard activation, all resize handles, dragging, layout/tab/ex
 
 ## Validation scope
 
-Browser checks use headless Brave with a temporary profile because this machine does not have the Chrome executable hard-coded by the older suites. Those suites run unchanged through a temporary external executable override. Touch and controller checks use emulated browser input; physical-device and Safari testing have not been performed. The production feed is empty until approved announcements are added.
+Browser checks use headless Brave with a temporary profile because this machine does not have the Chrome executable hard-coded by the older suites. Those suites run unchanged through a temporary external executable override. Touch and controller checks use emulated browser input; physical-device and Safari testing have not been performed. The production feed contains only approved announcements and verified released changes.
 
 Completed checks: `npm run build`, `npm test`, `npm run test:menu`, `npm run test:controllers`, `npm run test:patches`, and `git diff --check` all passed. The panel suite checked 1663×946, 1280×720, 1024×768, 820×1180, 390×844, 375×667 and 844×390. The existing menu suite also passed its six desktop sizes at 80%, 110% and 140% UI scale. No missing assets or browser errors were reported by the panel suite.
